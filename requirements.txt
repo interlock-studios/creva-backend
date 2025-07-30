@@ -2,47 +2,17 @@
 fastapi==0.116.1
 uvicorn[standard]==0.35.0
 
-# Google Cloud Platform
-google-cloud-storage==2.19.0
-google-cloud-firestore==2.21.0
-google-cloud-pubsub==2.31.1
-google-cloud-speech==2.33.0
-google-cloud-vision==3.10.2
-google-cloud-aiplatform==1.105.0
-google-cloud-secret-manager==2.16.4
-google-cloud-logging==3.12.1
-google-cloud-monitoring==2.27.2
-google-cloud-trace==1.11.1
+# Google Cloud AI
+google-cloud-aiplatform==1.74.0
 
-# Firebase (optional - only needed if ENABLE_AUTH=true)
-# firebase-admin==6.2.0
-
-# Video Processing (ScrapCreators API - no more yt-dlp!)
-pydub==0.25.1
+# Video Processing
 ffmpeg-python==0.2.0
 
-# OpenAI Whisper (OSS STT)
-openai-whisper==20250625
-torch>=2.0.0
-torchaudio>=2.0.0
-numpy>=1.21.0
-more-itertools==10.7.0
-
-# Data Validation & Serialization
-pydantic==2.11.4
-jsonschema==4.20.0
-
-# HTTP Client (ScrapCreators API)
+# HTTP Client for ScrapCreators API
 httpx==0.28.1
-requests==2.31.0
 
-# Utilities
+# Data Models
+pydantic==2.11.4
+
+# Environment
 python-dotenv==1.0.0
-structlog==25.4.0
-
-# Development
-pytest==7.4.3
-pytest-asyncio==0.21.1
-black==23.11.0
-flake8==6.1.0
-mypy==1.7.1

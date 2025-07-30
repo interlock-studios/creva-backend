@@ -1,168 +1,144 @@
-from fastapi import FastAPI, HTTPException, Request
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
-import structlog
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
 import os
-import asyncio
-from contextlib import asynccontextmanager
+from dotenv import load_dotenv
 
-from src.api.production_routes import router
-from src.utils.logging import setup_logging
-from src.services.whisper_service import WhisperService
+from src.services.tiktok_scraper import TikTokScraper, ScrapingOptions, APIError, NetworkError, ValidationError
+from src.services.vertex_ai_service import VertexAIService
+from src.worker.video_processor import VideoProcessor
 
-# Global Whisper service for preloading
-whisper_service = None
+load_dotenv()
+
+# Debug: Print API key status at startup
+import logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+api_key = os.getenv("SCRAPECREATORS_API_KEY")
+logger.info(f"API Key loaded: {'Yes' if api_key else 'No'}")
+if api_key:
+    logger.info(f"API Key starts with: {api_key[:10]}...")
+
+app = FastAPI(title="TikTok Workout Parser")
+
+scraper = TikTokScraper()
+vertex_ai = VertexAIService()
+video_processor = VideoProcessor()
 
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    """Application lifespan management"""
-    global whisper_service
-    
-    setup_logging()
-    logger = structlog.get_logger()
-    
-    logger.info(
-        "TikTok Parser API starting up",
-        version="2.0.0",
-        environment=os.getenv("ENVIRONMENT", "development")
-    )
-    
-    # Preload Whisper model for faster first requests
+class ProcessRequest(BaseModel):
+    url: str
+
+
+@app.post("/process")
+async def process_video(request: ProcessRequest):
+    """Process a TikTok video and return workout JSON"""
     try:
-        logger.info("Preloading Whisper model...")
-        whisper_service = WhisperService(
-            model_size=os.getenv("WHISPER_MODEL_SIZE", "large-v3"),
-            device=os.getenv("WHISPER_DEVICE", "auto")
+        # Configure scraping options - transcript is now included by default
+        options = ScrapingOptions(
+            get_transcript=True,  # Transcript is now included in main response
+            trim_response=True,
+            max_retries=3,
+            timeout=30
         )
-        await whisper_service.load_model()
-        logger.info("Whisper model loaded successfully")
+        
+        # Scrape video with transcript in single request
+        logger.info(f"Processing video: {request.url}")
+        video_content, metadata, transcript = await scraper.scrape_tiktok_complete(request.url, options)
+        
+        if transcript:
+            logger.info(f"Successfully got transcript: {len(transcript)} characters")
+        else:
+            logger.info("No transcript available for this video")
+        
+        # 3. Remove audio
+        logger.info("Removing audio from video...")
+        silent_video = await video_processor.remove_audio(video_content)
+        
+        # 4. Analyze with Gemini
+        caption = metadata.description or metadata.caption
+        
+        # Handle case where transcript might be None
+        if transcript is None:
+            logger.warning(f"Processing video without transcript: {request.url}")
+            # You can still proceed without transcript, or modify this based on your needs
+        else:
+            logger.info(f"Processing video with transcript ({len(transcript)} chars): {request.url}")
+        
+        logger.info("Analyzing video with Vertex AI...")
+        workout_json = vertex_ai.analyze_video_with_transcript(silent_video, transcript, caption)
+        
+        if not workout_json:
+            raise HTTPException(status_code=422, detail="Could not extract workout information")
+        
+        logger.info(f"Successfully processed video: {request.url}")
+        return workout_json
+        
+    except ValidationError as e:
+        logger.error(f"Validation error for {request.url}: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"Invalid URL: {str(e)}")
+    except APIError as e:
+        logger.error(f"API error for {request.url}: {str(e)} (Status: {e.status_code})")
+        if e.status_code == 404:
+            raise HTTPException(status_code=404, detail="TikTok video not found or unavailable")
+        elif e.status_code == 401:
+            raise HTTPException(status_code=500, detail="API authentication failed - check your API key")
+        elif e.status_code == 429:
+            raise HTTPException(status_code=429, detail="Rate limit exceeded - please try again later")
+        else:
+            raise HTTPException(status_code=500, detail=f"API error: {str(e)}")
+    except NetworkError as e:
+        logger.error(f"Network error for {request.url}: {str(e)}")
+        raise HTTPException(status_code=503, detail=f"Network error: {str(e)}")
     except Exception as e:
-        logger.error("Failed to preload Whisper model", error=str(e))
-        # Continue startup - model will be lazy loaded
-    
-    yield
-    
-    logger.info("TikTok Parser API shutting down")
+        # Log the full error for debugging
+        logger.exception(f"Unexpected error processing video {request.url}: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
-app = FastAPI(
-    title="Production TikTok Parser API",
-    description="""
-    Production-grade TikTok video parser that extracts:
-    - Video metadata (caption, author, stats)
-    - Speech-to-text transcription with timestamps (OpenAI Whisper)
-    - OCR text from video frames (Google Cloud Vision)
-    
-    Optimized for cost, speed, and reliability.
-    """,
-    version="2.0.0",
-    lifespan=lifespan,
-    docs_url="/docs" if os.getenv("ENVIRONMENT") != "production" else None,
-    redoc_url="/redoc" if os.getenv("ENVIRONMENT") != "production" else None
-)
-
-# CORS configuration
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=os.getenv("CORS_ORIGINS", "*").split(","),
-    allow_credentials=True,
-    allow_methods=["GET", "POST", "DELETE"],
-    allow_headers=["*"],
-    max_age=3600
-)
-
-# Include production routes
-app.include_router(router, prefix="/api/v2")
-
-# Legacy routes support (backward compatibility)
-from src.api.routes import router as legacy_router
-app.include_router(legacy_router, prefix="/api/v1")
+@app.get("/health")
+async def health():
+    return {"status": "healthy"}
 
 
-@app.exception_handler(HTTPException)
-async def http_exception_handler(request: Request, exc: HTTPException):
-    """Custom HTTP exception handler"""
-    logger = structlog.get_logger()
-    
-    if exc.status_code >= 500:
-        logger.error(
-            "HTTP error", 
-            status_code=exc.status_code,
-            detail=exc.detail,
-            path=request.url.path,
-            method=request.method
+@app.get("/test-api")
+async def test_api():
+    """Test the ScrapeCreators API connection"""
+    try:
+        # Test with a simple video info fetch (no video download)
+        test_url = "https://www.tiktok.com/@stoolpresidente/video/7463250363559218474"
+        
+        options = ScrapingOptions(
+            get_transcript=False,  # Skip transcript for faster testing
+            trim_response=True,
+            max_retries=1,
+            timeout=10
         )
-    
-    return JSONResponse(
-        status_code=exc.status_code,
-        content={
-            "error": exc.detail,
-            "status_code": exc.status_code,
-            "path": request.url.path
+        
+        info = await scraper.get_video_info(test_url, options)
+        
+        return {
+            "status": "success",
+            "message": "API key is working correctly",
+            "test_video": {
+                "title": info['metadata']['title'][:100],
+                "author": info['metadata']['author'],
+                "duration": info['metadata']['duration_seconds']
+            }
         }
-    )
-
-
-@app.exception_handler(Exception)
-async def global_exception_handler(request: Request, exc: Exception):
-    """Global exception handler for unhandled errors"""
-    logger = structlog.get_logger()
-    
-    logger.error(
-        "Unhandled exception", 
-        error=str(exc),
-        error_type=type(exc).__name__,
-        path=request.url.path,
-        method=request.method
-    )
-    
-    return JSONResponse(
-        status_code=500,
-        content={
-            "error": "Internal server error",
-            "status_code": 500,
-            "path": request.url.path
-        }
-    )
-
-
-@app.get("/")
-async def root():
-    """Root endpoint with API information"""
-    return {
-        "name": "TikTok Parser API",
-        "version": "2.0.0",
-        "description": "Production-grade TikTok video parser with STT and OCR",
-        "endpoints": {
-            "v2": "/api/v2/docs",
-            "v1": "/api/v1/health",
-            "health": "/api/v2/health",
-            "metrics": "/api/v2/metrics"
-        },
-        "features": [
-            "OpenAI Whisper STT with GPU acceleration",
-            "Google Cloud Vision OCR",
-            "Comprehensive TikTok metadata extraction",
-            "Cost-optimized processing pipeline",
-            "Real-time progress tracking",
-            "Webhook notifications"
-        ]
-    }
-
-
-@app.get("/favicon.ico", include_in_schema=False)
-async def favicon():
-    """Handle favicon requests"""
-    return JSONResponse(status_code=204, content=None)
+        
+    except ValidationError as e:
+        return {"status": "error", "type": "validation", "message": str(e)}
+    except APIError as e:
+        if e.status_code == 401:
+            return {"status": "error", "type": "auth", "message": "API key is invalid or missing"}
+        else:
+            return {"status": "error", "type": "api", "message": str(e), "status_code": e.status_code}
+    except Exception as e:
+        return {"status": "error", "type": "unexpected", "message": str(e)}
 
 
 if __name__ == "__main__":
     import uvicorn
     port = int(os.environ.get("PORT", 8080))
-    uvicorn.run(
-        "main:app",
-        host="0.0.0.0",
-        port=port,
-        log_level="info"
-    )
+    uvicorn.run(app, host="0.0.0.0", port=port)
