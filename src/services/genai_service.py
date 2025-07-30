@@ -1,30 +1,67 @@
-import vertexai
-from vertexai.generative_models import GenerativeModel, Part
+from google import genai
+from google.genai.types import HttpOptions, Part, GenerateContentConfig
 from typing import Dict, Any, Optional
 import json
 import base64
 import os
+import time
+import random
 
 
-class VertexAIService:
+class GenAIService:
     def __init__(self):
         # Get project ID from environment variable
         project_id = os.getenv("GOOGLE_CLOUD_PROJECT_ID")
         if not project_id:
             raise ValueError("GOOGLE_CLOUD_PROJECT_ID environment variable not set")
         
-        # Initialize Vertex AI with project and location
-        vertexai.init(project=project_id, location="us-central1")
+        # Initialize Google Gen AI SDK with Vertex AI backend
+        self.client = genai.Client(
+            project=project_id, 
+            location="us-central1", 
+            vertexai=True,
+            http_options=HttpOptions(api_version="v1")
+        )
         self.model = "gemini-2.0-flash"
+        self.last_request_time = 0
+        self.min_request_interval = 1.0  # Minimum 1 second between requests
+    
+    def _retry_with_backoff(self, func, max_retries=3, base_delay=1):
+        """Retry function with exponential backoff for 429 errors"""
+        for attempt in range(max_retries):
+            try:
+                return func()
+            except Exception as e:
+                error_str = str(e)
+                if "429" in error_str or "RESOURCE_EXHAUSTED" in error_str:
+                    if attempt == max_retries - 1:
+                        print(f"ERROR - Max retries ({max_retries}) reached for 429 error")
+                        raise e
+                    
+                    # Exponential backoff with jitter
+                    delay = base_delay * (2 ** attempt) + random.uniform(0, 1)
+                    print(f"WARNING - Got 429 error, retrying in {delay:.2f} seconds (attempt {attempt + 1}/{max_retries})")
+                    time.sleep(delay)
+                else:
+                    # Non-429 error, don't retry
+                    raise e
+        return None
+    
+    def _rate_limit(self):
+        """Ensure minimum time between requests"""
+        current_time = time.time()
+        time_since_last_request = current_time - self.last_request_time
+        if time_since_last_request < self.min_request_interval:
+            sleep_time = self.min_request_interval - time_since_last_request
+            print(f"INFO - Rate limiting: waiting {sleep_time:.2f} seconds")
+            time.sleep(sleep_time)
+        self.last_request_time = time.time()
     
     def analyze_video_with_transcript(self, video_content: bytes, transcript: Optional[str] = None, caption: Optional[str] = None) -> Optional[Dict[str, Any]]:
-        """Analyze video with Gemini 2.0 Flash"""
-        # Prepare multimodal input
-        parts = []
+        """Analyze video with Gemini 2.0 Flash using Google Gen AI SDK"""
         
-        # Add video using Part class
-        video_part = Part.from_data(video_content, mime_type="video/mp4")
-        parts.append(video_part)
+        # Apply rate limiting
+        self._rate_limit()
         
         # Build prompt
         prompt = "You are an expert fitness instructor analyzing a TikTok workout video."
@@ -69,30 +106,30 @@ Required JSON structure:
 
 IMPORTANT: Your response must be ONLY the JSON object, with no markdown formatting, no code blocks, no explanations before or after."""
         
-        # Add text prompt using Part class
-        text_part = Part.from_text(prompt)
-        parts.append(text_part)
+        # Prepare content for Google Gen AI SDK
+        contents = [
+            prompt,
+            Part.from_bytes(data=video_content, mime_type="video/mp4")
+        ]
         
-        # Generate content
-        model = GenerativeModel(self.model)
-        response = model.generate_content(
-            parts,
-            generation_config={
-                "max_output_tokens": 2048,  # Increased for more complex workouts
-                "temperature": 0.1,
-                "top_p": 0.8,
-                "response_mime_type": "application/json"  # Force JSON response
-            }
-        )
+        # Generate content using Google Gen AI SDK with retry logic
+        def make_request():
+            return self.client.models.generate_content(
+                model=self.model,
+                contents=contents,
+                config=GenerateContentConfig(
+                    max_output_tokens=2048,  # Increased for more complex workouts
+                    temperature=0.1,
+                    top_p=0.8,
+                    response_mime_type="application/json"  # Force JSON response
+                )
+            )
+        
+        response = self._retry_with_backoff(make_request, max_retries=5, base_delay=2)
         
         # Parse response
         try:
-            # Check if response has candidates and content
-            if not response.candidates or not response.candidates[0].content.parts:
-                print(f"ERROR - No content in response. Finish reason: {response.candidates[0].finish_reason if response.candidates else 'No candidates'}")
-                print(f"ERROR - Usage: {response.usage_metadata}")
-                return None
-            
+            # Get the response text from the new API structure
             response_text = response.text.strip()
             print(f"DEBUG - Raw Gemini response: {response_text[:500]}...")  # Log first 500 chars
             
@@ -113,10 +150,7 @@ IMPORTANT: Your response must be ONLY the JSON object, with no markdown formatti
         except Exception as e:
             print(f"ERROR - Failed to parse Gemini response: {e}")
             try:
-                print(f"ERROR - Response candidates: {len(response.candidates) if response.candidates else 0}")
-                if response.candidates:
-                    print(f"ERROR - Finish reason: {response.candidates[0].finish_reason}")
-                print(f"ERROR - Usage metadata: {response.usage_metadata}")
+                print(f"ERROR - Full response object: {response}")
             except:
-                print("ERROR - Could not access response metadata")
+                print("ERROR - Could not access response object")
             return None

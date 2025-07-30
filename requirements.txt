@@ -2,8 +2,8 @@
 fastapi==0.116.1
 uvicorn[standard]==0.35.0
 
-# Google Cloud AI
-google-cloud-aiplatform==1.74.0
+# Google Gen AI SDK (replaces deprecated vertexai package)
+google-genai
 
 # Video Processing
 ffmpeg-python==0.2.0

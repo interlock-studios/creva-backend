@@ -4,7 +4,7 @@ import os
 from dotenv import load_dotenv
 
 from src.services.tiktok_scraper import TikTokScraper, ScrapingOptions, APIError, NetworkError, ValidationError
-from src.services.vertex_ai_service import VertexAIService
+from src.services.genai_service import GenAIService
 from src.worker.video_processor import VideoProcessor
 
 load_dotenv()
@@ -19,10 +19,10 @@ logger.info(f"API Key loaded: {'Yes' if api_key else 'No'}")
 if api_key:
     logger.info(f"API Key starts with: {api_key[:10]}...")
 
-app = FastAPI(title="TikTok Workout Parser")
+app = FastAPI(title="TikTok Workout Parser - AI Powered")
 
 scraper = TikTokScraper()
-vertex_ai = VertexAIService()
+genai_service = GenAIService()
 video_processor = VideoProcessor()
 
 
@@ -65,8 +65,8 @@ async def process_video(request: ProcessRequest):
         else:
             logger.info(f"Processing video with transcript ({len(transcript)} chars): {request.url}")
         
-        logger.info("Analyzing video with Vertex AI...")
-        workout_json = vertex_ai.analyze_video_with_transcript(silent_video, transcript, caption)
+        logger.info("Analyzing video with Google Gen AI...")
+        workout_json = genai_service.analyze_video_with_transcript(silent_video, transcript, caption)
         
         if not workout_json:
             raise HTTPException(status_code=422, detail="Could not extract workout information")
@@ -93,7 +93,16 @@ async def process_video(request: ProcessRequest):
     except Exception as e:
         # Log the full error for debugging
         logger.exception(f"Unexpected error processing video {request.url}: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        
+        error_message = str(e)
+        # Handle 429 rate limit errors specifically
+        if "429" in error_message or "RESOURCE_EXHAUSTED" in error_message:
+            raise HTTPException(
+                status_code=429, 
+                detail="Rate limit exceeded. The Google Gen AI service is currently overloaded. Please try again in a few moments."
+            )
+        else:
+            raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.get("/health")
