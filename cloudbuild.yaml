@@ -1,0 +1,83 @@
+steps:
+  # Build API service image
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'build-api'
+    args: [
+      'build',
+      '-t', 'gcr.io/$PROJECT_ID/tiktok-parser-api:$SHORT_SHA',
+      '-t', 'gcr.io/$PROJECT_ID/tiktok-parser-api:latest',
+      '-f', 'Dockerfile',
+      '.'
+    ]
+
+  # Build Worker service image
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'build-worker'
+    args: [
+      'build',
+      '-t', 'gcr.io/$PROJECT_ID/tiktok-parser-worker:$SHORT_SHA',
+      '-t', 'gcr.io/$PROJECT_ID/tiktok-parser-worker:latest',
+      '-f', 'Dockerfile.worker',
+      '.'
+    ]
+
+  # Push API image
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'push-api'
+    args: ['push', 'gcr.io/$PROJECT_ID/tiktok-parser-api:$SHORT_SHA']
+    waitFor: ['build-api']
+
+  # Push Worker image
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'push-worker'
+    args: ['push', 'gcr.io/$PROJECT_ID/tiktok-parser-worker:$SHORT_SHA']
+    waitFor: ['build-worker']
+
+  # Deploy API service to Cloud Run
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: 'deploy-api'
+    entrypoint: 'gcloud'
+    args: [
+      'run', 'deploy', 'tiktok-parser-api',
+      '--image', 'gcr.io/$PROJECT_ID/tiktok-parser-api:$SHORT_SHA',
+      '--region', 'us-central1',
+      '--platform', 'managed',
+      '--allow-unauthenticated',
+      '--memory', '4Gi',
+      '--cpu', '4',
+      '--max-instances', '20',
+      '--timeout', '300',
+      '--concurrency', '80',
+      '--set-env-vars', 'GOOGLE_CLOUD_PROJECT=$PROJECT_ID'
+    ]
+    waitFor: ['push-api']
+
+  # Deploy Worker service to Cloud Run
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: 'deploy-worker'
+    entrypoint: 'gcloud'
+    args: [
+      'run', 'deploy', 'tiktok-parser-worker',
+      '--image', 'gcr.io/$PROJECT_ID/tiktok-parser-worker:$SHORT_SHA',
+      '--region', 'us-central1',
+      '--platform', 'managed',
+      '--no-allow-unauthenticated',
+      '--memory', '4Gi',
+      '--cpu', '4',
+      '--max-instances', '10',
+      '--timeout', '600',
+      '--concurrency', '1',
+      '--set-env-vars', 'GOOGLE_CLOUD_PROJECT=$PROJECT_ID'
+    ]
+    waitFor: ['push-worker']
+
+# Store images in Artifact Registry
+images:
+  - 'gcr.io/$PROJECT_ID/tiktok-parser-api:$SHORT_SHA'
+  - 'gcr.io/$PROJECT_ID/tiktok-parser-worker:$SHORT_SHA'
+
+options:
+  machineType: 'E2_HIGHCPU_8'
+  logging: CLOUD_LOGGING_ONLY
+
+timeout: '1200s'

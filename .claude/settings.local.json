@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find:*)",
+      "Bash(ls:*)",
+      "Bash(tree:*)",
+      "Bash(mkdir:*)",
+      "Bash(source:*)",
+      "Bash(pip install:*)",
+      "Bash(gcloud config set:*)",
+      "Bash(gcloud config get-value:*)",
+      "Bash(brew install:*)",
+      "Bash(terraform:*)",
+      "Bash(gcloud services enable:*)",
+      "Bash(python:*)"
+    ],
+    "deny": []
+  }
+}
