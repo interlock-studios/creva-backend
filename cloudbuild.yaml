@@ -104,13 +104,13 @@ steps:
           "--memory" "2Gi"
           "--cpu" "2"
           "--timeout" "900"
-          "--max-instances" "10"
+          "--max-instances" "50"
           "--min-instances" "0"
-          "--concurrency" "100"
+          "--concurrency" "80"
           "--cpu-throttling"
           "--execution-environment" "gen2"
           "--service-account" "${_SERVICE_NAME}@${PROJECT_ID}.iam.gserviceaccount.com"
-          "--set-env-vars" "GOOGLE_CLOUD_PROJECT_ID=${PROJECT_ID},ENVIRONMENT=${_ENVIRONMENT}"
+          "--set-env-vars" "GOOGLE_CLOUD_PROJECT_ID=${PROJECT_ID},ENVIRONMENT=${_ENVIRONMENT},MAX_CONCURRENT_PROCESSING=40,RATE_LIMIT_REQUESTS=20,RATE_LIMIT_WINDOW=60"
           "--set-secrets" "SCRAPECREATORS_API_KEY=scrapecreators-api-key:latest"
         )
         

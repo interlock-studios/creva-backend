@@ -11,7 +11,7 @@ This API takes a TikTok URL and automatically extracts:
 
 ## 🚀 Live Demo
 
-**Try it now:** https://tiktok-workout-parser-341666880405.us-central1.run.app
+**Try it now:** https://tiktok-workout-parser-ty6tkvdynq-uc.a.run.app/process
 
 **Quick test:**
 ```bash

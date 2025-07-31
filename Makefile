@@ -42,8 +42,28 @@ run: ## Run the application locally
 	@echo "$(GREEN)Starting application on port $(PORT)...$(NC)"
 	@$(VENV)/bin/python main.py
 
+.PHONY: check-requirements
+check-requirements: ## Check and install requirements if needed
+	@echo "$(GREEN)Checking requirements...$(NC)"
+	@$(VENV)/bin/pip install -r requirements.txt --quiet
+
+.PHONY: check-port
+check-port: ## Check if port is available
+	@echo "$(GREEN)Checking if port $(PORT) is available...$(NC)"
+	@lsof -ti:$(PORT) >/dev/null 2>&1 && { echo "$(RED)Port $(PORT) is already in use. Please stop the existing process or use a different port.$(NC)"; exit 1; } || echo "$(GREEN)Port $(PORT) is available$(NC)"
+
+.PHONY: kill-port
+kill-port: ## Kill any process using the port
+	@echo "$(YELLOW)Killing any process using port $(PORT)...$(NC)"
+	@lsof -ti:$(PORT) | xargs kill -9 2>/dev/null || echo "$(GREEN)No process found on port $(PORT)$(NC)"
+
 .PHONY: dev
-dev: ## Run in development mode with auto-reload
+dev: check-requirements check-port ## Run in development mode with auto-reload
+	@echo "$(GREEN)Starting in development mode...$(NC)"
+	@ENVIRONMENT=development $(VENV)/bin/uvicorn main:app --reload --host 0.0.0.0 --port $(PORT)
+
+.PHONY: dev-force
+dev-force: check-requirements kill-port ## Run in development mode (force kill existing process)
 	@echo "$(GREEN)Starting in development mode...$(NC)"
 	@ENVIRONMENT=development $(VENV)/bin/uvicorn main:app --reload --host 0.0.0.0 --port $(PORT)
 

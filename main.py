@@ -10,6 +10,8 @@ import json
 from datetime import datetime
 from contextlib import asynccontextmanager
 from dotenv import load_dotenv
+from collections import defaultdict
+import asyncio
 
 from src.services.tiktok_scraper import (
     TikTokScraper,
@@ -19,6 +21,7 @@ from src.services.tiktok_scraper import (
     ValidationError,
 )
 from src.services.genai_service import GenAIService
+from src.services.cache_service import CacheService
 from src.worker.video_processor import VideoProcessor
 
 load_dotenv()
@@ -123,6 +126,7 @@ async def global_exception_handler(request: Request, exc: Exception):
 scraper = TikTokScraper()
 genai_service = GenAIService()
 video_processor = VideoProcessor()
+cache_service = CacheService()
 
 
 class ProcessRequest(BaseModel):
@@ -132,101 +136,175 @@ class ProcessRequest(BaseModel):
 @app.post("/process")
 async def process_video(request: ProcessRequest, req: Request):
     """Process a TikTok video and return workout JSON"""
-    try:
-        # Configure scraping options - transcript is now included by default
-        options = ScrapingOptions(
-            get_transcript=True,  # Transcript is now included in main response
-            trim_response=True,
-            max_retries=3,
-            timeout=30,
+    
+    request_id = getattr(req.state, "request_id", "unknown")
+    
+    # Check cache first
+    cached_workout = cache_service.get_cached_workout(request.url)
+    if cached_workout:
+        logger.info(f"Returning cached result - Request ID: {request_id}, URL: {request.url}")
+        return cached_workout
+    
+    # Check if we can process this request
+    if processing_semaphore.locked():
+        logger.warning("Processing queue is full, rejecting request")
+        raise HTTPException(
+            status_code=503, 
+            detail="Service is currently overloaded. Please try again in a few minutes."
         )
+    
+    async with processing_semaphore:
+        try:
+            # Configure scraping options - transcript is now included by default
+            options = ScrapingOptions(
+                get_transcript=True,  # Transcript is now included in main response
+                trim_response=True,
+                max_retries=3,
+                timeout=30,
+            )
 
-        # Scrape video with transcript in single request
-        request_id = getattr(req.state, "request_id", "unknown")
-        logger.info(f"Processing video - Request ID: {request_id}, URL: {request.url}")
-        video_content, metadata, transcript = await scraper.scrape_tiktok_complete(
-            request.url, options
-        )
+            # Scrape video with transcript in single request
+            logger.info(f"Processing video - Request ID: {request_id}, URL: {request.url}")
+            video_content, metadata, transcript = await scraper.scrape_tiktok_complete(
+                request.url, options
+            )
 
-        if transcript:
-            logger.info(f"Successfully got transcript: {len(transcript)} characters")
-        else:
-            logger.info("No transcript available for this video")
+            if transcript:
+                logger.info(f"Successfully got transcript: {len(transcript)} characters")
+            else:
+                logger.info("No transcript available for this video")
 
-        # 3. Remove audio
-        logger.info("Removing audio from video...")
-        silent_video = await video_processor.remove_audio(video_content)
+            # 3. Remove audio
+            logger.info("Removing audio from video...")
+            silent_video = await video_processor.remove_audio(video_content)
 
-        # 4. Analyze with Gemini
-        caption = metadata.description or metadata.caption
+            # 4. Analyze with Gemini
+            caption = metadata.description or metadata.caption
 
-        # Handle case where transcript might be None
-        if transcript is None:
-            logger.warning(f"Processing video without transcript: {request.url}")
-            # You can still proceed without transcript, or modify this based on your needs
-        else:
+            # Handle case where transcript might be None
+            if transcript is None:
+                logger.warning(f"Processing video without transcript: {request.url}")
+                # You can still proceed without transcript, or modify this based on your needs
+            else:
+                logger.info(
+                    f"Processing video with transcript ({len(transcript)} chars): " f"{request.url}"
+                )
+
+            logger.info("Analyzing video with Google Gen AI...")
+            workout_json = genai_service.analyze_video_with_transcript(
+                silent_video, transcript, caption
+            )
+
+            if not workout_json:
+                raise HTTPException(status_code=422, detail="Could not extract workout information")
+
+            # Cache the successful result
+            cache_metadata = {
+                "title": metadata.title,
+                "author": metadata.author,
+                "duration_seconds": metadata.duration_seconds,
+                "processed_at": datetime.utcnow().isoformat()
+            }
+            cache_service.cache_workout(request.url, workout_json, cache_metadata)
+
             logger.info(
-                f"Processing video with transcript ({len(transcript)} chars): " f"{request.url}"
+                f"Successfully processed video - Request ID: {request_id}, " f"URL: {request.url}"
+            )
+            return workout_json
+
+        except ValidationError as e:
+            logger.error(
+                f"Validation error - Request ID: {request_id}, URL: {request.url}, " f"Error: {str(e)}"
+            )
+            raise HTTPException(status_code=400, detail=f"Invalid URL: {str(e)}")
+        except APIError as e:
+            logger.error(
+                f"API error - Request ID: {request_id}, URL: {request.url}, "
+                f"Error: {str(e)}, Status: {e.status_code}"
+            )
+            if e.status_code == 404:
+                raise HTTPException(status_code=404, detail="TikTok video not found or unavailable")
+            elif e.status_code == 401:
+                raise HTTPException(
+                    status_code=500, detail="API authentication failed - check your API key"
+                )
+            elif e.status_code == 429:
+                raise HTTPException(
+                    status_code=429, detail="Rate limit exceeded - please try again later"
+                )
+            else:
+                raise HTTPException(status_code=500, detail=f"API error: {str(e)}")
+        except NetworkError as e:
+            logger.error(
+                f"Network error - Request ID: {request_id}, URL: {request.url}, " f"Error: {str(e)}"
+            )
+            raise HTTPException(status_code=503, detail=f"Network error: {str(e)}")
+        except Exception as e:
+            # Log the full error for debugging
+            logger.exception(
+                f"Unexpected error - Request ID: {request_id}, URL: {request.url}, " f"Error: {str(e)}"
             )
 
-        logger.info("Analyzing video with Google Gen AI...")
-        workout_json = genai_service.analyze_video_with_transcript(
-            silent_video, transcript, caption
-        )
+            error_message = str(e)
+            # Handle 429 rate limit errors specifically
+            if "429" in error_message or "RESOURCE_EXHAUSTED" in error_message:
+                raise HTTPException(
+                    status_code=429,
+                    detail=(
+                        "Rate limit exceeded. The Google Gen AI service is currently "
+                        "overloaded. Please try again in a few moments."
+                    ),
+                )
+            else:
+                raise HTTPException(status_code=500, detail=str(e))
 
-        if not workout_json:
-            raise HTTPException(status_code=422, detail="Could not extract workout information")
 
-        logger.info(
-            f"Successfully processed video - Request ID: {request_id}, " f"URL: {request.url}"
-        )
-        return workout_json
+# Rate limiting configuration
+RATE_LIMIT_REQUESTS = int(os.getenv("RATE_LIMIT_REQUESTS", "10"))  # requests per window
+RATE_LIMIT_WINDOW = int(os.getenv("RATE_LIMIT_WINDOW", "60"))     # seconds
+rate_limit_store = defaultdict(list)
 
-    except ValidationError as e:
-        logger.error(
-            f"Validation error - Request ID: {request_id}, URL: {request.url}, " f"Error: {str(e)}"
-        )
-        raise HTTPException(status_code=400, detail=f"Invalid URL: {str(e)}")
-    except APIError as e:
-        logger.error(
-            f"API error - Request ID: {request_id}, URL: {request.url}, "
-            f"Error: {str(e)}, Status: {e.status_code}"
-        )
-        if e.status_code == 404:
-            raise HTTPException(status_code=404, detail="TikTok video not found or unavailable")
-        elif e.status_code == 401:
-            raise HTTPException(
-                status_code=500, detail="API authentication failed - check your API key"
-            )
-        elif e.status_code == 429:
-            raise HTTPException(
-                status_code=429, detail="Rate limit exceeded - please try again later"
-            )
-        else:
-            raise HTTPException(status_code=500, detail=f"API error: {str(e)}")
-    except NetworkError as e:
-        logger.error(
-            f"Network error - Request ID: {request_id}, URL: {request.url}, " f"Error: {str(e)}"
-        )
-        raise HTTPException(status_code=503, detail=f"Network error: {str(e)}")
-    except Exception as e:
-        # Log the full error for debugging
-        logger.exception(
-            f"Unexpected error - Request ID: {request_id}, URL: {request.url}, " f"Error: {str(e)}"
-        )
+# Request queue management
+MAX_CONCURRENT_PROCESSING = int(os.getenv("MAX_CONCURRENT_PROCESSING", "50"))
+processing_semaphore = asyncio.Semaphore(MAX_CONCURRENT_PROCESSING)
 
-        error_message = str(e)
-        # Handle 429 rate limit errors specifically
-        if "429" in error_message or "RESOURCE_EXHAUSTED" in error_message:
-            raise HTTPException(
-                status_code=429,
-                detail=(
-                    "Rate limit exceeded. The Google Gen AI service is currently "
-                    "overloaded. Please try again in a few moments."
-                ),
-            )
-        else:
-            raise HTTPException(status_code=500, detail=str(e))
+# Rate limiting middleware
+@app.middleware("http")
+async def rate_limit_middleware(request: Request, call_next):
+    # Skip rate limiting for health checks
+    if request.url.path == "/health":
+        return await call_next(request)
+    
+    # Get client IP (handle proxy headers)
+    client_ip = request.headers.get("X-Forwarded-For", request.client.host)
+    if "," in client_ip:
+        client_ip = client_ip.split(",")[0].strip()
+    
+    current_time = time.time()
+    
+    # Clean old entries
+    rate_limit_store[client_ip] = [
+        req_time for req_time in rate_limit_store[client_ip] 
+        if current_time - req_time < RATE_LIMIT_WINDOW
+    ]
+    
+    # Check rate limit
+    if len(rate_limit_store[client_ip]) >= RATE_LIMIT_REQUESTS:
+        logger.warning(f"Rate limit exceeded for IP: {client_ip}")
+        return JSONResponse(
+            status_code=429,
+            content={
+                "error": "Rate limit exceeded",
+                "detail": f"Too many requests. Limit: {RATE_LIMIT_REQUESTS} requests per {RATE_LIMIT_WINDOW} seconds",
+                "retry_after": RATE_LIMIT_WINDOW
+            },
+            headers={"Retry-After": str(RATE_LIMIT_WINDOW)}
+        )
+    
+    # Add current request
+    rate_limit_store[client_ip].append(current_time)
+    
+    return await call_next(request)
 
 
 @app.get("/health")
@@ -234,9 +312,49 @@ async def health():
     """Health check endpoint for container orchestration"""
     return {
         "status": "healthy",
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now().isoformat(),
         "environment": environment,
-        "version": app.version,
+        "project_id": project_id,
+    }
+
+
+@app.get("/status")
+async def status():
+    """Status endpoint showing current system load and queue status"""
+    current_time = time.time()
+    
+    # Calculate active rate limit entries
+    active_ips = sum(
+        1 for ip_requests in rate_limit_store.values()
+        if any(current_time - req_time < RATE_LIMIT_WINDOW for req_time in ip_requests)
+    )
+    
+    # Calculate semaphore status
+    available_slots = processing_semaphore._value
+    total_slots = MAX_CONCURRENT_PROCESSING
+    
+    # Get cache stats
+    cache_stats = cache_service.get_cache_stats()
+    
+    return {
+        "status": "operational",
+        "timestamp": datetime.now().isoformat(),
+        "rate_limiting": {
+            "active_ips": active_ips,
+            "limit_per_ip": RATE_LIMIT_REQUESTS,
+            "window_seconds": RATE_LIMIT_WINDOW
+        },
+        "processing_queue": {
+            "available_slots": available_slots,
+            "total_slots": total_slots,
+            "utilization_percent": round(((total_slots - available_slots) / total_slots) * 100, 2)
+        },
+        "cache": cache_stats,
+        "cloud_run": {
+            "max_instances": 50,
+            "concurrency_per_instance": 80,
+            "max_concurrent_requests": 4000
+        }
     }
 
 
@@ -284,6 +402,42 @@ async def test_api(req: Request):
             }
     except Exception as e:
         return {"status": "error", "type": "unexpected", "message": str(e)}
+
+
+@app.delete("/cache/{url_hash}")
+async def invalidate_cache_by_hash(url_hash: str):
+    """Invalidate cache entry by URL hash (for debugging)"""
+    # This is a debug endpoint - in production you might want to restrict access
+    if environment == "production":
+        raise HTTPException(status_code=404, detail="Not found")
+    
+    try:
+        if cache_service.db:
+            doc_ref = cache_service.cache_collection.document(url_hash)
+            exists = doc_ref.get().exists
+            if exists:
+                doc_ref.delete()
+                return {"deleted": 1, "cache_key": url_hash}
+            else:
+                return {"deleted": 0, "cache_key": url_hash, "message": "Document not found"}
+        else:
+            return {"error": "Cache service not available"}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+@app.post("/cache/invalidate")
+async def invalidate_cache_by_url(request: ProcessRequest):
+    """Invalidate cache for a specific TikTok URL"""
+    if environment == "production":
+        raise HTTPException(status_code=404, detail="Not found")
+    
+    success = cache_service.invalidate_cache(request.url)
+    return {
+        "url": request.url,
+        "invalidated": success,
+        "cache_key": cache_service._generate_cache_key(request.url)
+    }
 
 
 if __name__ == "__main__":
