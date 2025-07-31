@@ -1,238 +1,226 @@
 # Project Structure
 
-This document explains the organization of the TikTok Workout Parser codebase following industry-standard practices.
+**Quick guide to understanding and working with the codebase.**
 
-## Directory Layout
+## 📁 What's Where
 
 ```
 sets-ai-backend/
-├── src/                          # Source code (all application code lives here)
-│   ├── services/                 # Business logic and external integrations
-│   │   ├── __init__.py
-│   │   ├── cache_service.py      # Firestore cache management
-│   │   ├── genai_service.py      # Single Gemini API client
-│   │   ├── genai_service_pool.py # Multiple Gemini clients for scaling
-│   │   ├── queue_service.py      # Firestore job queue management
-│   │   └── tiktok_scraper.py     # TikTok video scraping
-│   │
-│   ├── worker/                   # Background job processing
-│   │   ├── __init__.py
-│   │   ├── video_processor.py    # Video manipulation (audio removal)
-│   │   └── worker_service.py     # Main worker process for queue
-│   │
-│   └── models/                   # Data models
-│       ├── __init__.py
-│       └── parser_result.py      # Workout data structures
-│
-├── main.py                       # Main API server entry point
-├── requirements.txt              # Python dependencies
-├── Dockerfile                    # Container configuration
-├── cloudbuild.yaml              # Main API deployment config
-├── cloudbuild-worker.yaml       # Worker deployment config
-├── deploy.sh                    # Main API deployment script
-├── deploy-worker.sh             # Worker deployment script
-│
-├── docs/                        # Documentation
-│   ├── README.md               # Main documentation
-│   ├── FLUTTER_INTEGRATION.md  # Flutter client guide
-│   └── PROJECT_STRUCTURE.md    # This file
-│
-├── tests/                       # Test files (if any)
-│   └── ...
-│
-└── .env.example                 # Environment variables template
+├── main.py                    # 🚀 Main API server - start here
+├── src/
+│   ├── services/              # 🔧 All the business logic
+│   │   ├── tiktok_scraper.py  #   Downloads TikTok videos
+│   │   ├── genai_service.py   #   Talks to Google AI
+│   │   ├── cache_service.py   #   Handles caching results
+│   │   └── queue_service.py   #   Manages job queue
+│   ├── worker/                # 🏭 Background processing
+│   │   ├── worker_service.py  #   Main worker process
+│   │   └── video_processor.py #   Video manipulation
+│   └── models/                # 📋 Data structures
+│       └── parser_result.py   #   Workout JSON format
+├── Makefile                   # 🛠️ All your commands (make dev, make deploy)
+├── requirements.txt           # 📦 Python dependencies
+└── .env.example              # ⚙️ Environment variables template
 ```
 
-## Architecture Overview
+## 🏗️ How It All Works
 
-The application follows a **microservices-inspired monorepo** structure with two deployable services:
+### Two Main Services
+1. **API Service** (`main.py`) - Handles web requests, checks cache, queues jobs
+2. **Worker Service** (`src/worker/`) - Processes videos in the background
 
-### 1. API Service (main.py)
-- **Purpose**: Handle HTTP requests, manage queue, serve cached results
-- **Responsibilities**:
-  - Accept video processing requests
-  - Check cache for existing results
-  - Queue new jobs for processing
-  - Provide job status endpoints
-- **Deployed as**: Cloud Run service
+### Key Components
+- **Services** - Each handles one thing (scraping, AI, cache, queue)
+- **Worker** - Runs separately, processes videos from queue
+- **Models** - Defines what the workout JSON looks like
 
-### 2. Worker Service (src/worker/worker_service.py)
-- **Purpose**: Process videos from queue asynchronously
-- **Responsibilities**:
-  - Poll queue for new jobs
-  - Download and process videos
-  - Analyze with Gemini AI
-  - Store results in cache
-- **Deployed as**: Separate Cloud Run service
+## 🛠️ Development Workflow
 
-## Why This Structure?
-
-### Industry Standards Applied
-
-1. **Separation of Concerns**
-   - `services/`: External integrations and business logic
-   - `worker/`: Background processing
-   - `models/`: Data structures
-
-2. **Scalability**
-   - API and Worker can scale independently
-   - Multiple workers can process queue in parallel
-   - Service pool pattern for rate limit distribution
-
-3. **Maintainability**
-   - Clear module boundaries
-   - Each service has a single responsibility
-   - Easy to test individual components
-
-4. **Deployment Flexibility**
-   - Services can be deployed separately
-   - Different resource allocations per service
-   - Independent scaling policies
-
-## Service Descriptions
-
-### services/cache_service.py
-- Manages Firestore document cache
-- 1-week TTL for processed videos
-- Handles cache invalidation
-
-### services/queue_service.py
-- Firestore-based job queue
-- Atomic job claiming for workers
-- Retry logic for failed jobs
-- Priority queue support
-
-### services/genai_service_pool.py
-- Manages multiple Gemini API clients
-- Round-robin request distribution
-- Supports multiple auth methods:
-  - Service account files
-  - Service account JSON
-  - Multiple regions
-  - Default credentials
-
-### worker/worker_service.py
-- Async job processing
-- Health check endpoints
-- Graceful shutdown
-- Concurrent job handling
-
-## Environment Variables
-
-### Required for Both Services
+### Starting Development
 ```bash
-GOOGLE_CLOUD_PROJECT_ID=your-project-id
-SCRAPECREATORS_API_KEY=your-api-key
+# Get everything running
+make dev
+
+# This starts:
+# - API server (port 8080)
+# - Worker service (port 8081)
 ```
 
-### Optional for Scaling
+### Working on the API
 ```bash
-# Multiple service accounts (comma-separated)
-GOOGLE_SERVICE_ACCOUNT_FILES=/keys/sa1.json,/keys/sa2.json
+# Just run the API
+make dev-api
 
-# Multiple regions (comma-separated)
-GEMINI_LOCATIONS=us-central1,us-east1,europe-west1
-
-# Worker configuration
-WORKER_POLLING_INTERVAL=5
-MAX_CONCURRENT_PROCESSING=50
+# Edit main.py or src/services/*.py
+# Server auto-reloads on changes
 ```
 
-## Deployment Architecture
-
-```
-                    ┌─────────────┐
-                    │   Client    │
-                    │  (Flutter)  │
-                    └──────┬──────┘
-                           │
-                    ┌──────▼──────┐
-                    │ Cloud Load  │
-                    │  Balancer   │
-                    └──────┬──────┘
-                           │
-                ┌──────────┴──────────┐
-                │                     │
-         ┌──────▼──────┐      ┌──────▼──────┐
-         │ API Service │      │ API Service │  (Auto-scaling)
-         │ Instance 1  │      │ Instance N  │
-         └──────┬──────┘      └──────┬──────┘
-                │                     │
-                └──────────┬──────────┘
-                           │
-                    ┌──────▼──────┐
-                    │  Firestore  │
-                    │   Database  │
-                    │ ┌─────────┐ │
-                    │ │  Cache  │ │
-                    │ │  Queue  │ │
-                    │ │ Results │ │
-                    │ └─────────┘ │
-                    └──────┬──────┘
-                           │
-                ┌──────────┴──────────┐
-                │                     │
-         ┌──────▼──────┐      ┌──────▼──────┐
-         │Worker Service│     │Worker Service│  (Auto-scaling)
-         │  Instance 1 │      │  Instance N │
-         └──────┬──────┘      └──────┬──────┘
-                │                     │
-                └──────────┬──────────┘
-                           │
-                    ┌──────▼──────┐
-                    │  Gemini AI  │
-                    │   (Vertex)  │
-                    └─────────────┘
-```
-
-## Development Workflow
-
-### Local Development
+### Working on the Worker
 ```bash
-# Run API locally
-python main.py
+# Just run the worker
+make dev-worker
 
-# Run worker locally (separate terminal)
-python -m src.worker.worker_service
+# Edit src/worker/*.py
+# Worker auto-reloads on changes
 ```
 
-### Testing
+### Testing Your Changes
 ```bash
-# Test API endpoints
+# Health checks
 curl http://localhost:8080/health
-
-# Test worker health
 curl http://localhost:8081/health
+
+# Test processing a video
+curl -X POST http://localhost:8080/process \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://www.tiktok.com/@user/video/123"}'
+
+# Check code quality
+make lint
+make test
 ```
 
-### Deployment
+## 🔧 Adding New Features
+
+### Adding a New API Endpoint
+1. Edit `main.py`
+2. Add your endpoint function
+3. Test with curl
+
+### Adding New Business Logic
+1. Create or edit files in `src/services/`
+2. Import in `main.py` or `worker_service.py`
+3. Use dependency injection pattern
+
+### Modifying Video Processing
+1. Edit `src/worker/video_processor.py`
+2. Worker will auto-reload
+3. Test with a real video
+
+### Changing Data Format
+1. Edit `src/models/parser_result.py`
+2. Update both API and Worker code
+3. Test end-to-end
+
+## 🧪 Testing Strategy
+
+### Manual Testing
 ```bash
-# Deploy API
-./deploy.sh
+# Start services
+make dev
 
-# Deploy Worker
-./deploy-worker.sh
+# Test happy path
+curl -X POST http://localhost:8080/process \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://www.tiktok.com/@lastairbender222/video/7518493301046119710"}'
+
+# Test error cases
+curl -X POST http://localhost:8080/process \
+  -H "Content-Type: application/json" \
+  -d '{"url": "invalid-url"}'
 ```
 
-## Best Practices
+### Code Quality
+```bash
+make lint      # Check code style
+make format    # Auto-format code
+make security  # Security checks
+```
 
-1. **Never put business logic in main.py**
-   - Keep it as a thin entry point
-   - All logic goes in services/
+## 🚀 Deployment
 
-2. **Use dependency injection**
-   - Services are instantiated at module level
-   - Easy to mock for testing
+### Local Testing
+```bash
+# Test Docker build
+make docker-build
+make docker-run
+```
 
-3. **Handle errors gracefully**
-   - Workers retry failed jobs
-   - API returns appropriate status codes
+### Deploy to Production
+```bash
+# One command deploys both services
+make deploy
 
-4. **Monitor everything**
-   - Health endpoints for both services
-   - Queue statistics endpoint
-   - Structured logging
+# Or deploy individually
+./deploy.sh        # API service
+./deploy-worker.sh # Worker service
+```
 
-5. **Scale horizontally**
-   - Add more worker instances for throughput
-   - Add more API instances for availability
+## 🔍 Debugging Tips
+
+### Check Logs
+```bash
+# Local logs
+make dev  # Shows logs from both services
+
+# Production logs
+make logs
+make logs-tail
+```
+
+### Common Issues
+```bash
+# Worker not processing?
+curl http://localhost:8081/health
+
+# Queue stuck?
+curl http://localhost:8080/status
+
+# Firestore issues?
+make setup-firestore
+```
+
+## 📝 Code Patterns
+
+### Services Pattern
+```python
+# Each service is a class with clear methods
+class TikTokScraper:
+    def __init__(self):
+        # Setup
+    
+    async def scrape_video(self, url):
+        # Do the work
+```
+
+### Error Handling
+```python
+# Use custom exceptions
+from src.services.tiktok_scraper import APIError, NetworkError
+
+try:
+    result = await scraper.scrape_video(url)
+except APIError as e:
+    # Handle API errors
+except NetworkError as e:
+    # Handle network errors
+```
+
+### Async Everything
+```python
+# All I/O operations are async
+async def process_video(url: str):
+    result = await scraper.scrape_video(url)
+    analysis = await ai_service.analyze(result)
+    await cache.store(url, analysis)
+```
+
+## 🎯 Best Practices
+
+1. **Keep main.py thin** - Just routing, all logic in services
+2. **One class per file** - Easy to find and test
+3. **Async for I/O** - Network calls, file operations, database
+4. **Error handling** - Catch specific exceptions, log with context
+5. **Configuration** - Use environment variables, validate on startup
+
+## 💡 Quick Tips
+
+- **New to the codebase?** Start with `main.py` and follow the imports
+- **Adding features?** Look at existing services for patterns
+- **Debugging?** Add logging with request IDs for tracing
+- **Testing?** Use `make dev` and curl commands
+- **Deploying?** `make deploy` handles everything
+
+---
+
+**Questions?** Check the logs, use health endpoints, or run `make help`

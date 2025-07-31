@@ -225,12 +225,204 @@ make dev-force
 - **Cost Efficient** - Only pay for what you use
 - **Open Source** - Customize however you want
 
+## 👨‍💻 For Developers
+
+### Development Workflow
+
+#### Starting Development
+```bash
+# Get everything running
+make dev
+
+# Or run services separately:
+make dev-api      # Just API (port 8080)
+make dev-worker   # Just Worker (port 8081)
+make dev-force    # Kill existing processes and restart
+```
+
+#### Making Changes
+```bash
+# 1. Edit code (auto-reloads on save)
+# - API code: main.py, src/services/*.py
+# - Worker code: src/worker/*.py
+# - Models: src/models/*.py
+
+# 2. Test your changes
+curl http://localhost:8080/health
+curl -X POST http://localhost:8080/process \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://www.tiktok.com/@user/video/123"}'
+
+# 3. Check code quality
+make lint
+make format
+make security
+```
+
+### Testing
+
+#### Manual Testing
+```bash
+# Health checks
+curl http://localhost:8080/health    # API health
+curl http://localhost:8081/health    # Worker health
+
+# Test video processing (use real TikTok URLs)
+curl -X POST http://localhost:8080/process \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://www.tiktok.com/@lastairbender222/video/7518493301046119710"}'
+
+# Test error handling
+curl -X POST http://localhost:8080/process \
+  -H "Content-Type: application/json" \
+  -d '{"url": "invalid-url"}'
+
+# Check queue status
+curl http://localhost:8080/status
+
+# Test job status (if you get a job_id)
+curl http://localhost:8080/status/your_job_id_here
+```
+
+#### Testing Different Scenarios
+```bash
+# Test cached video (should be instant)
+curl -X POST http://localhost:8080/process \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://www.tiktok.com/@lastairbender222/video/7518493301046119710"}'
+
+# Test new video (will queue or process directly)
+curl -X POST http://localhost:8080/process \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://www.tiktok.com/@user/video/NEW_VIDEO_ID"}'
+
+# Test invalid URL
+curl -X POST http://localhost:8080/process \
+  -H "Content-Type: application/json" \
+  -d '{"url": "not-a-tiktok-url"}'
+```
+
+#### Code Quality Checks
+```bash
+make validate     # Run all checks (lint + security + test)
+make lint         # Check code style (black, flake8, mypy)
+make format       # Auto-format code with black
+make security     # Security checks (bandit, safety)
+make test         # Run test suite (if tests exist)
+```
+
+### Adding New Features
+
+#### New API Endpoint
+1. Edit `main.py`
+2. Add your endpoint function:
+```python
+@app.get("/my-endpoint")
+async def my_endpoint():
+    return {"message": "Hello!"}
+```
+3. Test with curl
+
+#### New Service
+1. Create `src/services/my_service.py`:
+```python
+import logging
+
+logger = logging.getLogger(__name__)
+
+class MyService:
+    def __init__(self):
+        logger.info("MyService initialized")
+    
+    async def do_something(self):
+        # Your logic here
+        return "result"
+```
+2. Import in `main.py` or `worker_service.py`
+3. Use in your endpoints
+
+#### Modify Video Processing
+1. Edit `src/worker/video_processor.py`
+2. Update the processing pipeline
+3. Test with real videos
+
+### Debugging
+
+#### Check Logs
+```bash
+# Local development logs
+make dev  # Shows logs from both services in real-time
+
+# Production logs
+make logs      # Recent logs
+make logs-tail # Follow logs in real-time
+```
+
+#### Common Debug Commands
+```bash
+# Check if services are running
+ps aux | grep python
+lsof -i :8080  # Check what's using port 8080
+lsof -i :8081  # Check what's using port 8081
+
+# Check Firestore connection
+# (Should see "Queue service connected" in logs)
+
+# Test external services
+curl -X GET "https://api.scrapecreators.com/health"  # If available
+```
+
+#### Common Issues
+- **Port already in use**: Run `make dev-force`
+- **Worker not processing**: Check `curl http://localhost:8081/health`
+- **Firestore errors**: Run `make setup-firestore`
+- **API key errors**: Check your `.env` file
+
+### Project Structure
+```
+src/
+├── services/           # Business logic
+│   ├── tiktok_scraper.py   # Downloads TikTok videos
+│   ├── genai_service.py    # AI video analysis  
+│   ├── cache_service.py    # Result caching
+│   └── queue_service.py    # Job queue management
+├── worker/             # Background processing
+│   ├── worker_service.py   # Main worker process
+│   └── video_processor.py  # Video manipulation
+└── models/             # Data structures
+    └── parser_result.py    # Workout JSON format
+```
+
+### Environment Variables
+```bash
+# Required
+GOOGLE_CLOUD_PROJECT_ID=your-project-id
+SCRAPECREATORS_API_KEY=your-api-key
+
+# Optional
+ENVIRONMENT=development  # development|staging|production
+PORT=8080               # API port
+WORKER_PORT=8081        # Worker port
+LOG_LEVEL=INFO          # DEBUG|INFO|WARNING|ERROR
+```
+
 ## 🤝 Contributing
 
+### Quick Start
 1. Fork the repo
-2. Make your changes
-3. Run `make validate` to check code quality
-4. Submit a pull request
+2. Create a feature branch: `git checkout -b my-feature`
+3. Make your changes
+4. Test locally: `make dev` and test with curl
+5. Check code quality: `make validate`
+6. Commit changes: `git commit -m "Add my feature"`
+7. Push and create pull request
+
+### Code Standards
+- **Python**: Follow PEP 8, use type hints
+- **Async**: All I/O operations should be async
+- **Error Handling**: Use custom exceptions, log with context
+- **Testing**: Test manually with real TikTok URLs
+- **Documentation**: Update README if you change APIs
 
 ## 📚 Project Structure
 
