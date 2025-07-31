@@ -262,7 +262,7 @@ curl -X GET "http://localhost:8080/health"
 # Test video processing
 curl -X POST "http://localhost:8080/process" \
   -H "Content-Type: application/json" \
-  -d '{"url": "https://www.tiktok.com/@user/video/1234567890"}'
+  -d '{"url": "https://www.tiktok.com/@lastairbender222/video/7518493301046119710"}'
 ```
 
 #### Production Testing
@@ -273,7 +273,7 @@ curl -X GET "https://tiktok-workout-parser-341666880405.us-central1.run.app/heal
 # Test video processing
 curl -X POST "https://tiktok-workout-parser-341666880405.us-central1.run.app/process" \
   -H "Content-Type: application/json" \
-  -d '{"url": "https://www.tiktok.com/@user/video/1234567890"}'
+  -d '{"url": "https://www.tiktok.com/@lastairbender222/video/7518493301046119710"}'
 ```
 
 ## 💰 Cost Information

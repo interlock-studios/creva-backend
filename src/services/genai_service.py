@@ -22,7 +22,7 @@ class GenAIService:
             vertexai=True,
             http_options=HttpOptions(api_version="v1")
         )
-        self.model = "gemini-2.0-flash"
+        self.model = "gemini-2.0-flash-lite"
         self.last_request_time = 0
         self.min_request_interval = 1.0  # Minimum 1 second between requests
     
