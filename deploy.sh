@@ -205,8 +205,65 @@ else
     print_status "Production URL: ${SERVICE_URL}"
 fi
 
+print_status "✅ API deployment complete!"
+
+# Deploy Worker Service
+print_status "Deploying Worker Service..."
+
+# Check if worker service account exists
+WORKER_SA="tiktok-workout-worker@${PROJECT_ID}.iam.gserviceaccount.com"
+if ! gcloud iam service-accounts describe "${WORKER_SA}" >/dev/null 2>&1; then
+    print_status "Creating worker service account..."
+    gcloud iam service-accounts create tiktok-workout-worker \
+        --display-name="TikTok Workout Worker Service Account"
+    
+    # Grant necessary permissions
+    gcloud projects add-iam-policy-binding "${PROJECT_ID}" \
+        --member="serviceAccount:${WORKER_SA}" \
+        --role="roles/datastore.user" \
+        --quiet
+    
+    gcloud projects add-iam-policy-binding "${PROJECT_ID}" \
+        --member="serviceAccount:${WORKER_SA}" \
+        --role="roles/aiplatform.user" \
+        --quiet
+fi
+
+# Deploy worker service
+gcloud run deploy tiktok-workout-worker \
+    --image "${IMAGE_TAG}" \
+    --region "${REGION}" \
+    --platform managed \
+    --allow-unauthenticated \
+    --memory 4Gi \
+    --cpu 4 \
+    --timeout 300 \
+    --concurrency 10 \
+    --max-instances 50 \
+    --min-instances 3 \
+    --cpu-boost \
+    --port 8081 \
+    --command python \
+    --args=-m,src.worker.worker_service \
+    --set-env-vars "GOOGLE_CLOUD_PROJECT_ID=${PROJECT_ID},ENVIRONMENT=${ENVIRONMENT},WORKER_BATCH_SIZE=10,WORKER_POLLING_INTERVAL=1" \
+    --set-secrets "SCRAPECREATORS_API_KEY=scrapecreators-api-key:latest" \
+    --service-account "${WORKER_SA}" || {
+    print_warning "Worker deployment failed, but API is deployed successfully"
+}
+
+# Get worker service URL
+WORKER_URL=$(gcloud run services describe tiktok-workout-worker \
+    --platform managed \
+    --region "${REGION}" \
+    --format 'value(status.url)' 2>/dev/null || echo "Worker not deployed")
+
 print_status "✅ Deployment complete!"
-print_status "🚀 Test your API:"
+print_status "🚀 Services deployed:"
+echo ""
+echo "API Service: ${SERVICE_URL}"
+echo "Worker Service: ${WORKER_URL}"
+echo ""
+print_status "Test your API:"
 echo ""
 echo "curl -X GET \"${SERVICE_URL}/health\""
 echo ""

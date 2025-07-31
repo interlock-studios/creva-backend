@@ -54,7 +54,7 @@ def get_config_with_defaults() -> Dict[str, Any]:
         "environment": os.getenv("ENVIRONMENT", "production"),
         "project_id": os.getenv("GOOGLE_CLOUD_PROJECT_ID"),
         "cache_ttl_hours": int(os.getenv("CACHE_TTL_HOURS", "168")),  # 1 week
-        "worker_polling_interval": int(os.getenv("WORKER_POLLING_INTERVAL", "5")),
+        "worker_polling_interval": float(os.getenv("WORKER_POLLING_INTERVAL", "5")),
         "worker_batch_size": int(os.getenv("WORKER_BATCH_SIZE", "1")),
         "worker_shutdown_timeout": int(os.getenv("WORKER_SHUTDOWN_TIMEOUT", "30")),
         "rate_limit_requests": int(os.getenv("RATE_LIMIT_REQUESTS", "10")),

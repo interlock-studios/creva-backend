@@ -128,14 +128,66 @@ video_processor = VideoProcessor()
 cache_service = CacheService()
 queue_service = QueueService()
 
+# Track active direct processing
+import threading
+active_direct_processing = 0
+active_processing_lock = threading.Lock()
+MAX_DIRECT_PROCESSING = 5  # Process directly if under this limit
+
 
 class ProcessRequest(BaseModel):
     url: str
 
 
+async def process_video_direct(url: str, request_id: str):
+    """Process video directly (not through queue)"""
+    global active_direct_processing
+    
+    try:
+        # Increment active processing count
+        with active_processing_lock:
+            active_direct_processing += 1
+        
+        logger.info(f"Direct processing started - Request ID: {request_id}, Active: {active_direct_processing}")
+        
+        # Configure scraping options
+        options = ScrapingOptions(
+            get_transcript=True,
+            trim_response=True,
+            max_retries=2,
+            timeout=20,
+        )
+        
+        # 1. Scrape video
+        video_content, metadata, transcript = await scraper.scrape_tiktok_complete(url, options)
+        
+        # 2. Remove audio
+        silent_video = await video_processor.remove_audio(video_content)
+        
+        # 3. Analyze with Gemini
+        caption = metadata.description or metadata.caption
+        workout_json = genai_service.analyze_video_with_transcript(
+            silent_video, transcript, caption
+        )
+        
+        if not workout_json:
+            raise Exception("Could not extract workout information from video")
+        
+        # 4. Cache the result
+        cache_service.cache_workout(url, workout_json)
+        
+        logger.info(f"Direct processing completed - Request ID: {request_id}")
+        return workout_json
+        
+    finally:
+        # Always decrement counter
+        with active_processing_lock:
+            active_direct_processing -= 1
+
+
 @app.post("/process")
 async def process_video(request: ProcessRequest, req: Request):
-    """Process a TikTok video and return workout JSON"""
+    """Hybrid processing: try direct first, fall back to queue if busy"""
     
     request_id = getattr(req.state, "request_id", "unknown")
     
@@ -145,7 +197,7 @@ async def process_video(request: ProcessRequest, req: Request):
         logger.info(f"Returning cached result - Request ID: {request_id}, URL: {request.url}")
         return cached_workout
     
-    # Check if already in queue with pending status
+    # Check if already in queue
     existing_job = await queue_service.get_job_by_url(request.url, status="pending")
     if existing_job:
         logger.info(f"Video already queued - Request ID: {request_id}, Job ID: {existing_job['job_id']}")
@@ -156,7 +208,6 @@ async def process_video(request: ProcessRequest, req: Request):
             "check_url": f"/status/{existing_job['job_id']}"
         }
     
-    # Check if already processing
     processing_job = await queue_service.get_job_by_url(request.url, status="processing")
     if processing_job:
         logger.info(f"Video already processing - Request ID: {request_id}, Job ID: {processing_job['job_id']}")
@@ -167,8 +218,27 @@ async def process_video(request: ProcessRequest, req: Request):
             "check_url": f"/status/{processing_job['job_id']}"
         }
     
+    # Try direct processing if we have capacity
+    with active_processing_lock:
+        can_process_direct = active_direct_processing < MAX_DIRECT_PROCESSING
+    
+    if can_process_direct:
+        try:
+            # Try to process directly with timeout
+            result = await asyncio.wait_for(
+                process_video_direct(request.url, request_id),
+                timeout=30.0  # 30 second timeout for direct processing
+            )
+            return result
+        except asyncio.TimeoutError:
+            logger.warning(f"Direct processing timeout - Request ID: {request_id}, falling back to queue")
+        except Exception as e:
+            logger.error(f"Direct processing failed - Request ID: {request_id}, Error: {str(e)}, falling back to queue")
+    else:
+        logger.info(f"At capacity ({active_direct_processing}/{MAX_DIRECT_PROCESSING}) - Request ID: {request_id}, using queue")
+    
+    # Fall back to queue
     try:
-        # Add to queue with normal priority
         job_id = await queue_service.enqueue_video(request.url, request_id, priority="normal")
         
         logger.info(f"Video queued for processing - Request ID: {request_id}, Job ID: {job_id}")
@@ -182,7 +252,7 @@ async def process_video(request: ProcessRequest, req: Request):
         
     except Exception as e:
         logger.error(f"Failed to queue video - Request ID: {request_id}, Error: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Failed to queue video: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to process video: {str(e)}")
 
 
 # Rate limiting configuration
@@ -298,6 +368,14 @@ async def status():
     return {
         "status": "operational",
         "timestamp": datetime.now().isoformat(),
+        "hybrid_mode": {
+            "enabled": True,
+            "direct_processing": {
+                "active": active_direct_processing,
+                "max": MAX_DIRECT_PROCESSING,
+                "available": MAX_DIRECT_PROCESSING - active_direct_processing
+            }
+        },
         "rate_limiting": {
             "active_ips": active_ips,
             "limit_per_ip": RATE_LIMIT_REQUESTS,

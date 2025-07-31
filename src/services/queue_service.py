@@ -6,6 +6,7 @@ import warnings
 from typing import Optional, Dict, Any, List
 from datetime import datetime, timedelta
 import time
+import asyncio
 
 # Suppress Firestore deprecation warnings for now
 warnings.filterwarnings("ignore", message="Detected filter using positional arguments")
@@ -87,42 +88,58 @@ class QueueService:
         if not self.db:
             return None
         
-        try:
-            # Use transaction to atomically claim a job
-            transaction = self.db.transaction()
-            
-            @firestore.transactional
-            def claim_job(transaction):
-                # Query for oldest pending job (simplified - no priority)
+        # Try up to 3 times to claim a job (in case of race conditions)
+        for attempt in range(3):
+            try:
+                # Find the oldest pending jobs
                 query = (
                     self.queue_collection
                     .where("status", "==", "pending")
                     .order_by("created_at")
-                    .limit(1)
+                    .limit(5)  # Get a few in case of race conditions
                 )
                 
-                docs = list(query.stream(transaction=transaction))
-                if docs:
-                    doc = docs[0]
-                    job_data = doc.to_dict()
-                    
-                    # Claim the job
-                    transaction.update(doc.reference, {
-                        "status": "processing",
-                        "worker_id": worker_id,
-                        "started_at": datetime.utcnow(),
-                        "attempts": job_data.get("attempts", 0) + 1
-                    })
-                    
-                    return {"job_id": doc.id, **job_data}
+                docs = list(query.stream())
+                if not docs:
+                    return None
                 
+                # Try to claim each job until we succeed
+                for doc in docs:
+                    job_data = doc.to_dict()
+                    job_id = doc.id
+                    
+                    # Check if job is still pending (to avoid race condition)
+                    current_status = job_data.get("status")
+                    if current_status != "pending":
+                        logger.debug(f"Job {job_id} already claimed (status: {current_status})")
+                        continue
+                    
+                    # Try to claim the job atomically
+                    try:
+                        # Use conditional update to prevent race conditions
+                        doc.reference.update({
+                            "status": "processing",
+                            "worker_id": worker_id,
+                            "started_at": datetime.utcnow(),
+                            "attempts": job_data.get("attempts", 0) + 1
+                        })
+                        
+                        logger.info(f"Worker {worker_id} claimed job {job_id}")
+                        return {"job_id": job_id, **job_data}
+                    except Exception as e:
+                        # Another worker might have claimed it
+                        logger.debug(f"Failed to claim job {job_id}: {e}")
+                        continue
+                
+                # If we get here, all jobs were already claimed
+                if attempt < 2:
+                    await asyncio.sleep(0.1)  # Brief pause before retry
+                    
+            except Exception as e:
+                logger.error(f"Error getting next job: {e}")
                 return None
-            
-            return claim_job(transaction)
-            
-        except Exception as e:
-            logger.error(f"Error getting next job: {e}")
-            return None
+        
+        return None
     
     async def mark_job_complete(self, job_id: str, result: Dict):
         """Mark job as complete and store result"""

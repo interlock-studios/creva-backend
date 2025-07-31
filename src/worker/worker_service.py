@@ -76,12 +76,12 @@ class VideoWorker:
                 await self.queue_service.mark_job_complete(job_id, cached_workout)
                 return
             
-            # Configure scraping options
+            # Configure scraping options with shorter timeout
             options = ScrapingOptions(
                 get_transcript=True,
                 trim_response=True,
-                max_retries=3,
-                timeout=30,
+                max_retries=2,  # Reduced retries
+                timeout=20,     # Reduced timeout
             )
             
             # 1. Scrape video with transcript
@@ -93,14 +93,18 @@ class VideoWorker:
             else:
                 logger.info(f"Job {job_id} - No transcript available")
             
-            # 2. Remove audio
-            logger.info(f"Job {job_id} - Removing audio...")
-            silent_video = await self.video_processor.remove_audio(video_content)
+            # 2. Process audio removal and get GenAI service in parallel
+            logger.info(f"Job {job_id} - Processing video and preparing AI service...")
+            silent_video_task = asyncio.create_task(self.video_processor.remove_audio(video_content))
+            genai_service_task = asyncio.create_task(self.genai_pool.get_next_service())
             
-            # 3. Get GenAI service from pool
-            genai_service = await self.genai_pool.get_next_service()
+            # Wait for both operations to complete
+            silent_video, genai_service = await asyncio.gather(
+                silent_video_task,
+                genai_service_task
+            )
             
-            # 4. Analyze with Gemini
+            # 3. Analyze with Gemini
             caption = metadata.description or metadata.caption
             logger.info(f"Job {job_id} - Analyzing with GenAI service {genai_service.service_id}...")
             
@@ -138,20 +142,28 @@ class VideoWorker:
     async def worker_loop(self):
         """Main worker loop"""
         logger.info(f"Worker {WORKER_ID} starting main loop")
+        logger.info(f"Worker configuration: batch_size={WORKER_BATCH_SIZE}, polling_interval={POLLING_INTERVAL}")
         
         while self.running:
             try:
-                # Get next job from queue
-                job = await self.queue_service.get_next_job(WORKER_ID)
-                
-                if job:
-                    # Process job asynchronously
-                    task = asyncio.create_task(self.process_video_job(job))
-                    self.tasks.add(task)
-                    task.add_done_callback(self.tasks.discard)
+                # Check if we can take more jobs
+                active_tasks = len(self.tasks)
+                if active_tasks < WORKER_BATCH_SIZE:
+                    # Get next job from queue
+                    job = await self.queue_service.get_next_job(WORKER_ID)
+                    
+                    if job:
+                        # Process job asynchronously
+                        task = asyncio.create_task(self.process_video_job(job))
+                        self.tasks.add(task)
+                        task.add_done_callback(self.tasks.discard)
+                        logger.info(f"Started processing job {job['job_id']} ({active_tasks + 1}/{WORKER_BATCH_SIZE} active)")
+                    else:
+                        # No jobs available, wait before polling again
+                        await asyncio.sleep(POLLING_INTERVAL)
                 else:
-                    # No jobs available, wait before polling again
-                    await asyncio.sleep(POLLING_INTERVAL)
+                    # At capacity, wait a bit before checking again
+                    await asyncio.sleep(0.05)  # Check more frequently when at capacity
                 
             except Exception as e:
                 logger.error(f"Worker loop error: {e}")

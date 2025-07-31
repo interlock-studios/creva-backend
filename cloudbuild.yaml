@@ -2,7 +2,7 @@
 substitutions:
   _SERVICE_NAME: tiktok-workout-parser
   _REGION: us-central1
-  _ENVIRONMENT: ${_ENVIRONMENT}  # Will be set by trigger or default to production
+  _ENVIRONMENT: production
 
 options:
   logging: CLOUD_LOGGING_ONLY
@@ -36,7 +36,7 @@ steps:
       - '-t'
       - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_SERVICE_NAME}/${_SERVICE_NAME}:latest'
       - '--build-arg'
-      - 'BUILD_DATE=${_BUILD_TIME}'
+      - 'BUILD_DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ)'
       - '--build-arg'
       - 'VERSION=${SHORT_SHA}'
       - '.'

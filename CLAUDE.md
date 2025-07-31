@@ -5,10 +5,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Project Overview
 
 TikTok Workout Parser is a Python FastAPI backend service that transforms TikTok workout videos into structured workout data. The system features:
-- **AI-Powered Analysis**: Google Gemini 2.0 Flash for video content understanding
+- **Hybrid Processing**: Direct processing for low traffic, queue-based for high traffic
+- **AI-Powered Analysis**: Google Gemini 2.0 Flash with multi-location service pooling
 - **Video Processing**: Automated TikTok video scraping and audio removal
-- **RESTful API**: FastAPI endpoints for video processing and health monitoring
-- **Cloud Deployment**: Google Cloud Run with containerized deployment
+- **Queue System**: Firestore-based job queue with auto-scaling workers
+- **Smart Caching**: Firestore cache with 1-week TTL for instant results
+- **Cloud Deployment**: Google Cloud Run with integrated API and Worker services
 - **Production Ready**: Comprehensive error handling, logging, and monitoring
 
 ## Common Commands
@@ -21,7 +23,10 @@ make install               # Install/update dependencies
 source .venv/bin/activate  # Activate virtual environment
 
 # Running the application
-make dev                   # Start development server with auto-reload
+make dev                   # Start both API and Worker services with auto-reload
+make dev-api               # Start only API service (port 8080)
+make dev-worker            # Start only Worker service (port 8081)
+make dev-force             # Force restart (kills existing processes)
 make run                   # Run production mode locally
 python main.py             # Direct execution (port 8080)
 
@@ -68,7 +73,10 @@ curl -X POST http://localhost:8080/process \
   -d '{"url": "https://www.tiktok.com/@lastairbender222/video/7518493301046119710"}'
 
 # Production testing
-curl https://tiktok-workout-parser-341666880405.us-central1.run.app/process
+curl https://tiktok-workout-parser-ty6tkvdynq-uc.a.run.app/health
+curl -X POST https://tiktok-workout-parser-ty6tkvdynq-uc.a.run.app/process \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://www.tiktok.com/@user/video/1234567890"}'
 ```
 
 ## Architecture Overview
@@ -82,26 +90,49 @@ curl https://tiktok-workout-parser-341666880405.us-central1.run.app/process
 - **Environment Management**: Development/staging/production configuration
 
 **Core Endpoints:**
-- `POST /process`: Main video processing endpoint
+- `POST /process`: Main video processing endpoint (hybrid: direct or queued)
+- `GET /status/{job_id}`: Check status of queued processing jobs
+- `GET /status`: System status with queue statistics
 - `GET /health`: Container health check
 - `GET /test-api`: API connection validation
 
 ### Service Layer Architecture
 **Key Services:**
 - `src/services/genai_service.py`: Google Gemini AI integration
+- `src/services/genai_service_pool.py`: Multi-location Gemini service pool for scaling
 - `src/services/tiktok_scraper.py`: TikTok video scraping and API integration
+- `src/services/queue_service.py`: Firestore-based job queue management
+- `src/services/cache_service.py`: Firestore cache with TTL for instant results
+- `src/services/config_validator.py`: Environment configuration and validation
 - `src/worker/video_processor.py`: Video download and audio processing
+- `src/worker/worker_service.py`: Background worker service for queue processing
 
 **Data Models:**
 - `src/models/parser_result.py`: Pydantic models for video metadata
 - Structured workout JSON output with exercises, sets, and instructions
 
-### Video Processing Pipeline
+### Video Processing Pipeline (Hybrid Architecture)
+
+**For Cached Videos (90% of popular workouts):**
 1. **URL Validation**: TikTok URL normalization and validation
-2. **Video Scraping**: ScrapeCreators API integration with transcript extraction
-3. **Audio Removal**: FFmpeg processing to create silent video
-4. **AI Analysis**: Gemini 2.0 Flash processes video + transcript
-5. **Structured Output**: JSON workout data with exercises, sets, and metadata
+2. **Cache Check**: Instant return if video already processed
+
+**For New Videos - Direct Processing (Low Traffic):**
+1. **URL Validation**: TikTok URL normalization and validation
+2. **Capacity Check**: If under 5 concurrent videos
+3. **Video Scraping**: ScrapeCreators API integration with transcript extraction
+4. **Audio Removal**: FFmpeg processing to create silent video
+5. **AI Analysis**: Gemini 2.0 Flash processes video + transcript
+6. **Cache Storage**: Store result in Firestore cache
+7. **Structured Output**: JSON workout data with exercises, sets, and metadata
+
+**For New Videos - Queue Processing (High Traffic):**
+1. **URL Validation**: TikTok URL normalization and validation
+2. **Queue Enqueue**: Add job to Firestore queue
+3. **Job ID Return**: Return job_id for status tracking
+4. **Worker Processing**: Background worker processes from queue
+5. **Status Updates**: Job status updated in Firestore
+6. **Result Storage**: Final result stored in cache and results collection
 
 ### External Services Integration
 **ScrapeCreators API:**
@@ -110,10 +141,12 @@ curl https://tiktok-workout-parser-341666880405.us-central1.run.app/process
 - Transcript extraction from video
 - Comprehensive error handling and retry logic
 
-**Google Gen AI (Gemini):**
+**Google Gen AI (Gemini with Service Pool):**
+- Multi-location service pool (us-central1, us-east1, europe-west1)
 - Video content analysis with transcript
 - Structured JSON output generation
 - Rate limiting and retry with exponential backoff
+- Automatic failover between regions
 - Custom prompts for fitness content extraction
 
 **FFmpeg Processing:**
@@ -154,7 +187,7 @@ curl https://tiktok-workout-parser-341666880405.us-central1.run.app/process
     "url": "https://www.tiktok.com/@lastairbender222/video/7518493301046119710"
 }
 
-# Workout Response
+# Direct/Cached Response (Immediate)
 {
     "title": "Full Body HIIT Workout",
     "description": "Intense 15-minute full body workout",
@@ -172,6 +205,32 @@ curl https://tiktok-workout-parser-341666880405.us-central1.run.app/process
     ],
     "tags": ["hiit", "cardio", "fullbody"],
     "creator": "@fitnessuser"
+}
+
+# Queued Response (When At Capacity)
+{
+    "status": "queued",
+    "job_id": "req123_1234567890",
+    "message": "Video queued for processing. Check status with job_id.",
+    "check_url": "/status/req123_1234567890"
+}
+
+# Status Check Response (Processing)
+{
+    "status": "processing",
+    "created_at": "2024-01-01T12:00:00",
+    "attempts": 1
+}
+
+# Status Check Response (Completed)
+{
+    "status": "completed",
+    "result": {
+        "title": "Full Body HIIT Workout",
+        "description": "Intense 15-minute full body workout",
+        "exercises": [...]
+    },
+    "completed_at": "2024-01-01T12:01:30"
 }
 ```
 
@@ -483,10 +542,35 @@ python example_usage.py
 
 ---
 
-**Architecture Summary:**
+**Architecture Summary (Hybrid Processing):**
+
+**Cached Videos (Instant):**
 1. FastAPI receives TikTok URL via POST request
-2. ScrapeCreators API downloads video and extracts metadata/transcript  
-3. FFmpeg removes audio from video for faster AI processing
-4. Google Gemini analyzes silent video + transcript
-5. Structured workout JSON returned to client
-6. All operations logged with correlation IDs for monitoring
+2. Cache service checks Firestore for existing result
+3. Return cached workout JSON immediately
+
+**Direct Processing (Low Traffic):**
+1. FastAPI receives TikTok URL via POST request
+2. Check processing capacity (< 5 concurrent)
+3. ScrapeCreators API downloads video and extracts metadata/transcript
+4. FFmpeg removes audio from video for faster AI processing
+5. Google Gemini (multi-region pool) analyzes silent video + transcript
+6. Store result in Firestore cache
+7. Return structured workout JSON to client
+
+**Queue Processing (High Traffic):**
+1. FastAPI receives TikTok URL via POST request
+2. Check processing capacity (>= 5 concurrent)
+3. Add job to Firestore queue
+4. Return job_id for status tracking
+5. Worker service processes jobs from queue in background
+6. Worker updates job status in Firestore
+7. Client polls status endpoint with job_id
+8. Final result cached and returned when complete
+
+**Components:**
+- Main API Service (Cloud Run): Direct processing + queue management
+- Worker Service (Cloud Run): Background queue processing
+- Firestore Queue: Reliable job queue with status tracking
+- Firestore Cache: 1-week TTL for instant results
+- All operations logged with correlation IDs for monitoring
