@@ -400,11 +400,10 @@ This project includes GitHub Actions for automatic deployments:
 3. **Pull requests** → Runs tests only
 
 To enable automatic deployments:
-1. Set up GitHub repository secret:
-   - `GOOGLE_CLOUD_CREDENTIALS`: Your Google Cloud service account JSON key
+1. Set up GitHub repository secrets:
+   - `WIF_PROVIDER`: Google Cloud Workload Identity Provider
+   - `WIF_SERVICE_ACCOUNT`: Service account email
 2. Push to `main` or `staging` branches
-
-The workflow simply runs `make deploy` - no complex setup needed!
 
 ## 🛠️ Development Commands
 
