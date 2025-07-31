@@ -384,6 +384,14 @@ make dev-worker
 make dev-force
 ```
 
+### Step 5: Deploy to Production
+```bash
+# Deploy both API and Worker services
+make deploy
+```
+
+**Note:** This repository is configured for automatic deployment on commit to main branch. Both the API and Worker services will be deployed automatically.
+
 ### Test Your Setup
 
 Open a new terminal and try this:
@@ -536,11 +544,8 @@ make deploy
 ./deploy.sh
 ```
 
-#### Step 4: Deploy Worker Service
-```bash
-# Deploy the worker service
-./deploy-worker.sh
-```
+#### Step 4: Worker Service (Auto-Deployed)
+The worker service is now automatically deployed with the main API service. No separate deployment needed!
 
 #### Step 5: Configure Multiple Gemini API Keys (Optional)
 ```bash

@@ -123,7 +123,52 @@ steps:
         
         gcloud "$${DEPLOY_ARGS[@]}"
 
-  # Step 7: Run smoke tests
+  # Step 7: Deploy worker service
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: 'deploy-worker'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        echo "Deploying worker service..."
+        
+        # Create worker service account if needed
+        WORKER_SA="tiktok-workout-worker@${PROJECT_ID}.iam.gserviceaccount.com"
+        if ! gcloud iam service-accounts describe "$${WORKER_SA}" 2>/dev/null; then
+          echo "Creating worker service account..."
+          gcloud iam service-accounts create tiktok-workout-worker \
+            --display-name="TikTok Workout Worker Service Account"
+          
+          # Grant necessary permissions
+          gcloud projects add-iam-policy-binding ${PROJECT_ID} \
+            --member="serviceAccount:$${WORKER_SA}" \
+            --role="roles/datastore.user"
+          
+          gcloud projects add-iam-policy-binding ${PROJECT_ID} \
+            --member="serviceAccount:$${WORKER_SA}" \
+            --role="roles/aiplatform.user"
+        fi
+        
+        # Deploy worker service
+        gcloud run deploy tiktok-workout-worker \
+          --image ${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_SERVICE_NAME}/${_SERVICE_NAME}:${SHORT_SHA} \
+          --region ${_REGION} \
+          --platform managed \
+          --allow-unauthenticated \
+          --memory 2Gi \
+          --cpu 1 \
+          --timeout 300 \
+          --concurrency 1 \
+          --max-instances 10 \
+          --min-instances 1 \
+          --port 8081 \
+          --command python \
+          --args -m,src.worker.worker_service \
+          --set-env-vars GOOGLE_CLOUD_PROJECT_ID=${PROJECT_ID},ENVIRONMENT=${_ENVIRONMENT} \
+          --set-secrets SCRAPECREATORS_API_KEY=scrapecreators-api-key:latest \
+          --service-account "$${WORKER_SA}"
+
+  # Step 8: Run smoke tests
   - name: 'gcr.io/cloud-builders/gcloud'
     id: 'smoke-test'
     entrypoint: 'bash'
