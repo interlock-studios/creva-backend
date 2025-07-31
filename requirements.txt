@@ -16,3 +16,6 @@ pydantic==2.11.4
 
 # Environment
 python-dotenv==1.0.0
+
+# Health check
+requests==2.32.3

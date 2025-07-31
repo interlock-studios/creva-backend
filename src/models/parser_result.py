@@ -4,6 +4,7 @@ from pydantic import BaseModel
 
 class VideoMetadata(BaseModel):
     """Metadata from TikTok video"""
+
     title: Optional[str] = None
     description: Optional[str] = None
     caption: Optional[str] = None
