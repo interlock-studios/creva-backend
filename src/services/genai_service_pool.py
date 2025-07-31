@@ -1,0 +1,273 @@
+from google import genai
+from google.genai.types import HttpOptions, Part, GenerateContentConfig
+from google.auth import default
+from google.oauth2 import service_account
+from typing import Dict, Any, Optional, List
+import json
+import os
+import time
+import random
+import asyncio
+import logging
+
+logger = logging.getLogger(__name__)
+
+
+class GenAIServicePool:
+    """Pool of GenAI services for distributed rate limiting"""
+    
+    def __init__(self):
+        self.services = []
+        self.current_index = 0
+        self.lock = asyncio.Lock()
+        
+        # Get project ID
+        self.project_id = os.getenv("GOOGLE_CLOUD_PROJECT_ID")
+        if not self.project_id:
+            raise ValueError("GOOGLE_CLOUD_PROJECT_ID environment variable not set")
+        
+        # Initialize services with different approaches
+        self._init_services()
+        
+        if not self.services:
+            raise ValueError("No GenAI services could be initialized")
+        
+        logger.info(f"Initialized GenAI service pool with {len(self.services)} services")
+    
+    def _init_services(self):
+        """Initialize multiple GenAI services"""
+        
+        # Method 1: Multiple service account files
+        sa_files = os.getenv("GOOGLE_SERVICE_ACCOUNT_FILES", "").split(",")
+        for sa_file in sa_files:
+            sa_file = sa_file.strip()
+            if sa_file and os.path.exists(sa_file):
+                try:
+                    credentials = service_account.Credentials.from_service_account_file(sa_file)
+                    client = genai.Client(
+                        project=self.project_id,
+                        location="us-central1",
+                        vertexai=True,
+                        credentials=credentials,
+                        http_options=HttpOptions(api_version="v1"),
+                    )
+                    service = GenAIService(client, f"sa_file_{len(self.services)}")
+                    self.services.append(service)
+                    logger.info(f"Loaded service account from file: {sa_file}")
+                except Exception as e:
+                    logger.error(f"Failed to load service account from {sa_file}: {e}")
+        
+        # Method 2: Multiple service account JSON strings (for Cloud Run)
+        sa_jsons = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSONS", "").split("|||")  # Use ||| as delimiter
+        for i, sa_json in enumerate(sa_jsons):
+            sa_json = sa_json.strip()
+            if sa_json:
+                try:
+                    sa_info = json.loads(sa_json)
+                    credentials = service_account.Credentials.from_service_account_info(sa_info)
+                    client = genai.Client(
+                        project=self.project_id,
+                        location="us-central1",
+                        vertexai=True,
+                        credentials=credentials,
+                        http_options=HttpOptions(api_version="v1"),
+                    )
+                    service = GenAIService(client, f"sa_json_{i}")
+                    self.services.append(service)
+                    logger.info(f"Loaded service account from JSON string {i}")
+                except Exception as e:
+                    logger.error(f"Failed to load service account from JSON {i}: {e}")
+        
+        # Method 3: Default credentials (if no explicit accounts provided)
+        if not self.services:
+            try:
+                # This will use the default service account in Cloud Run
+                credentials, _ = default()
+                client = genai.Client(
+                    project=self.project_id,
+                    location="us-central1",
+                    vertexai=True,
+                    credentials=credentials,
+                    http_options=HttpOptions(api_version="v1"),
+                )
+                service = GenAIService(client, "default")
+                self.services.append(service)
+                logger.info("Using default credentials")
+            except Exception as e:
+                logger.error(f"Failed to use default credentials: {e}")
+        
+        # Method 4: Multiple locations for same project (distributes load)
+        locations = os.getenv("GEMINI_LOCATIONS", "us-central1").split(",")
+        if len(locations) > 1 and self.services:
+            # Use the first service's credentials for other locations
+            base_credentials = self.services[0].client._credentials
+            for location in locations[1:]:
+                location = location.strip()
+                try:
+                    client = genai.Client(
+                        project=self.project_id,
+                        location=location,
+                        vertexai=True,
+                        credentials=base_credentials,
+                        http_options=HttpOptions(api_version="v1"),
+                    )
+                    service = GenAIService(client, f"location_{location}")
+                    self.services.append(service)
+                    logger.info(f"Added service for location: {location}")
+                except Exception as e:
+                    logger.error(f"Failed to add service for location {location}: {e}")
+    
+    async def get_next_service(self) -> 'GenAIService':
+        """Get next available service in round-robin fashion"""
+        async with self.lock:
+            if not self.services:
+                raise Exception("No GenAI services available")
+            
+            # Simple round-robin
+            service = self.services[self.current_index]
+            self.current_index = (self.current_index + 1) % len(self.services)
+            
+            logger.debug(f"Using GenAI service: {service.service_id}")
+            return service
+    
+    def get_pool_size(self) -> int:
+        """Get number of services in pool"""
+        return len(self.services)
+
+
+class GenAIService:
+    """Individual GenAI service instance"""
+    
+    def __init__(self, client: genai.Client, service_id: str):
+        self.client = client
+        self.service_id = service_id
+        self.model = "gemini-2.0-flash-lite"
+        self.last_request_time = 0
+        self.min_request_interval = 0.2  # 200ms between requests per service
+    
+    def _retry_with_backoff(self, func, max_retries=3, base_delay=1):
+        """Retry function with exponential backoff for 429 errors"""
+        for attempt in range(max_retries):
+            try:
+                return func()
+            except Exception as e:
+                error_str = str(e)
+                if "429" in error_str or "RESOURCE_EXHAUSTED" in error_str:
+                    if attempt == max_retries - 1:
+                        logger.error(f"Service {self.service_id} - Max retries reached for 429 error")
+                        raise e
+                    
+                    # Exponential backoff with jitter
+                    delay = base_delay * (2**attempt) + random.uniform(0, 1)
+                    logger.warning(
+                        f"Service {self.service_id} - Got 429 error, retrying in {delay:.2f}s "
+                        f"(attempt {attempt + 1}/{max_retries})"
+                    )
+                    time.sleep(delay)
+                else:
+                    # Non-429 error, don't retry
+                    raise e
+        return None
+    
+    def _rate_limit(self):
+        """Ensure minimum time between requests for this service"""
+        current_time = time.time()
+        time_since_last_request = current_time - self.last_request_time
+        if time_since_last_request < self.min_request_interval:
+            sleep_time = self.min_request_interval - time_since_last_request
+            logger.debug(f"Service {self.service_id} - Rate limiting: waiting {sleep_time:.2f}s")
+            time.sleep(sleep_time)
+        self.last_request_time = time.time()
+    
+    def analyze_video_with_transcript(
+        self,
+        video_content: bytes,
+        transcript: Optional[str] = None,
+        caption: Optional[str] = None,
+    ) -> Optional[Dict[str, Any]]:
+        """Analyze video with Gemini 2.0 Flash"""
+        
+        # Apply rate limiting for this specific service
+        self._rate_limit()
+        
+        # Build prompt
+        prompt = "You are an expert fitness instructor analyzing a TikTok workout video."
+        
+        if transcript:
+            prompt += f"\n\nTRANSCRIPT:\n{transcript}"
+        
+        if caption:
+            prompt += f"\n\nCAPTION:\n{caption}"
+        
+        prompt += """
+
+Analyze this workout video and extract the following information. Return your response as a valid JSON object with NO additional text, explanations, or formatting.
+
+Required JSON structure:
+{
+  "title": "descriptive workout title",
+  "description": "brief description of the workout or null",
+  "workout_type": "one of: strength, cardio, hiit, yoga, stretching, bodyweight, mixed",
+  "duration_minutes": estimated duration as integer or null,
+  "difficulty_level": integer from 1 to 10,
+  "exercises": [
+    {
+      "name": "exercise name",
+      "muscle_groups": ["array of: chest, back, shoulders, biceps, triceps, legs, glutes, core, full_body"],
+      "equipment": "one of: none, dumbbells, barbell, resistance_bands, kettlebell, machine, bodyweight, other",
+      "sets": [
+        {
+          "reps": integer or null,
+          "weight_lbs": number or null,
+          "duration_seconds": integer or null,
+          "distance_miles": number or null,
+          "rest_seconds": integer or null
+        }
+      ],
+      "instructions": "brief instructions or null"
+    }
+  ],
+  "tags": ["array of relevant tags"] or null,
+  "creator": "creator name or null"
+}
+
+IMPORTANT: Your response must be ONLY the JSON object, with no markdown formatting, no code blocks, no explanations before or after."""
+        
+        # Prepare content
+        contents = [prompt, Part.from_bytes(data=video_content, mime_type="video/mp4")]
+        
+        # Generate content with retry logic
+        def make_request():
+            return self.client.models.generate_content(
+                model=self.model,
+                contents=contents,
+                config=GenerateContentConfig(
+                    max_output_tokens=2048,
+                    temperature=0.1,
+                    top_p=0.8,
+                    response_mime_type="application/json",
+                ),
+            )
+        
+        logger.info(f"Service {self.service_id} - Analyzing video")
+        response = self._retry_with_backoff(make_request, max_retries=5, base_delay=2)
+        
+        # Parse response
+        try:
+            response_text = response.text.strip()
+            logger.debug(f"Service {self.service_id} - Raw response: {response_text[:500]}...")
+            
+            # Clean up response if needed
+            if "```json" in response_text:
+                json_start = response_text.find("```json") + 7
+                json_end = response_text.find("```", json_start)
+                response_text = response_text[json_start:json_end].strip()
+            elif "```" in response_text:
+                json_start = response_text.find("```") + 3
+                json_end = response_text.find("```", json_start)
+                response_text = response_text[json_start:json_end].strip()
+            
+            return json.loads(response_text)
+        except Exception as e:
+            logger.error(f"Service {self.service_id} - Failed to parse response: {e}")
+            return None

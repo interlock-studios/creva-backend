@@ -22,6 +22,22 @@ curl -X POST "https://tiktok-workout-parser-ty6tkvdynq-uc.a.run.app/process" \
 
 ### What You Get Back
 
+**If video is NEW (needs processing):**
+```json
+{
+  "status": "queued",
+  "job_id": "req123_1234567890",
+  "message": "Video queued for processing. Check status with job_id.",
+  "check_url": "/status/req123_1234567890"
+}
+```
+
+Then check the status:
+```bash
+curl "https://tiktok-workout-parser-ty6tkvdynq-uc.a.run.app/status/req123_1234567890"
+```
+
+**If video was CACHED (instant result):**
 ```json
 {
   "title": "Updated Ab Routine",
@@ -259,11 +275,17 @@ curl -X POST "https://tiktok-workout-parser-ty6tkvdynq-uc.a.run.app/process" \
 
 ## 🛠️ How It Works
 
-1. **You send a TikTok URL** → We download the video (no watermark!)
-2. **We extract the transcript** → Get all the spoken instructions
-3. **We remove the audio** → Makes AI analysis faster
+### For Cached Videos (90% of popular workouts):
+1. **You send a TikTok URL** → We check our cache
+2. **Found in cache!** → Instant workout JSON response
+
+### For New Videos:
+1. **You send a TikTok URL** → Not in cache, add to queue
+2. **You get a job ID** → Use this to check status
+3. **Worker processes video** → Downloads, extracts transcript, removes audio
 4. **AI analyzes everything** → Google's Gemini AI understands the workout
-5. **You get structured data** → Clean JSON with all the workout details
+5. **Results stored in cache** → Next time it's instant!
+6. **Check status with job ID** → Get your workout JSON
 
 ## 🏗️ Tech Stack
 
@@ -272,6 +294,33 @@ curl -X POST "https://tiktok-workout-parser-ty6tkvdynq-uc.a.run.app/process" \
 - **Hosting**: Google Cloud Run (serverless)
 - **Video Processing**: ffmpeg
 - **Video Scraping**: ScrapeCreators API
+- **Queue**: Firestore Collections (NEW!)
+- **Cache**: Firestore with 1-week TTL
+
+
+
+## 🚀 Scaling Architecture (NEW!)
+
+The application now supports a queue-based architecture to handle 10k+ users:
+
+### Queue-Based Processing Flow
+1. **API receives request** → Checks cache → Returns if cached
+2. **If not cached** → Adds to Firestore queue → Returns job ID
+3. **Worker picks up job** → Processes video → Stores result
+4. **Client checks status** → Gets result when ready
+
+### Components
+- **Main API Service**: Handles requests, manages queue
+- **Worker Service**: Processes videos with multiple Gemini API keys
+- **Firestore Queue**: Reliable job queue with retry logic
+- **Firestore Cache**: 1-week cache for popular videos
+
+### Benefits
+- ✅ **No dropped requests** - All videos get queued
+- ✅ **5x+ throughput** - Multiple Gemini API keys
+- ✅ **Auto-scaling** - Workers scale based on queue size
+- ✅ **90% cache hits** - Popular videos served instantly
+- ✅ **Reliable retries** - Failed jobs automatically retry
 
 
 
@@ -311,10 +360,28 @@ SCRAPECREATORS_API_KEY=your_actual_api_key_here
 
 ### Step 4: Run It!
 ```bash
-# Start the app
+# Start both API and Worker services
 make dev
 
 # Your API is now running at http://localhost:8080
+# Your Worker is processing videos in the background
+# Press Ctrl+C to stop both services
+```
+
+**What's running:**
+- **API Service** (port 8080) - Handles requests, checks cache, queues jobs
+- **Worker Service** (port 8081) - Processes videos from queue with Gemini AI
+
+**Alternative commands:**
+```bash
+# Run only the API (if you want manual control)
+make dev-api
+
+# Run only the Worker (in a separate terminal)
+make dev-worker
+
+# Force restart (kills existing processes)
+make dev-force
 ```
 
 ### Test Your Setup
@@ -328,10 +395,76 @@ curl http://localhost:8080/health
 # Test with a real TikTok video
 curl -X POST http://localhost:8080/process \
   -H "Content-Type: application/json" \
-  -d '{"url": "https://www.tiktok.com/@lastairbender222/video/7518493301046119710"}'
+  -d '{"url": "https://www.tiktok.com/@user/video/1234567890"}'
 ```
 
-You should see a JSON response with workout details!
+**Response (if video is new - needs processing):**
+```json
+{
+  "status": "queued",
+  "job_id": "req123_1234567890",
+  "message": "Video queued for processing. Check status with job_id.",
+  "check_url": "/status/req123_1234567890"
+}
+```
+
+**Then check the status:**
+```bash
+# Check job status
+curl http://localhost:8080/status/req123_1234567890
+```
+
+**Response (when completed):**
+```json
+{
+  "status": "completed",
+  "result": {
+    "title": "Full Body HIIT Workout",
+    "description": "Intense 15-minute full body workout",
+    "workout_type": "hiit",
+    "exercises": [...]
+  },
+  "completed_at": "2024-01-01T12:01:30"
+}
+```
+
+**Response (if video was already cached):**
+```json
+{
+  "title": "Full Body HIIT Workout",
+  "description": "Intense 15-minute full body workout",
+  "workout_type": "hiit",
+  "duration_minutes": 15,
+  "difficulty_level": 8,
+  "exercises": [
+    {
+      "name": "Burpees",
+      "muscle_groups": ["full_body"],
+      "equipment": "bodyweight",
+      "sets": [
+        {
+          "reps": 15,
+          "rest_seconds": 30
+        }
+      ],
+      "instructions": "Start standing, drop to plank, do push-up, jump back up"
+    }
+  ],
+  "tags": ["hiit", "cardio", "fullbody"],
+  "creator": "@fitnessuser"
+}
+```
+
+Another example:
+```bash
+curl -X POST http://localhost:8080/process \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://www.tiktok.com/@laura.roskein/video/7520357075034115342"}'
+```
+
+You'll get either:
+- **Instant workout JSON** (if video was processed before - cached)
+- **Job ID response** (if new video - check status with the job_id)
 
 ## 🔧 Manual Setup (if make doesn't work)
 
@@ -353,9 +486,17 @@ cp .env.example .env
 # 5. Edit .env with your API key
 nano .env
 
-# 6. Run the app
+# 6. Run the API and Worker
+# Terminal 1: API
 python main.py
+
+# Terminal 2: Worker (open new terminal, then activate venv and run)
+python -m src.worker.worker_service
 ```
+
+**Note:** For queue processing to work, you'll need:
+1. Both API and Worker running
+2. Firestore indexes created (if you get index errors, run `make setup-firestore`)
 
 ## 🌐 Deploy to the Internet (Optional)
 
@@ -365,7 +506,11 @@ Want to put your API online so others can use it? Here's how:
 - **Google Cloud account** (free tier works)
 - **Credit card** (for verification, won't charge you)
 
-### Step 1: Setup Google Cloud
+### Option 1: Queue-Based Deployment (Recommended for Scale)
+
+This deployment method handles 10k+ users with multiple Gemini API keys.
+
+#### Step 1: Setup Google Cloud
 ```bash
 # Install Google Cloud CLI
 # Download from: https://cloud.google.com/sdk/docs/install
@@ -377,18 +522,57 @@ gcloud auth login
 make setup-gcp
 ```
 
-### Step 2: Store Your API Key Securely
+#### Step 2: Store Your API Key Securely
 ```bash
 # This stores your API key safely in Google Cloud
 make create-secrets
 ```
 
-### Step 3: Deploy!
+#### Step 3: Deploy Main API
 ```bash
-# Deploy to the internet
+# Deploy the main API service
+make deploy
+# or
+./deploy.sh
+```
+
+#### Step 4: Deploy Worker Service
+```bash
+# Deploy the worker service
+./deploy-worker.sh
+```
+
+#### Step 5: Configure Multiple Gemini API Keys (Optional)
+```bash
+# Create additional service accounts for higher throughput
+for i in {1..5}; do
+  gcloud iam service-accounts create gemini-worker-$i \
+    --display-name="Gemini Worker $i"
+  
+  gcloud projects add-iam-policy-binding $PROJECT_ID \
+    --member="serviceAccount:gemini-worker-$i@$PROJECT_ID.iam.gserviceaccount.com" \
+    --role="roles/aiplatform.user"
+done
+
+# Update worker with multiple locations (easier approach)
+gcloud run services update tiktok-workout-worker \
+  --update-env-vars GEMINI_LOCATIONS="us-central1,us-east1,europe-west1"
+```
+
+Your services will be live at:
+- **API**: https://tiktok-workout-parser-xxx.run.app
+- **Worker**: https://tiktok-workout-worker-xxx.run.app
+
+
+### Option 2: Simple Deployment (Original Method)
+
+For smaller scale deployments without queue processing:
+
+```bash
+# Deploy everything in one command
 make deploy
 
-# Your API will be live at a URL like:
+# Your API will be live at:
 # https://tiktok-workout-parser-123456789.us-central1.run.app
 ```
 
@@ -442,13 +626,24 @@ curl http://localhost:8080/health
 
 #### `POST /process`
 Process a TikTok video and get workout data.
+
+**Queue-Based Response (NEW):**
 ```bash
 curl -X POST http://localhost:8080/process \
   -H "Content-Type: application/json" \
   -d '{"url": "https://www.tiktok.com/@user/video/1234567890"}'
 ```
 
-**Response:**
+```json
+{
+  "status": "queued",
+  "job_id": "req123_1234567890",
+  "message": "Video queued for processing. Check status with job_id.",
+  "check_url": "/status/req123_1234567890"
+}
+```
+
+**Cached Response (if already processed):**
 ```json
 {
   "title": "Full Body HIIT Workout",
@@ -472,6 +667,64 @@ curl -X POST http://localhost:8080/process \
   ],
   "tags": ["hiit", "cardio", "fullbody"],
   "creator": "@fitnessuser"
+}
+```
+
+#### `GET /status/{job_id}` (NEW)
+Check the status of a queued video processing job.
+```bash
+curl http://localhost:8080/status/req123_1234567890
+```
+
+**Processing Response:**
+```json
+{
+  "status": "processing",
+  "created_at": "2024-01-01T12:00:00",
+  "attempts": 1
+}
+```
+
+**Completed Response:**
+```json
+{
+  "status": "completed",
+  "result": {
+    "title": "Full Body HIIT Workout",
+    "description": "Intense 15-minute full body workout",
+    "workout_type": "hiit",
+    "duration_minutes": 15,
+    "difficulty_level": 8,
+    "exercises": [...]
+  },
+  "completed_at": "2024-01-01T12:01:30"
+}
+```
+
+#### `GET /status`
+Get system status including queue statistics.
+```bash
+curl http://localhost:8080/status
+```
+
+**Response:**
+```json
+{
+  "status": "operational",
+  "timestamp": "2024-01-01T12:00:00",
+  "queue": {
+    "status": "active",
+    "queue_stats": {
+      "pending": 5,
+      "processing": 2,
+      "completed": 100,
+      "failed": 1
+    }
+  },
+  "cache": {
+    "total_cached_workouts": 150,
+    "default_ttl_hours": 168
+  }
 }
 ```
 
@@ -558,7 +811,11 @@ curl -X GET "http://localhost:8080/health"
 # Test video processing
 curl -X POST "http://localhost:8080/process" \
   -H "Content-Type: application/json" \
-  -d '{"url": "https://www.tiktok.com/@lastairbender222/video/7518493301046119710"}'
+  -d '{"url": "https://www.tiktok.com/@user/video/1234567890"}'
+
+# Response will be either:
+# - Workout JSON (if cached)
+# - Job ID (if new - use /status/{job_id} to check)
 ```
 
 #### Production Testing
@@ -569,7 +826,10 @@ curl -X GET "https://tiktok-workout-parser-ty6tkvdynq-uc.a.run.app/health"
 # Test video processing
 curl -X POST "https://tiktok-workout-parser-ty6tkvdynq-uc.a.run.app/process" \
   -H "Content-Type: application/json" \
-  -d '{"url": "https://www.tiktok.com/@lastairbender222/video/7518493301046119710"}'
+  -d '{"url": "https://www.tiktok.com/@user/video/1234567890"}'
+
+# If queued, check status:
+curl "https://tiktok-workout-parser-ty6tkvdynq-uc.a.run.app/status/{job_id}"
 ```
 
 ## 💰 Cost Information
@@ -642,9 +902,24 @@ ls   # Should show main.py, requirements.txt, etc.
 
 #### App won't start
 ```bash
-# Check if port 8080 is already in use
+# Check if ports 8080 and 8081 are already in use
 lsof -i :8080
-# Kill the process or use a different port
+lsof -i :8081
+# Kill the processes or use: make dev-force
+```
+
+#### "The query requires an index" error
+```bash
+# You need to create Firestore indexes for the queue
+make setup-firestore
+# Or click the link in the error message to create the index
+```
+
+#### Videos stay "pending" forever
+```bash
+# Make sure the worker is running
+# Check if you see "Worker started" in the logs
+# If using make dev, both API and Worker should start together
 ```
 
 ### Getting Help

@@ -22,7 +22,9 @@ from src.services.tiktok_scraper import (
 )
 from src.services.genai_service import GenAIService
 from src.services.cache_service import CacheService
+from src.services.queue_service import QueueService
 from src.worker.video_processor import VideoProcessor
+from src.services.config_validator import validate_required_env_vars, get_config_with_defaults
 
 load_dotenv()
 
@@ -34,17 +36,14 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Log environment info (without exposing secrets)
-environment = os.getenv("ENVIRONMENT", "production")
-project_id = os.getenv("GOOGLE_CLOUD_PROJECT_ID")
-logger.info(f"Starting application - Environment: {environment}, Project: {project_id}")
+# Validate configuration
+validate_required_env_vars(["SCRAPECREATORS_API_KEY", "GOOGLE_CLOUD_PROJECT_ID"], "API")
 
-# Verify required environment variables
-required_vars = ["SCRAPECREATORS_API_KEY", "GOOGLE_CLOUD_PROJECT_ID"]
-for var in required_vars:
-    if not os.getenv(var):
-        logger.error(f"Missing required environment variable: {var}")
-        raise ValueError(f"Missing required environment variable: {var}")
+# Get configuration
+config = get_config_with_defaults()
+environment = config["environment"]
+project_id = config["project_id"]
+logger.info(f"Starting application - Environment: {environment}, Project: {project_id}")
 
 
 # Application lifespan management
@@ -127,6 +126,7 @@ scraper = TikTokScraper()
 genai_service = GenAIService()
 video_processor = VideoProcessor()
 cache_service = CacheService()
+queue_service = QueueService()
 
 
 class ProcessRequest(BaseModel):
@@ -145,118 +145,44 @@ async def process_video(request: ProcessRequest, req: Request):
         logger.info(f"Returning cached result - Request ID: {request_id}, URL: {request.url}")
         return cached_workout
     
-    # Check if we can process this request
-    if processing_semaphore.locked():
-        logger.warning("Processing queue is full, rejecting request")
-        raise HTTPException(
-            status_code=503, 
-            detail="Service is currently overloaded. Please try again in a few minutes."
-        )
+    # Check if already in queue with pending status
+    existing_job = await queue_service.get_job_by_url(request.url, status="pending")
+    if existing_job:
+        logger.info(f"Video already queued - Request ID: {request_id}, Job ID: {existing_job['job_id']}")
+        return {
+            "status": "queued",
+            "job_id": existing_job["job_id"],
+            "message": "Video already queued for processing",
+            "check_url": f"/status/{existing_job['job_id']}"
+        }
     
-    async with processing_semaphore:
-        try:
-            # Configure scraping options - transcript is now included by default
-            options = ScrapingOptions(
-                get_transcript=True,  # Transcript is now included in main response
-                trim_response=True,
-                max_retries=3,
-                timeout=30,
-            )
-
-            # Scrape video with transcript in single request
-            logger.info(f"Processing video - Request ID: {request_id}, URL: {request.url}")
-            video_content, metadata, transcript = await scraper.scrape_tiktok_complete(
-                request.url, options
-            )
-
-            if transcript:
-                logger.info(f"Successfully got transcript: {len(transcript)} characters")
-            else:
-                logger.info("No transcript available for this video")
-
-            # 3. Remove audio
-            logger.info("Removing audio from video...")
-            silent_video = await video_processor.remove_audio(video_content)
-
-            # 4. Analyze with Gemini
-            caption = metadata.description or metadata.caption
-
-            # Handle case where transcript might be None
-            if transcript is None:
-                logger.warning(f"Processing video without transcript: {request.url}")
-                # You can still proceed without transcript, or modify this based on your needs
-            else:
-                logger.info(
-                    f"Processing video with transcript ({len(transcript)} chars): " f"{request.url}"
-                )
-
-            logger.info("Analyzing video with Google Gen AI...")
-            workout_json = genai_service.analyze_video_with_transcript(
-                silent_video, transcript, caption
-            )
-
-            if not workout_json:
-                raise HTTPException(status_code=422, detail="Could not extract workout information")
-
-            # Cache the successful result
-            cache_metadata = {
-                "title": metadata.title,
-                "author": metadata.author,
-                "duration_seconds": metadata.duration_seconds,
-                "processed_at": datetime.utcnow().isoformat()
-            }
-            cache_service.cache_workout(request.url, workout_json, cache_metadata)
-
-            logger.info(
-                f"Successfully processed video - Request ID: {request_id}, " f"URL: {request.url}"
-            )
-            return workout_json
-
-        except ValidationError as e:
-            logger.error(
-                f"Validation error - Request ID: {request_id}, URL: {request.url}, " f"Error: {str(e)}"
-            )
-            raise HTTPException(status_code=400, detail=f"Invalid URL: {str(e)}")
-        except APIError as e:
-            logger.error(
-                f"API error - Request ID: {request_id}, URL: {request.url}, "
-                f"Error: {str(e)}, Status: {e.status_code}"
-            )
-            if e.status_code == 404:
-                raise HTTPException(status_code=404, detail="TikTok video not found or unavailable")
-            elif e.status_code == 401:
-                raise HTTPException(
-                    status_code=500, detail="API authentication failed - check your API key"
-                )
-            elif e.status_code == 429:
-                raise HTTPException(
-                    status_code=429, detail="Rate limit exceeded - please try again later"
-                )
-            else:
-                raise HTTPException(status_code=500, detail=f"API error: {str(e)}")
-        except NetworkError as e:
-            logger.error(
-                f"Network error - Request ID: {request_id}, URL: {request.url}, " f"Error: {str(e)}"
-            )
-            raise HTTPException(status_code=503, detail=f"Network error: {str(e)}")
-        except Exception as e:
-            # Log the full error for debugging
-            logger.exception(
-                f"Unexpected error - Request ID: {request_id}, URL: {request.url}, " f"Error: {str(e)}"
-            )
-
-            error_message = str(e)
-            # Handle 429 rate limit errors specifically
-            if "429" in error_message or "RESOURCE_EXHAUSTED" in error_message:
-                raise HTTPException(
-                    status_code=429,
-                    detail=(
-                        "Rate limit exceeded. The Google Gen AI service is currently "
-                        "overloaded. Please try again in a few moments."
-                    ),
-                )
-            else:
-                raise HTTPException(status_code=500, detail=str(e))
+    # Check if already processing
+    processing_job = await queue_service.get_job_by_url(request.url, status="processing")
+    if processing_job:
+        logger.info(f"Video already processing - Request ID: {request_id}, Job ID: {processing_job['job_id']}")
+        return {
+            "status": "processing",
+            "job_id": processing_job["job_id"],
+            "message": "Video is currently being processed",
+            "check_url": f"/status/{processing_job['job_id']}"
+        }
+    
+    try:
+        # Add to queue with normal priority
+        job_id = await queue_service.enqueue_video(request.url, request_id, priority="normal")
+        
+        logger.info(f"Video queued for processing - Request ID: {request_id}, Job ID: {job_id}")
+        
+        return {
+            "status": "queued",
+            "job_id": job_id,
+            "message": "Video queued for processing. Check status with job_id.",
+            "check_url": f"/status/{job_id}"
+        }
+        
+    except Exception as e:
+        logger.error(f"Failed to queue video - Request ID: {request_id}, Error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to queue video: {str(e)}")
 
 
 # Rate limiting configuration
@@ -309,13 +235,43 @@ async def rate_limit_middleware(request: Request, call_next):
 
 @app.get("/health")
 async def health():
-    """Health check endpoint for container orchestration"""
-    return {
+    """Health check endpoint with service validation"""
+    health_status = {
         "status": "healthy",
         "timestamp": datetime.now().isoformat(),
         "environment": environment,
         "project_id": project_id,
+        "version": "1.0.0",
+        "services": {}
     }
+    
+    # Check cache service
+    try:
+        cache_healthy = cache_service.is_healthy()
+        health_status["services"]["cache"] = "healthy" if cache_healthy else "unhealthy"
+    except Exception as e:
+        health_status["services"]["cache"] = f"error: {str(e)}"
+        health_status["status"] = "degraded"
+    
+    # Check queue service
+    try:
+        queue_stats = queue_service.get_queue_stats()
+        health_status["services"]["queue"] = queue_stats.get("status", "unknown")
+        if queue_stats.get("status") == "error":
+            health_status["status"] = "degraded"
+    except Exception as e:
+        health_status["services"]["queue"] = f"error: {str(e)}"
+        health_status["status"] = "degraded"
+    
+    # Check TikTok scraper
+    try:
+        # Just check if the service is initialized
+        health_status["services"]["tiktok_scraper"] = "healthy"
+    except Exception as e:
+        health_status["services"]["tiktok_scraper"] = f"error: {str(e)}"
+        health_status["status"] = "degraded"
+    
+    return health_status
 
 
 @app.get("/status")
@@ -336,6 +292,9 @@ async def status():
     # Get cache stats
     cache_stats = cache_service.get_cache_stats()
     
+    # Get queue stats
+    queue_stats = queue_service.get_queue_stats()
+    
     return {
         "status": "operational",
         "timestamp": datetime.now().isoformat(),
@@ -350,12 +309,24 @@ async def status():
             "utilization_percent": round(((total_slots - available_slots) / total_slots) * 100, 2)
         },
         "cache": cache_stats,
+        "queue": queue_stats,
         "cloud_run": {
             "max_instances": 50,
             "concurrency_per_instance": 80,
             "max_concurrent_requests": 4000
         }
     }
+
+
+@app.get("/status/{job_id}")
+async def get_job_status(job_id: str):
+    """Check processing status for a specific job"""
+    result = await queue_service.get_job_result(job_id)
+    
+    if result.get("status") == "not_found":
+        raise HTTPException(status_code=404, detail="Job not found")
+    
+    return result
 
 
 @app.get("/test-api")

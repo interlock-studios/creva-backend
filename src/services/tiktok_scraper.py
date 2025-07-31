@@ -114,13 +114,18 @@ class ScrapingOptions:
 
 class TikTokScraper:
     def __init__(self):
+        """Initialize TikTok scraper with API key validation"""
         self.api_key = os.getenv("SCRAPECREATORS_API_KEY")
-        if not self.api_key:
-            raise ValueError("SCRAPECREATORS_API_KEY environment variable not set")
         
-        # Clean the API key - remove any whitespace, newlines, or formatting issues
-        self.api_key = self.api_key.strip()
+        # Validate required environment variables
+        if not self.api_key or self.api_key == "your_actual_api_key_here":
+            raise ValueError(
+                "SCRAPECREATORS_API_KEY environment variable is required and must be set to a valid API key. "
+                "Please update your .env file with your actual ScrapeCreators API key."
+            )
+        
         self.base_url = "https://api.scrapecreators.com/v2/tiktok/video"
+        logger.info("TikTok scraper initialized with API key validation")
 
         # Default headers for all requests
         self.default_headers = {

@@ -1,0 +1,54 @@
+# Cloud Build configuration for worker service
+# This file builds and deploys the worker service to Cloud Run
+
+steps:
+  # Build the Docker image
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['build', '-t', 'gcr.io/$PROJECT_ID/tiktok-workout-worker:$COMMIT_SHA', '.']
+
+  # Push the Docker image to Container Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'gcr.io/$PROJECT_ID/tiktok-workout-worker:$COMMIT_SHA']
+
+  # Deploy to Cloud Run
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - 'tiktok-workout-worker'
+      - '--image'
+      - 'gcr.io/$PROJECT_ID/tiktok-workout-worker:$COMMIT_SHA'
+      - '--region'
+      - 'us-central1'
+      - '--platform'
+      - 'managed'
+      - '--allow-unauthenticated'
+      - '--memory'
+      - '2Gi'
+      - '--cpu'
+      - '1'
+      - '--timeout'
+      - '300'
+      - '--concurrency'
+      - '1'  # One job at a time per instance
+      - '--max-instances'
+      - '10'  # Scale up to 10 workers
+      - '--min-instances'
+      - '1'   # Always have at least 1 worker running
+      - '--port'
+      - '8081'
+      - '--command'
+      - 'python'
+      - '--args'
+      - '-m'
+      - 'src.worker.worker_service'
+      - '--set-env-vars'
+      - 'ENVIRONMENT=production'
+      - '--service-account'
+      - 'tiktok-workout-worker@$PROJECT_ID.iam.gserviceaccount.com'
+
+images:
+  - 'gcr.io/$PROJECT_ID/tiktok-workout-worker:$COMMIT_SHA'
+
+timeout: '1200s'
