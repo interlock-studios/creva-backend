@@ -53,7 +53,7 @@ Create a `.env` file:
 GOOGLE_CLOUD_PROJECT_ID=sets-ai
 
 # ScrapeCreators API Key (for TikTok video scraping)
-SCRAPECREATORS_API_KEY=TqHKAnqkrYcEQDRFDf2mjyPawR43
+SCRAPECREATORS_API_KEY=scrapecreators_api_key_here
 
 # Optional: Set to 'production' for production environment
 ENVIRONMENT=development
