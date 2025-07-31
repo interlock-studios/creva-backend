@@ -117,6 +117,9 @@ class TikTokScraper:
         self.api_key = os.getenv("SCRAPECREATORS_API_KEY")
         if not self.api_key:
             raise ValueError("SCRAPECREATORS_API_KEY environment variable not set")
+        
+        # Clean the API key - remove any whitespace, newlines, or formatting issues
+        self.api_key = self.api_key.strip()
         self.base_url = "https://api.scrapecreators.com/v2/tiktok/video"
 
         # Default headers for all requests

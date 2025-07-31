@@ -15,7 +15,7 @@ This API takes a TikTok URL and automatically extracts:
 
 **Quick test:**
 ```bash
-curl -X POST "https://tiktok-workout-parser-341666880405.us-central1.run.app/process" \
+curl -X POST "https://tiktok-workout-parser-ty6tkvdynq-uc.a.run.app/process" \
   -H "Content-Type: application/json" \
   -d '{"url": "https://www.tiktok.com/@lastairbender222/video/7518493301046119710"}'
 ```
@@ -564,10 +564,10 @@ curl -X POST "http://localhost:8080/process" \
 #### Production Testing
 ```bash
 # Test the live API
-curl -X GET "https://tiktok-workout-parser-341666880405.us-central1.run.app/health"
+curl -X GET "https://tiktok-workout-parser-ty6tkvdynq-uc.a.run.app/health"
 
 # Test video processing
-curl -X POST "https://tiktok-workout-parser-341666880405.us-central1.run.app/process" \
+curl -X POST "https://tiktok-workout-parser-ty6tkvdynq-uc.a.run.app/process" \
   -H "Content-Type: application/json" \
   -d '{"url": "https://www.tiktok.com/@lastairbender222/video/7518493301046119710"}'
 ```

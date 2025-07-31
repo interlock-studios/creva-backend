@@ -19,7 +19,7 @@ class GenAIService:
         self.client = genai.Client(
             project=project_id,
             location="us-central1",
-            vertexai=True,
+            vertexai=True,  # Use Vertex AI backend
             http_options=HttpOptions(api_version="v1"),
         )
         self.model = "gemini-2.0-flash-lite"
