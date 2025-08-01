@@ -74,13 +74,13 @@ curl -X POST http://localhost:8080/process \
   -d '{"url": "https://www.tiktok.com/@lastairbender222/video/7518493301046119710"}'
 
 # Production testing
-curl https://tiktok-workout-parser-ty6tkvdynq-uc.a.run.app/health
-curl -X POST https://tiktok-workout-parser-ty6tkvdynq-uc.a.run.app/process \
+curl https://workout-parser-ty6tkvdynq-uc.a.run.app/health
+curl -X POST https://workout-parser-ty6tkvdynq-uc.a.run.app/process \
   -H "Content-Type: application/json" \
   -d '{"url": "https://www.tiktok.com/@user/video/1234567890"}'
 
 # Instagram testing
-curl -X POST https://tiktok-workout-parser-ty6tkvdynq-uc.a.run.app/process \
+curl -X POST https://workout-parser-ty6tkvdynq-uc.a.run.app/process \
   -H "Content-Type: application/json" \
   -d '{"url": "https://www.instagram.com/reel/CS7CshJjb15/"}'
 ```

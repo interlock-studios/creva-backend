@@ -6,16 +6,16 @@ Send a TikTok or Instagram URL → Get back structured workout data with exercis
 
 ## 🚀 Try It Now
 
-**Live API:** https://tiktok-workout-parser-ty6tkvdynq-uc.a.run.app
+**Live API:** https://workout-parser-ty6tkvdynq-uc.a.run.app
 
 ```bash
 # TikTok Example
-curl -X POST "https://tiktok-workout-parser-ty6tkvdynq-uc.a.run.app/process" \
+curl -X POST "https://workout-parser-ty6tkvdynq-uc.a.run.app/process" \
   -H "Content-Type: application/json" \
   -d '{"url": "https://www.tiktok.com/@lastairbender222/video/7518493301046119710"}'
 
 # Instagram Example  
-curl -X POST "https://tiktok-workout-parser-ty6tkvdynq-uc.a.run.app/process" \
+curl -X POST "https://workout-parser-ty6tkvdynq-uc.a.run.app/process" \
   -H "Content-Type: application/json" \
   -d '{"url": "https://www.instagram.com/reel/CS7CshJjb15/"}'
 ```
@@ -61,7 +61,7 @@ Same JSON as above, but takes 10-15 seconds to process.
 
 Then check status:
 ```bash
-curl "https://tiktok-workout-parser-ty6tkvdynq-uc.a.run.app/status/req123_1234567890"
+curl "https://workout-parser-ty6tkvdynq-uc.a.run.app/status/req123_1234567890"
 ```
 
 ## 🏗️ Technical Overview
@@ -186,7 +186,7 @@ make create-secrets
 make deploy
 ```
 
-Your API will be live at: `https://tiktok-workout-parser-xxx.run.app`
+Your API will be live at: `https://workout-parser-xxx.run.app`
 
 ## 🔍 Troubleshooting
 

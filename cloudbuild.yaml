@@ -1,6 +1,6 @@
 # Cloud Build configuration with security best practices
 substitutions:
-  _SERVICE_NAME: tiktok-workout-parser
+  _SERVICE_NAME: workout-parser
   _REGION: us-central1
   _ENVIRONMENT: production
 
@@ -133,10 +133,10 @@ steps:
         echo "Deploying worker service..."
         
         # Create worker service account if needed
-        WORKER_SA="tiktok-workout-worker@${PROJECT_ID}.iam.gserviceaccount.com"
+        WORKER_SA="workout-parser-worker@${PROJECT_ID}.iam.gserviceaccount.com"
         if ! gcloud iam service-accounts describe "$${WORKER_SA}" 2>/dev/null; then
           echo "Creating worker service account..."
-          gcloud iam service-accounts create tiktok-workout-worker \
+          gcloud iam service-accounts create workout-parser-worker \
             --display-name="TikTok Workout Worker Service Account"
           
           # Grant necessary permissions
@@ -150,7 +150,7 @@ steps:
         fi
         
         # Deploy worker service
-        gcloud run deploy tiktok-workout-worker \
+        gcloud run deploy workout-parser-worker \
           --image ${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_SERVICE_NAME}/${_SERVICE_NAME}:${SHORT_SHA} \
           --region ${_REGION} \
           --platform managed \

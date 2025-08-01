@@ -9,7 +9,7 @@ NC='\033[0m' # No Color
 
 # Configuration
 PROJECT_ID="sets-ai"
-SERVICE_NAME="tiktok-workout-parser"
+SERVICE_NAME="workout-parser"
 REGION="us-central1"
 ARTIFACT_REGISTRY="us-central1-docker.pkg.dev"
 REPOSITORY="${ARTIFACT_REGISTRY}/${PROJECT_ID}/${SERVICE_NAME}"
@@ -211,11 +211,11 @@ print_status "✅ API deployment complete!"
 print_status "Deploying Worker Service..."
 
 # Check if worker service account exists
-WORKER_SA="tiktok-workout-worker@${PROJECT_ID}.iam.gserviceaccount.com"
+WORKER_SA="workout-parser-worker@${PROJECT_ID}.iam.gserviceaccount.com"
 if ! gcloud iam service-accounts describe "${WORKER_SA}" >/dev/null 2>&1; then
     print_status "Creating worker service account..."
-    gcloud iam service-accounts create tiktok-workout-worker \
-        --display-name="TikTok Workout Worker Service Account"
+    gcloud iam service-accounts create workout-parser-worker \
+        --display-name="Workout Parser Worker Service Account"
     
     # Grant necessary permissions
     gcloud projects add-iam-policy-binding "${PROJECT_ID}" \
@@ -230,7 +230,7 @@ if ! gcloud iam service-accounts describe "${WORKER_SA}" >/dev/null 2>&1; then
 fi
 
 # Deploy worker service
-gcloud run deploy tiktok-workout-worker \
+gcloud run deploy workout-parser-worker \
     --image "${IMAGE_TAG}" \
     --region "${REGION}" \
     --platform managed \
@@ -252,7 +252,7 @@ gcloud run deploy tiktok-workout-worker \
 }
 
 # Get worker service URL
-WORKER_URL=$(gcloud run services describe tiktok-workout-worker \
+WORKER_URL=$(gcloud run services describe workout-parser-worker \
     --platform managed \
     --region "${REGION}" \
     --format 'value(status.url)' 2>/dev/null || echo "Worker not deployed")

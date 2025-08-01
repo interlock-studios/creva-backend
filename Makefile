@@ -3,7 +3,7 @@
 
 # Variables
 PROJECT_ID := sets-ai
-SERVICE_NAME := tiktok-workout-parser
+SERVICE_NAME := workout-parser
 REGION := us-central1
 PYTHON := python3.11
 VENV := .venv
