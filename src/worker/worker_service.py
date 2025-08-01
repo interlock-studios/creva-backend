@@ -12,7 +12,7 @@ from contextlib import asynccontextmanager
 from dotenv import load_dotenv
 import socket
 
-from src.services.tiktok_scraper import TikTokScraper, ScrapingOptions
+
 from src.services.genai_service_pool import GenAIServicePool
 from src.services.cache_service import CacheService
 from src.services.queue_service import QueueService
@@ -52,7 +52,6 @@ class VideoWorker:
         self.tasks = set()
         
         # Initialize services
-        self.scraper = TikTokScraper()
         self.genai_pool = GenAIServicePool()
         self.cache_service = CacheService()
         self.queue_service = QueueService()
@@ -76,22 +75,17 @@ class VideoWorker:
                 await self.queue_service.mark_job_complete(job_id, cached_workout)
                 return
             
-            # Configure scraping options with shorter timeout
-            options = ScrapingOptions(
-                get_transcript=True,
-                trim_response=True,
-                max_retries=2,  # Reduced retries
-                timeout=20,     # Reduced timeout
-            )
+            # 1. Download video using video processor (handles both TikTok and Instagram)
+            logger.info(f"Job {job_id} - Downloading and processing video...")
+            video_content, metadata_dict = await self.video_processor.download_video(url)
             
-            # 1. Scrape video with transcript
-            logger.info(f"Job {job_id} - Scraping video...")
-            video_content, metadata, transcript = await self.scraper.scrape_tiktok_complete(url, options)
+            # Extract transcript from metadata
+            transcript = metadata_dict.get("transcript_text")
             
             if transcript:
-                logger.info(f"Job {job_id} - Got transcript: {len(transcript)} characters")
+                logger.info(f"Job {job_id} - Got transcript/caption: {len(transcript)} characters")
             else:
-                logger.info(f"Job {job_id} - No transcript available")
+                logger.info(f"Job {job_id} - No transcript/caption available")
             
             # 2. Process audio removal and get GenAI service in parallel
             logger.info(f"Job {job_id} - Processing video and preparing AI service...")
@@ -105,7 +99,7 @@ class VideoWorker:
             )
             
             # 3. Analyze with Gemini
-            caption = metadata.description or metadata.caption
+            caption = metadata_dict.get("caption", "") or metadata_dict.get("description", "")
             logger.info(f"Job {job_id} - Analyzing with GenAI service {genai_service.service_id}...")
             
             workout_json = genai_service.analyze_video_with_transcript(
@@ -117,11 +111,12 @@ class VideoWorker:
             
             # 5. Cache the result
             cache_metadata = {
-                "title": metadata.title,
-                "author": metadata.author,
-                "duration_seconds": metadata.duration_seconds,
+                "title": metadata_dict.get("title", "Unknown"),
+                "author": metadata_dict.get("uploader", "Unknown"),
+                "duration_seconds": metadata_dict.get("duration", 0),
                 "processed_at": datetime.utcnow().isoformat(),
-                "worker_id": WORKER_ID
+                "worker_id": WORKER_ID,
+                "platform": metadata_dict.get("platform", "unknown")
             }
             self.cache_service.cache_workout(url, workout_json, cache_metadata)
             

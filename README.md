@@ -1,26 +1,33 @@
-# TikTok Workout Parser
+# Social Media Workout Parser
 
-**Turn any TikTok workout video into structured JSON data in seconds!**
+**Turn any TikTok or Instagram workout video into structured JSON data in seconds!**
 
-Send a TikTok URL → Get back structured workout data with exercises, sets, reps, and instructions.
+Send a TikTok or Instagram URL → Get back structured workout data with exercises, sets, reps, and instructions.
 
 ## 🚀 Try It Now
 
 **Live API:** https://tiktok-workout-parser-ty6tkvdynq-uc.a.run.app
 
 ```bash
+# TikTok Example
 curl -X POST "https://tiktok-workout-parser-ty6tkvdynq-uc.a.run.app/process" \
   -H "Content-Type: application/json" \
   -d '{"url": "https://www.tiktok.com/@lastairbender222/video/7518493301046119710"}'
+
+# Instagram Example  
+curl -X POST "https://tiktok-workout-parser-ty6tkvdynq-uc.a.run.app/process" \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://www.instagram.com/reel/CS7CshJjb15/"}'
 ```
 
 ## 🎯 How It Works
 
 ### Simple Flow
-1. **Send TikTok URL** → API receives your request
-2. **Check Cache** → If we've seen this video before, instant result!
-3. **Process Video** → Download video, extract transcript, analyze with AI
-4. **Return Data** → Get structured workout JSON
+1. **Send TikTok/Instagram URL** → API receives your request
+2. **Detect Platform** → Automatically routes to appropriate scraper
+3. **Check Cache** → If we've seen this video before, instant result!
+4. **Process Video** → Download video, extract transcript/caption, analyze with AI
+5. **Return Data** → Get structured workout JSON
 
 ### Three Response Types
 
@@ -116,11 +123,17 @@ make deploy       # Deploy to production
 ## 📡 API Endpoints
 
 ### `POST /process`
-Process a TikTok video
+Process a TikTok or Instagram video
 ```bash
+# TikTok
 curl -X POST http://localhost:8080/process \
   -H "Content-Type: application/json" \
   -d '{"url": "https://www.tiktok.com/@user/video/123"}'
+
+# Instagram
+curl -X POST http://localhost:8080/process \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://www.instagram.com/reel/ABC123/"}'
 ```
 
 ### `GET /status/{job_id}`
@@ -137,21 +150,22 @@ curl http://localhost:8080/health
 
 ## 🔧 How Processing Works
 
-### When you send a TikTok URL:
+### When you send a TikTok or Instagram URL:
 
-1. **URL Validation** - Check if it's a valid TikTok URL
-2. **Cache Check** - Look in Firestore cache (1-week TTL)
-3. **If Cached** → Return result instantly
-4. **If Not Cached** → Check system capacity
-5. **If Low Traffic** → Process directly (10-15 seconds)
-6. **If High Traffic** → Add to queue, return job_id
+1. **Platform Detection** - Automatically detect TikTok or Instagram
+2. **URL Validation** - Check if it's a valid URL for the detected platform
+3. **Cache Check** - Look in Firestore cache (1-week TTL)
+4. **If Cached** → Return result instantly
+5. **If Not Cached** → Check system capacity
+6. **If Low Traffic** → Process directly (10-15 seconds)
+7. **If High Traffic** → Add to queue, return job_id
 
 ### Background Processing (for queued videos):
 1. **Worker picks up job** from Firestore queue
-2. **Download video** using ScrapeCreators API
-3. **Extract transcript** from video metadata
+2. **Download video** using platform-specific scraper (TikTok/Instagram)
+3. **Extract metadata** - transcript from TikTok, caption from Instagram
 4. **Remove audio** with ffmpeg (faster AI processing)
-5. **Analyze with Gemini AI** (video + transcript)
+5. **Analyze with Gemini AI** (video + transcript/caption)
 6. **Store result** in cache and results collection
 7. **Update job status** to completed
 
@@ -267,10 +281,15 @@ make security
 curl http://localhost:8080/health    # API health
 curl http://localhost:8081/health    # Worker health
 
-# Test video processing (use real TikTok URLs)
+# Test video processing (use real TikTok or Instagram URLs)
 curl -X POST http://localhost:8080/process \
   -H "Content-Type: application/json" \
   -d '{"url": "https://www.tiktok.com/@lastairbender222/video/7518493301046119710"}'
+
+# Test Instagram processing
+curl -X POST http://localhost:8080/process \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://www.instagram.com/reel/CS7CshJjb15/"}'
 
 # Test error handling
 curl -X POST http://localhost:8080/process \
@@ -296,10 +315,15 @@ curl -X POST http://localhost:8080/process \
   -H "Content-Type: application/json" \
   -d '{"url": "https://www.tiktok.com/@user/video/NEW_VIDEO_ID"}'
 
+# Test Instagram video
+curl -X POST http://localhost:8080/process \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://www.instagram.com/reel/CS7CshJjb15/"}'
+
 # Test invalid URL
 curl -X POST http://localhost:8080/process \
   -H "Content-Type: application/json" \
-  -d '{"url": "not-a-tiktok-url"}'
+  -d '{"url": "not-a-valid-url"}'
 ```
 
 #### Code Quality Checks
@@ -383,12 +407,14 @@ curl -X GET "https://api.scrapecreators.com/health"  # If available
 src/
 ├── services/           # Business logic
 │   ├── tiktok_scraper.py   # Downloads TikTok videos
+│   ├── instagram_scraper.py # Downloads Instagram videos
+│   ├── url_router.py       # Platform detection and routing
 │   ├── genai_service.py    # AI video analysis  
 │   ├── cache_service.py    # Result caching
 │   └── queue_service.py    # Job queue management
 ├── worker/             # Background processing
 │   ├── worker_service.py   # Main worker process
-│   └── video_processor.py  # Video manipulation
+│   └── video_processor.py  # Video manipulation (handles both platforms)
 └── models/             # Data structures
     └── parser_result.py    # Workout JSON format
 ```
@@ -432,12 +458,14 @@ sets-ai-backend/
 ├── src/
 │   ├── services/
 │   │   ├── genai_service.py    # AI video analysis
-│   │   ├── tiktok_scraper.py   # Video downloading
+│   │   ├── tiktok_scraper.py   # TikTok video downloading
+│   │   ├── instagram_scraper.py # Instagram video downloading
+│   │   ├── url_router.py       # Platform detection and routing
 │   │   ├── queue_service.py    # Job queue management
 │   │   └── cache_service.py    # Result caching
 │   └── worker/
 │       ├── worker_service.py   # Background processing
-│       └── video_processor.py  # Video processing logic
+│       └── video_processor.py  # Video processing logic (both platforms)
 ├── Makefile                    # Development commands
 └── requirements.txt            # Dependencies
 ```

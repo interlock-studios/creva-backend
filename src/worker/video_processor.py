@@ -2,22 +2,42 @@ import ffmpeg
 import tempfile
 import os
 from typing import Tuple
+import logging
 
 from src.services.tiktok_scraper import TikTokScraper
+from src.services.instagram_scraper import InstagramScraper
+from src.services.url_router import URLRouter
+
+logger = logging.getLogger(__name__)
 
 
 class VideoProcessor:
     def __init__(self):
-        self.scraper = TikTokScraper()
+        self.tiktok_scraper = TikTokScraper()
+        self.instagram_scraper = InstagramScraper()
+        self.url_router = URLRouter()
 
     async def download_video(self, url: str) -> Tuple[bytes, dict]:
-        """Download video using ScrapCreators API"""
-        video_content, metadata_obj, transcript_text = await self.scraper.scrape_tiktok_complete(
-            url
-        )
+        """Download video using appropriate scraper based on platform"""
+        # Detect platform
+        platform = self.url_router.detect_platform(url)
+        
+        if platform is None:
+            raise ValueError(f"Unsupported URL: {url}. Only TikTok and Instagram URLs are supported.")
+        
+        logger.info(f"Processing {platform} video: {url}")
+        
+        # Use appropriate scraper
+        if platform == "tiktok":
+            video_content, metadata_obj, transcript_text = await self.tiktok_scraper.scrape_tiktok_complete(url)
+        else:  # instagram
+            video_content, metadata_obj, caption_text = await self.instagram_scraper.scrape_instagram_complete(url)
+            # Instagram returns caption instead of transcript, but we'll treat it similarly
+            transcript_text = caption_text
 
-        # Convert metadata to dict format
+        # Convert metadata to dict format (same format for both platforms)
         metadata = {
+            "platform": platform,
             "title": metadata_obj.title or "Unknown",
             "duration": metadata_obj.duration_seconds or 0,
             "uploader": metadata_obj.author or "Unknown",

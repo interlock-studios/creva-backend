@@ -15,11 +15,19 @@ import asyncio
 
 from src.services.tiktok_scraper import (
     TikTokScraper,
-    ScrapingOptions,
-    APIError,
-    NetworkError,
-    ValidationError,
+    ScrapingOptions as TikTokScrapingOptions,
+    APIError as TikTokAPIError,
+    NetworkError as TikTokNetworkError,
+    ValidationError as TikTokValidationError,
 )
+from src.services.instagram_scraper import (
+    InstagramScraper,
+    ScrapingOptions as InstagramScrapingOptions,
+    APIError as InstagramAPIError,
+    NetworkError as InstagramNetworkError,
+    ValidationError as InstagramValidationError,
+)
+from src.services.url_router import URLRouter
 from src.services.genai_service import GenAIService
 from src.services.cache_service import CacheService
 from src.services.queue_service import QueueService
@@ -57,8 +65,9 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="TikTok Workout Parser - AI Powered",
+    title="Social Media Workout Parser - AI Powered",
     version="1.0.0",
+    description="Parse workout videos from TikTok and Instagram using AI",
     docs_url="/docs" if environment != "production" else None,
     redoc_url="/redoc" if environment != "production" else None,
     lifespan=lifespan,
@@ -122,7 +131,9 @@ async def global_exception_handler(request: Request, exc: Exception):
     )
 
 
-scraper = TikTokScraper()
+tiktok_scraper = TikTokScraper()
+instagram_scraper = InstagramScraper()
+url_router = URLRouter()
 genai_service = GenAIService()
 video_processor = VideoProcessor()
 cache_service = CacheService()
@@ -150,22 +161,23 @@ async def process_video_direct(url: str, request_id: str):
         
         logger.info(f"Direct processing started - Request ID: {request_id}, Active: {active_direct_processing}")
         
-        # Configure scraping options
-        options = ScrapingOptions(
-            get_transcript=True,
-            trim_response=True,
-            max_retries=2,
-            timeout=20,
-        )
+        # Validate URL and detect platform
+        is_valid, error_msg, platform = url_router.validate_url(url)
+        if not is_valid:
+            raise ValueError(error_msg)
         
-        # 1. Scrape video
-        video_content, metadata, transcript = await scraper.scrape_tiktok_complete(url, options)
+        logger.info(f"Processing {platform} video - Request ID: {request_id}")
+        
+        # 1. Download and process video using video processor (handles both platforms)
+        video_content, metadata = await video_processor.download_video(url)
         
         # 2. Remove audio
         silent_video = await video_processor.remove_audio(video_content)
         
         # 3. Analyze with Gemini
-        caption = metadata.description or metadata.caption
+        caption = metadata.get("caption", "") or metadata.get("description", "")
+        transcript = metadata.get("transcript_text")
+        
         workout_json = genai_service.analyze_video_with_transcript(
             silent_video, transcript, caption
         )
@@ -409,48 +421,72 @@ async def get_job_status(job_id: str):
 
 @app.get("/test-api")
 async def test_api(req: Request):
-    """Test the ScrapeCreators API connection"""
+    """Test the ScrapeCreators API connection for both TikTok and Instagram"""
+    results = {}
+    
+    # Test TikTok
     try:
-        # Test with a simple video info fetch (no video download)
         test_url = "https://www.tiktok.com/@stoolpresidente/video/7463250363559218474"
-
-        options = ScrapingOptions(
-            get_transcript=False,  # Skip transcript for faster testing
+        options = TikTokScrapingOptions(
+            get_transcript=False,
             trim_response=True,
             max_retries=1,
             timeout=10,
         )
-
-        info = await scraper.get_video_info(test_url, options)
-
-        return {
+        info = await tiktok_scraper.get_video_info(test_url, options)
+        results["tiktok"] = {
             "status": "success",
-            "message": "API key is working correctly",
+            "message": "TikTok API working correctly",
             "test_video": {
                 "title": info["metadata"]["title"][:100],
                 "author": info["metadata"]["author"],
                 "duration": info["metadata"]["duration_seconds"],
             },
         }
-
-    except ValidationError as e:
-        return {"status": "error", "type": "validation", "message": str(e)}
-    except APIError as e:
-        if e.status_code == 401:
-            return {
-                "status": "error",
-                "type": "auth",
-                "message": "API key is invalid or missing",
-            }
-        else:
-            return {
-                "status": "error",
-                "type": "api",
-                "message": str(e),
-                "status_code": e.status_code,
-            }
+    except (TikTokValidationError, TikTokAPIError, TikTokNetworkError) as e:
+        results["tiktok"] = {
+            "status": "error",
+            "message": str(e),
+            "type": type(e).__name__
+        }
     except Exception as e:
-        return {"status": "error", "type": "unexpected", "message": str(e)}
+        results["tiktok"] = {"status": "error", "type": "unexpected", "message": str(e)}
+    
+    # Test Instagram
+    try:
+        test_url = "https://www.instagram.com/reel/DDXT72CSnUJ/"
+        options = InstagramScrapingOptions(
+            trim_response=True,
+            max_retries=1,
+            timeout=10,
+        )
+        info = await instagram_scraper.get_video_info(test_url, options)
+        results["instagram"] = {
+            "status": "success",
+            "message": "Instagram API working correctly",
+            "test_video": {
+                "title": info["metadata"]["title"][:100],
+                "author": info["metadata"]["author"],
+                "duration": info["metadata"]["duration_seconds"],
+            },
+        }
+    except (InstagramValidationError, InstagramAPIError, InstagramNetworkError) as e:
+        results["instagram"] = {
+            "status": "error", 
+            "message": str(e),
+            "type": type(e).__name__
+        }
+    except Exception as e:
+        results["instagram"] = {"status": "error", "type": "unexpected", "message": str(e)}
+    
+    # Overall status
+    overall_status = "success" if all(r["status"] == "success" for r in results.values()) else "partial"
+    
+    return {
+        "status": overall_status,
+        "message": "API connection test results",
+        "platforms": results
+    }
 
 
 @app.delete("/cache/{url_hash}")
