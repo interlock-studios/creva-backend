@@ -237,7 +237,7 @@ make dev-force
 - **Hybrid Processing** - Fast when quiet, scalable when busy
 - **Production Ready** - Handles failures, retries, monitoring
 - **Cost Efficient** - Only pay for what you use
-- **Open Source** - Customize however you want
+- **Proprietary Technology** - Advanced AI-powered video analysis
 
 ## 👨‍💻 For Developers
 
@@ -404,19 +404,29 @@ curl -X GET "https://api.scrapecreators.com/health"  # If available
 
 ### Project Structure
 ```
-src/
-├── services/           # Business logic
-│   ├── tiktok_scraper.py   # Downloads TikTok videos
-│   ├── instagram_scraper.py # Downloads Instagram videos
-│   ├── url_router.py       # Platform detection and routing
-│   ├── genai_service.py    # AI video analysis  
-│   ├── cache_service.py    # Result caching
-│   └── queue_service.py    # Job queue management
-├── worker/             # Background processing
-│   ├── worker_service.py   # Main worker process
-│   └── video_processor.py  # Video manipulation (handles both platforms)
-└── models/             # Data structures
-    └── parser_result.py    # Workout JSON format
+sets-ai-backend/
+├── main.py                     # Main FastAPI application
+├── src/
+│   ├── services/              # Core business logic services
+│   │   ├── tiktok_scraper.py      # TikTok video downloading & metadata
+│   │   ├── instagram_scraper.py   # Instagram video downloading & metadata
+│   │   ├── url_router.py          # Platform detection and URL validation
+│   │   ├── genai_service.py       # Single GenAI service instance
+│   │   ├── genai_service_pool.py  # Multiple GenAI services for workers
+│   │   ├── cache_service.py       # Firestore-based result caching
+│   │   ├── queue_service.py       # Firestore-based job queue
+│   │   └── config_validator.py    # Environment validation
+│   ├── worker/                # Background processing system
+│   │   ├── worker_service.py      # Main worker process (Cloud Run service)
+│   │   └── video_processor.py     # Video processing pipeline (both platforms)
+│   └── models/                # Data structures
+│       └── parser_result.py       # Workout JSON schema
+├── requirements.txt           # Python dependencies
+├── requirements-dev.txt       # Development dependencies
+├── Dockerfile                # Container configuration
+├── cloudbuild.yaml           # Google Cloud Build configuration
+├── Makefile                  # Development commands
+└── README.md                 # This file
 ```
 
 ### Environment Variables
@@ -432,44 +442,36 @@ WORKER_PORT=8081        # Worker port
 LOG_LEVEL=INFO          # DEBUG|INFO|WARNING|ERROR
 ```
 
-## 🤝 Contributing
+## 📚 Architecture Details
 
-### Quick Start
-1. Fork the repo
-2. Create a feature branch: `git checkout -b my-feature`
-3. Make your changes
-4. Test locally: `make dev` and test with curl
-5. Check code quality: `make validate`
-6. Commit changes: `git commit -m "Add my feature"`
-7. Push and create pull request
+### Service Architecture
+- **Main API** (`main.py`): FastAPI service handling HTTP requests
+- **Worker Service** (`src/worker/worker_service.py`): Background video processing
+- **GenAI Pool** (`src/services/genai_service_pool.py`): Multiple AI service instances
+- **Queue System** (`src/services/queue_service.py`): Firestore-based job management
+- **Cache System** (`src/services/cache_service.py`): Result caching with TTL
 
-### Code Standards
-- **Python**: Follow PEP 8, use type hints
-- **Async**: All I/O operations should be async
-- **Error Handling**: Use custom exceptions, log with context
-- **Testing**: Test manually with real TikTok URLs
-- **Documentation**: Update README if you change APIs
+### Processing Flow
+1. **Request comes in** → `main.py` receives TikTok/Instagram URL
+2. **Platform detection** → `url_router.py` determines TikTok vs Instagram
+3. **Cache check** → `cache_service.py` looks for existing results
+4. **Processing decision** → Direct processing or queue based on load
+5. **Video download** → Platform-specific scraper downloads video
+6. **AI analysis** → `genai_service_pool.py` analyzes with Gemini
+7. **Result storage** → Cache and return structured workout data
 
-## 📚 Project Structure
-
-```
-sets-ai-backend/
-├── main.py                     # Main API service
-├── src/
-│   ├── services/
-│   │   ├── genai_service.py    # AI video analysis
-│   │   ├── tiktok_scraper.py   # TikTok video downloading
-│   │   ├── instagram_scraper.py # Instagram video downloading
-│   │   ├── url_router.py       # Platform detection and routing
-│   │   ├── queue_service.py    # Job queue management
-│   │   └── cache_service.py    # Result caching
-│   └── worker/
-│       ├── worker_service.py   # Background processing
-│       └── video_processor.py  # Video processing logic (both platforms)
-├── Makefile                    # Development commands
-└── requirements.txt            # Dependencies
-```
+### Scaling Strategy
+- **Hybrid processing**: Direct for low load, queue for high load
+- **Multiple GenAI services**: Distribute API calls across service accounts
+- **Auto-scaling**: Cloud Run scales based on demand
+- **Worker instances**: Dedicated background processing capacity
 
 ---
 
 **Questions?** Open an issue or check the logs with `make logs`
+
+---
+
+**⚠️ Proprietary Software Notice**
+
+This software is proprietary and confidential. All rights reserved. This codebase contains trade secrets and proprietary technology for AI-powered video analysis. Unauthorized copying, distribution, or reverse engineering is prohibited.
