@@ -207,21 +207,21 @@ Required JSON structure:
 {
   "title": "descriptive workout title",
   "description": "brief description of the workout or null",
-  "workout_type": "one of: strength, cardio, hiit, yoga, stretching, bodyweight, mixed",
-  "duration_minutes": estimated duration as integer or null,
-  "difficulty_level": integer from 1 to 10,
+  "workout_type": "MUST be one of: push, pull, legs, upper body, lower body, full body, strength, cardio, HIIT, hypertrophy, endurance, power, mobility, flexibility",
+  "duration_minutes": estimatedtotal workout duration in minutes (including rest periods) as integer or null,
+  "difficulty_level": integer from 1 to 10 (1=beginner, 10=expert),
   "exercises": [
     {
       "name": "exercise name",
-      "muscle_groups": ["array of: chest, back, shoulders, biceps, triceps, legs, glutes, core, full_body"],
-      "equipment": "one of: none, dumbbells, barbell, resistance_bands, kettlebell, machine, bodyweight, other",
+      "muscle_groups": ["MUST use exact values from: abs, arms, back, biceps, calves, chest, core, forearms, glutes, hamstrings, lats, legs, lower back, obliques, quads, shoulders, traps, triceps"],
+      "equipment": "equipment needed (examples: Barbell, Dumbbells, Kettlebell, Machine, Cable, Bodyweight, Resistance Band, Medicine Ball, Pull-up Bar, Dip Station, None)",
       "sets": [
         {
           "reps": integer or null,
           "weight_lbs": number or null,
           "duration_seconds": integer or null,
           "distance_miles": number or null,
-          "rest_seconds": integer or null
+          "rest_seconds": integer or null (defaults to 90 if not specified)
         }
       ],
       "instructions": "brief instructions or null"
@@ -230,6 +230,16 @@ Required JSON structure:
   "tags": ["array of relevant tags"] or null,
   "creator": "creator name or null"
 }
+
+CRITICAL REQUIREMENTS:
+- Each exercise MUST have at least 1 set
+- Each set MUST include at least ONE measurement (reps, weight_lbs, duration_seconds, or distance_miles)
+- For strength exercises: use reps and optionally weight_lbs
+- For cardio exercises: use duration_seconds or distance_miles
+- For bodyweight exercises: use reps and optionally duration_seconds
+- muscle_groups must use EXACT values from the list above
+- equipment should be descriptive (use common names like those in examples above)
+- workout_type must use EXACT values from the list above
 
 IMPORTANT: Your response must be ONLY the JSON object, with no markdown formatting, no code blocks, no explanations before or after."""
         
