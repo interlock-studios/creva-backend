@@ -1,6 +1,6 @@
 from google import genai
 from google.genai.types import HttpOptions, Part, GenerateContentConfig
-from src.models.parser_result import VideoMetadata
+
 from google.auth import default
 from google.oauth2 import service_account
 from typing import Dict, Any, Optional, List
@@ -16,28 +16,28 @@ logger = logging.getLogger(__name__)
 
 class GenAIServicePool:
     """Pool of GenAI services for distributed rate limiting"""
-    
+
     def __init__(self):
         self.services = []
         self.current_index = 0
         self.lock = asyncio.Lock()
-        
+
         # Get project ID
         self.project_id = os.getenv("GOOGLE_CLOUD_PROJECT_ID")
         if not self.project_id:
             raise ValueError("GOOGLE_CLOUD_PROJECT_ID environment variable not set")
-        
+
         # Initialize services with different approaches
         self._init_services()
-        
+
         if not self.services:
             raise ValueError("No GenAI services could be initialized")
-        
+
         logger.info(f"Initialized GenAI service pool with {len(self.services)} services")
-    
+
     def _init_services(self):
         """Initialize multiple GenAI services"""
-        
+
         # Method 1: Multiple service account files
         sa_files = os.getenv("GOOGLE_SERVICE_ACCOUNT_FILES", "").split(",")
         for sa_file in sa_files:
@@ -57,9 +57,11 @@ class GenAIServicePool:
                     logger.info(f"Loaded service account from file: {sa_file}")
                 except Exception as e:
                     logger.error(f"Failed to load service account from {sa_file}: {e}")
-        
+
         # Method 2: Multiple service account JSON strings (for Cloud Run)
-        sa_jsons = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSONS", "").split("|||")  # Use ||| as delimiter
+        sa_jsons = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSONS", "").split(
+            "|||"
+        )  # Use ||| as delimiter
         for i, sa_json in enumerate(sa_jsons):
             sa_json = sa_json.strip()
             if sa_json:
@@ -78,7 +80,7 @@ class GenAIServicePool:
                     logger.info(f"Loaded service account from JSON string {i}")
                 except Exception as e:
                     logger.error(f"Failed to load service account from JSON {i}: {e}")
-        
+
         # Method 3: Default credentials (if no explicit accounts provided)
         if not self.services:
             try:
@@ -96,7 +98,7 @@ class GenAIServicePool:
                 logger.info("Using default credentials")
             except Exception as e:
                 logger.error(f"Failed to use default credentials: {e}")
-        
+
         # Method 4: Multiple locations for same project (distributes load)
         locations = os.getenv("GEMINI_LOCATIONS", "us-central1").split(",")
         if len(locations) > 1 and self.services:
@@ -117,24 +119,24 @@ class GenAIServicePool:
                     logger.info(f"Added service for location: {location}")
                 except Exception as e:
                     logger.error(f"Failed to add service for location {location}: {e}")
-    
-    async def get_next_service(self) -> 'GenAIService':
+
+    async def get_next_service(self) -> "GenAIService":
         """Get next available service in round-robin fashion"""
         async with self.lock:
             if not self.services:
                 raise Exception("No GenAI services available")
-            
+
             # Simple round-robin
             service = self.services[self.current_index]
             self.current_index = (self.current_index + 1) % len(self.services)
-            
+
             logger.debug(f"Using GenAI service: {service.service_id}")
             return service
-    
+
     def get_pool_size(self) -> int:
         """Get number of services in pool"""
         return len(self.services)
-    
+
     async def analyze_video(
         self,
         video_content: bytes,
@@ -144,7 +146,7 @@ class GenAIServicePool:
         """Analyze video using round-robin GenAI service selection"""
         service = await self.get_next_service()
         return service.analyze_video_with_transcript(video_content, transcript, caption)
-    
+
     async def analyze_slideshow(
         self,
         slideshow_images: List[bytes],
@@ -158,14 +160,14 @@ class GenAIServicePool:
 
 class GenAIService:
     """Individual GenAI service instance"""
-    
+
     def __init__(self, client: genai.Client, service_id: str):
         self.client = client
         self.service_id = service_id
         self.model = "gemini-2.0-flash-lite"
         self.last_request_time = 0
         self.min_request_interval = 0.2  # 200ms between requests per service
-    
+
     def _retry_with_backoff(self, func, max_retries=3, base_delay=1):
         """Retry function with exponential backoff for 429 errors"""
         for attempt in range(max_retries):
@@ -175,9 +177,11 @@ class GenAIService:
                 error_str = str(e)
                 if "429" in error_str or "RESOURCE_EXHAUSTED" in error_str:
                     if attempt == max_retries - 1:
-                        logger.error(f"Service {self.service_id} - Max retries reached for 429 error")
+                        logger.error(
+                            f"Service {self.service_id} - Max retries reached for 429 error"
+                        )
                         raise e
-                    
+
                     # Exponential backoff with jitter
                     delay = base_delay * (2**attempt) + random.uniform(0, 1)
                     logger.warning(
@@ -189,7 +193,7 @@ class GenAIService:
                     # Non-429 error, don't retry
                     raise e
         return None
-    
+
     def _rate_limit(self):
         """Ensure minimum time between requests for this service"""
         current_time = time.time()
@@ -199,7 +203,7 @@ class GenAIService:
             logger.debug(f"Service {self.service_id} - Rate limiting: waiting {sleep_time:.2f}s")
             time.sleep(sleep_time)
         self.last_request_time = time.time()
-    
+
     def analyze_video_with_transcript(
         self,
         video_content: bytes,
@@ -207,19 +211,19 @@ class GenAIService:
         caption: Optional[str] = None,
     ) -> Optional[Dict[str, Any]]:
         """Analyze video with Gemini 2.0 Flash"""
-        
+
         # Apply rate limiting for this specific service
         self._rate_limit()
-        
+
         # Build prompt
         prompt = "You are an expert fitness instructor analyzing a TikTok workout video."
-        
+
         if transcript:
             prompt += f"\n\nTRANSCRIPT:\n{transcript}"
-        
+
         if caption:
             prompt += f"\n\nCAPTION:\n{caption}"
-        
+
         prompt += """
 
 Analyze this workout video and extract the following information. Return your response as a valid JSON object with NO additional text, explanations, or formatting.
@@ -263,10 +267,10 @@ CRITICAL REQUIREMENTS:
 - workout_type must use EXACT values from the list above
 
 IMPORTANT: Your response must be ONLY the JSON object, with no markdown formatting, no code blocks, no explanations before or after."""
-        
+
         # Prepare content
         contents = [prompt, Part.from_bytes(data=video_content, mime_type="video/mp4")]
-        
+
         # Generate content with retry logic
         def make_request():
             return self.client.models.generate_content(
@@ -279,15 +283,15 @@ IMPORTANT: Your response must be ONLY the JSON object, with no markdown formatti
                     response_mime_type="application/json",
                 ),
             )
-        
+
         logger.info(f"Service {self.service_id} - Analyzing video")
         response = self._retry_with_backoff(make_request, max_retries=5, base_delay=2)
-        
+
         # Parse response
         try:
             response_text = response.text.strip()
             logger.debug(f"Service {self.service_id} - Raw response: {response_text[:500]}...")
-            
+
             # Clean up response if needed
             if "```json" in response_text:
                 json_start = response_text.find("```json") + 7
@@ -297,7 +301,7 @@ IMPORTANT: Your response must be ONLY the JSON object, with no markdown formatti
                 json_start = response_text.find("```") + 3
                 json_end = response_text.find("```", json_start)
                 response_text = response_text[json_start:json_end].strip()
-            
+
             return json.loads(response_text)
         except Exception as e:
             logger.error(f"Service {self.service_id} - Failed to parse response: {e}")
@@ -310,22 +314,23 @@ IMPORTANT: Your response must be ONLY the JSON object, with no markdown formatti
         caption: Optional[str] = None,
     ) -> Optional[Dict[str, Any]]:
         """Analyze slideshow images with Gemini 2.0 Flash"""
-        
+
         # Apply rate limiting for this specific service
         self._rate_limit()
-        
+
         # Build prompt for slideshow analysis
         prompt = "You are an expert fitness instructor analyzing a TikTok workout slideshow containing multiple images."
-        
+
         if transcript:
             prompt += f"\n\nTRANSCRIPT:\n{transcript}"
-        
+
         if caption:
             prompt += f"\n\nCAPTION:\n{caption}"
-        
-        prompt += f"""
 
-This is a slideshow with {len(slideshow_images)} images showing workout exercises, poses, or fitness content. Analyze ALL the images together to extract the following information. Return your response as a valid JSON object with NO additional text, explanations, or formatting.
+        image_count = len(slideshow_images)
+        prompt += f"\n\nThis is a slideshow with {image_count} images showing workout exercises, poses, or fitness content. Analyze ALL the images together to extract the following information. Return your response as a valid JSON object with NO additional text, explanations, or formatting."
+
+        prompt += """
 
 Required JSON structure:
 {
@@ -367,10 +372,10 @@ CRITICAL REQUIREMENTS:
 - Analyze ALL images together to understand the complete workout sequence
 
 IMPORTANT: Your response must be ONLY the JSON object, with no markdown formatting, no code blocks, no explanations before or after."""
-        
+
         # Prepare content with multiple images
         contents = [prompt]
-        
+
         # Add all slideshow images to the analysis
         valid_images = 0
         for i, image_content in enumerate(slideshow_images):
@@ -379,12 +384,14 @@ IMPORTANT: Your response must be ONLY the JSON object, with no markdown formatti
                     contents.append(Part.from_bytes(data=image_content, mime_type="image/jpeg"))
                     valid_images += 1
                 except Exception as e:
-                    logger.warning(f"Service {self.service_id} - Failed to add image {i} to analysis: {e}")
-        
+                    logger.warning(
+                        f"Service {self.service_id} - Failed to add image {i} to analysis: {e}"
+                    )
+
         if valid_images == 0:
             logger.error(f"Service {self.service_id} - No valid images found in slideshow")
             return None
-        
+
         # Generate content with retry logic
         def make_request():
             return self.client.models.generate_content(
@@ -397,15 +404,17 @@ IMPORTANT: Your response must be ONLY the JSON object, with no markdown formatti
                     response_mime_type="application/json",
                 ),
             )
-        
+
         logger.info(f"Service {self.service_id} - Analyzing slideshow with {valid_images} images")
         response = self._retry_with_backoff(make_request, max_retries=5, base_delay=2)
-        
+
         # Parse response
         try:
             response_text = response.text.strip()
-            logger.debug(f"Service {self.service_id} - Raw slideshow response: {response_text[:500]}...")
-            
+            logger.debug(
+                f"Service {self.service_id} - Raw slideshow response: {response_text[:500]}..."
+            )
+
             # Clean up response if needed
             if "```json" in response_text:
                 json_start = response_text.find("```json") + 7
@@ -415,7 +424,7 @@ IMPORTANT: Your response must be ONLY the JSON object, with no markdown formatti
                 json_start = response_text.find("```") + 3
                 json_end = response_text.find("```", json_start)
                 response_text = response_text[json_start:json_end].strip()
-            
+
             return json.loads(response_text)
         except Exception as e:
             logger.error(f"Service {self.service_id} - Failed to parse slideshow response: {e}")

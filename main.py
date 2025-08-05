@@ -141,6 +141,7 @@ queue_service = QueueService()
 
 # Track active direct processing
 import threading
+
 active_direct_processing = 0
 active_processing_lock = threading.Lock()
 MAX_DIRECT_PROCESSING = 5  # Process directly if under this limit
@@ -153,44 +154,73 @@ class ProcessRequest(BaseModel):
 async def process_video_direct(url: str, request_id: str):
     """Process video directly (not through queue)"""
     global active_direct_processing
-    
+
     try:
         # Increment active processing count
         with active_processing_lock:
             active_direct_processing += 1
-        
-        logger.info(f"Direct processing started - Request ID: {request_id}, Active: {active_direct_processing}")
-        
+
+        logger.info(
+            f"Direct processing started - Request ID: {request_id}, Active: {active_direct_processing}"
+        )
+
         # Validate URL and detect platform
         is_valid, error_msg, platform = url_router.validate_url(url)
         if not is_valid:
             raise ValueError(error_msg)
-        
+
         logger.info(f"Processing {platform} video - Request ID: {request_id}")
-        
+
         # 1. Download and process video using video processor (handles both platforms)
         video_content, metadata = await video_processor.download_video(url)
-        
-        # 2. Remove audio
-        silent_video = await video_processor.remove_audio(video_content)
-        
-        # 3. Analyze with Gemini
+
+        # Check if this is a slideshow
+        is_slideshow = metadata.get("is_slideshow", False)
         caption = metadata.get("caption", "") or metadata.get("description", "")
         transcript = metadata.get("transcript_text")
-        
-        workout_json = genai_service.analyze_video_with_transcript(
-            silent_video, transcript, caption
-        )
-        
+
+        if is_slideshow:
+            # Handle slideshow content - get all images and analyze directly
+            logger.info(f"Processing slideshow with {metadata.get('image_count', 0)} images - Request ID: {request_id}")
+            
+            if platform == "tiktok":
+                # Get all slideshow images for AI analysis
+                slideshow_images, slideshow_metadata, slideshow_transcript = (
+                    await tiktok_scraper.scrape_tiktok_slideshow(url)
+                )
+                
+                # Use slideshow-specific transcript if available
+                if slideshow_transcript:
+                    transcript = slideshow_transcript
+                
+                # Analyze slideshow with Gemini (use single service for direct processing)
+                workout_json = genai_service.analyze_slideshow_with_transcript(
+                    slideshow_images, transcript, caption
+                )
+            else:
+                # Instagram slideshows not yet supported
+                raise Exception("Instagram slideshows not yet supported")
+        else:
+            # Handle regular video content
+            logger.info(f"Processing regular video - Request ID: {request_id}")
+            
+            # 2. Remove audio
+            silent_video = await video_processor.remove_audio(video_content)
+
+            # 3. Analyze with Gemini
+            workout_json = genai_service.analyze_video_with_transcript(
+                silent_video, transcript, caption
+            )
+
         if not workout_json:
             raise Exception("Could not extract workout information from video")
-        
+
         # 4. Cache the result
         cache_service.cache_workout(url, workout_json)
-        
+
         logger.info(f"Direct processing completed - Request ID: {request_id}")
         return workout_json
-        
+
     finally:
         # Always decrement counter
         with active_processing_lock:
@@ -200,68 +230,78 @@ async def process_video_direct(url: str, request_id: str):
 @app.post("/process")
 async def process_video(request: ProcessRequest, req: Request):
     """Hybrid processing: try direct first, fall back to queue if busy"""
-    
+
     request_id = getattr(req.state, "request_id", "unknown")
-    
+
     # Check cache first
     cached_workout = cache_service.get_cached_workout(request.url)
     if cached_workout:
         logger.info(f"Returning cached result - Request ID: {request_id}, URL: {request.url}")
         return cached_workout
-    
+
     # Check if already in queue
     existing_job = await queue_service.get_job_by_url(request.url, status="pending")
     if existing_job:
-        logger.info(f"Video already queued - Request ID: {request_id}, Job ID: {existing_job['job_id']}")
+        logger.info(
+            f"Video already queued - Request ID: {request_id}, Job ID: {existing_job['job_id']}"
+        )
         return {
             "status": "queued",
             "job_id": existing_job["job_id"],
             "message": "Video already queued for processing",
-            "check_url": f"/status/{existing_job['job_id']}"
+            "check_url": f"/status/{existing_job['job_id']}",
         }
-    
+
     processing_job = await queue_service.get_job_by_url(request.url, status="processing")
     if processing_job:
-        logger.info(f"Video already processing - Request ID: {request_id}, Job ID: {processing_job['job_id']}")
+        logger.info(
+            f"Video already processing - Request ID: {request_id}, Job ID: {processing_job['job_id']}"
+        )
         return {
             "status": "processing",
             "job_id": processing_job["job_id"],
             "message": "Video is currently being processed",
-            "check_url": f"/status/{processing_job['job_id']}"
+            "check_url": f"/status/{processing_job['job_id']}",
         }
-    
+
     # Try direct processing if we have capacity
     with active_processing_lock:
         can_process_direct = active_direct_processing < MAX_DIRECT_PROCESSING
-    
+
     if can_process_direct:
         try:
             # Try to process directly with timeout
             result = await asyncio.wait_for(
                 process_video_direct(request.url, request_id),
-                timeout=30.0  # 30 second timeout for direct processing
+                timeout=30.0,  # 30 second timeout for direct processing
             )
             return result
         except asyncio.TimeoutError:
-            logger.warning(f"Direct processing timeout - Request ID: {request_id}, falling back to queue")
+            logger.warning(
+                f"Direct processing timeout - Request ID: {request_id}, falling back to queue"
+            )
         except Exception as e:
-            logger.error(f"Direct processing failed - Request ID: {request_id}, Error: {str(e)}, falling back to queue")
+            logger.error(
+                f"Direct processing failed - Request ID: {request_id}, Error: {str(e)}, falling back to queue"
+            )
     else:
-        logger.info(f"At capacity ({active_direct_processing}/{MAX_DIRECT_PROCESSING}) - Request ID: {request_id}, using queue")
-    
+        logger.info(
+            f"At capacity ({active_direct_processing}/{MAX_DIRECT_PROCESSING}) - Request ID: {request_id}, using queue"
+        )
+
     # Fall back to queue
     try:
         job_id = await queue_service.enqueue_video(request.url, request_id, priority="normal")
-        
+
         logger.info(f"Video queued for processing - Request ID: {request_id}, Job ID: {job_id}")
-        
+
         return {
             "status": "queued",
             "job_id": job_id,
             "message": "Video queued for processing. Check status with job_id.",
-            "check_url": f"/status/{job_id}"
+            "check_url": f"/status/{job_id}",
         }
-        
+
     except Exception as e:
         logger.error(f"Failed to queue video - Request ID: {request_id}, Error: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to process video: {str(e)}")
@@ -269,12 +309,13 @@ async def process_video(request: ProcessRequest, req: Request):
 
 # Rate limiting configuration
 RATE_LIMIT_REQUESTS = int(os.getenv("RATE_LIMIT_REQUESTS", "10"))  # requests per window
-RATE_LIMIT_WINDOW = int(os.getenv("RATE_LIMIT_WINDOW", "60"))     # seconds
+RATE_LIMIT_WINDOW = int(os.getenv("RATE_LIMIT_WINDOW", "60"))  # seconds
 rate_limit_store = defaultdict(list)
 
 # Request queue management
 MAX_CONCURRENT_PROCESSING = int(os.getenv("MAX_CONCURRENT_PROCESSING", "50"))
 processing_semaphore = asyncio.Semaphore(MAX_CONCURRENT_PROCESSING)
+
 
 # Rate limiting middleware
 @app.middleware("http")
@@ -282,20 +323,21 @@ async def rate_limit_middleware(request: Request, call_next):
     # Skip rate limiting for health checks
     if request.url.path == "/health":
         return await call_next(request)
-    
+
     # Get client IP (handle proxy headers)
     client_ip = request.headers.get("X-Forwarded-For", request.client.host)
     if "," in client_ip:
         client_ip = client_ip.split(",")[0].strip()
-    
+
     current_time = time.time()
-    
+
     # Clean old entries
     rate_limit_store[client_ip] = [
-        req_time for req_time in rate_limit_store[client_ip] 
+        req_time
+        for req_time in rate_limit_store[client_ip]
         if current_time - req_time < RATE_LIMIT_WINDOW
     ]
-    
+
     # Check rate limit
     if len(rate_limit_store[client_ip]) >= RATE_LIMIT_REQUESTS:
         logger.warning(f"Rate limit exceeded for IP: {client_ip}")
@@ -304,14 +346,14 @@ async def rate_limit_middleware(request: Request, call_next):
             content={
                 "error": "Rate limit exceeded",
                 "detail": f"Too many requests. Limit: {RATE_LIMIT_REQUESTS} requests per {RATE_LIMIT_WINDOW} seconds",
-                "retry_after": RATE_LIMIT_WINDOW
+                "retry_after": RATE_LIMIT_WINDOW,
             },
-            headers={"Retry-After": str(RATE_LIMIT_WINDOW)}
+            headers={"Retry-After": str(RATE_LIMIT_WINDOW)},
         )
-    
+
     # Add current request
     rate_limit_store[client_ip].append(current_time)
-    
+
     return await call_next(request)
 
 
@@ -324,9 +366,9 @@ async def health():
         "environment": environment,
         "project_id": project_id,
         "version": "1.0.0",
-        "services": {}
+        "services": {},
     }
-    
+
     # Check cache service
     try:
         cache_healthy = cache_service.is_healthy()
@@ -334,7 +376,7 @@ async def health():
     except Exception as e:
         health_status["services"]["cache"] = f"error: {str(e)}"
         health_status["status"] = "degraded"
-    
+
     # Check queue service
     try:
         queue_stats = queue_service.get_queue_stats()
@@ -344,7 +386,7 @@ async def health():
     except Exception as e:
         health_status["services"]["queue"] = f"error: {str(e)}"
         health_status["status"] = "degraded"
-    
+
     # Check TikTok scraper
     try:
         # Just check if the service is initialized
@@ -352,7 +394,7 @@ async def health():
     except Exception as e:
         health_status["services"]["tiktok_scraper"] = f"error: {str(e)}"
         health_status["status"] = "degraded"
-    
+
     return health_status
 
 
@@ -360,23 +402,24 @@ async def health():
 async def status():
     """Status endpoint showing current system load and queue status"""
     current_time = time.time()
-    
+
     # Calculate active rate limit entries
     active_ips = sum(
-        1 for ip_requests in rate_limit_store.values()
+        1
+        for ip_requests in rate_limit_store.values()
         if any(current_time - req_time < RATE_LIMIT_WINDOW for req_time in ip_requests)
     )
-    
+
     # Calculate semaphore status
     available_slots = processing_semaphore._value
     total_slots = MAX_CONCURRENT_PROCESSING
-    
+
     # Get cache stats
     cache_stats = cache_service.get_cache_stats()
-    
+
     # Get queue stats
     queue_stats = queue_service.get_queue_stats()
-    
+
     return {
         "status": "operational",
         "timestamp": datetime.now().isoformat(),
@@ -385,26 +428,26 @@ async def status():
             "direct_processing": {
                 "active": active_direct_processing,
                 "max": MAX_DIRECT_PROCESSING,
-                "available": MAX_DIRECT_PROCESSING - active_direct_processing
-            }
+                "available": MAX_DIRECT_PROCESSING - active_direct_processing,
+            },
         },
         "rate_limiting": {
             "active_ips": active_ips,
             "limit_per_ip": RATE_LIMIT_REQUESTS,
-            "window_seconds": RATE_LIMIT_WINDOW
+            "window_seconds": RATE_LIMIT_WINDOW,
         },
         "processing_queue": {
             "available_slots": available_slots,
             "total_slots": total_slots,
-            "utilization_percent": round(((total_slots - available_slots) / total_slots) * 100, 2)
+            "utilization_percent": round(((total_slots - available_slots) / total_slots) * 100, 2),
         },
         "cache": cache_stats,
         "queue": queue_stats,
         "cloud_run": {
             "max_instances": 50,
             "concurrency_per_instance": 80,
-            "max_concurrent_requests": 4000
-        }
+            "max_concurrent_requests": 4000,
+        },
     }
 
 
@@ -412,10 +455,10 @@ async def status():
 async def get_job_status(job_id: str):
     """Check processing status for a specific job"""
     result = await queue_service.get_job_result(job_id)
-    
+
     if result.get("status") == "not_found":
         raise HTTPException(status_code=404, detail="Job not found")
-    
+
     return result
 
 
@@ -423,7 +466,7 @@ async def get_job_status(job_id: str):
 async def test_api(req: Request):
     """Test the ScrapeCreators API connection for both TikTok and Instagram"""
     results = {}
-    
+
     # Test TikTok
     try:
         test_url = "https://www.tiktok.com/@stoolpresidente/video/7463250363559218474"
@@ -444,14 +487,10 @@ async def test_api(req: Request):
             },
         }
     except (TikTokValidationError, TikTokAPIError, TikTokNetworkError) as e:
-        results["tiktok"] = {
-            "status": "error",
-            "message": str(e),
-            "type": type(e).__name__
-        }
+        results["tiktok"] = {"status": "error", "message": str(e), "type": type(e).__name__}
     except Exception as e:
         results["tiktok"] = {"status": "error", "type": "unexpected", "message": str(e)}
-    
+
     # Test Instagram
     try:
         test_url = "https://www.instagram.com/reel/DDXT72CSnUJ/"
@@ -471,21 +510,19 @@ async def test_api(req: Request):
             },
         }
     except (InstagramValidationError, InstagramAPIError, InstagramNetworkError) as e:
-        results["instagram"] = {
-            "status": "error", 
-            "message": str(e),
-            "type": type(e).__name__
-        }
+        results["instagram"] = {"status": "error", "message": str(e), "type": type(e).__name__}
     except Exception as e:
         results["instagram"] = {"status": "error", "type": "unexpected", "message": str(e)}
-    
+
     # Overall status
-    overall_status = "success" if all(r["status"] == "success" for r in results.values()) else "partial"
-    
+    overall_status = (
+        "success" if all(r["status"] == "success" for r in results.values()) else "partial"
+    )
+
     return {
         "status": overall_status,
         "message": "API connection test results",
-        "platforms": results
+        "platforms": results,
     }
 
 
@@ -495,7 +532,7 @@ async def invalidate_cache_by_hash(url_hash: str):
     # This is a debug endpoint - in production you might want to restrict access
     if environment == "production":
         raise HTTPException(status_code=404, detail="Not found")
-    
+
     try:
         if cache_service.db:
             doc_ref = cache_service.cache_collection.document(url_hash)
@@ -516,12 +553,12 @@ async def invalidate_cache_by_url(request: ProcessRequest):
     """Invalidate cache for a specific TikTok URL"""
     if environment == "production":
         raise HTTPException(status_code=404, detail="Not found")
-    
+
     success = cache_service.invalidate_cache(request.url)
     return {
         "url": request.url,
         "invalidated": success,
-        "cache_key": cache_service._generate_cache_key(request.url)
+        "cache_key": cache_service._generate_cache_key(request.url),
     }
 
 

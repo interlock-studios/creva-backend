@@ -38,11 +38,13 @@ logger = logging.getLogger(__name__)
 
 class InstagramScraperError(Exception):
     """Base exception for Instagram scraper errors"""
+
     pass
 
 
 class APIError(InstagramScraperError):
     """API related errors"""
+
     def __init__(
         self,
         message: str,
@@ -56,17 +58,20 @@ class APIError(InstagramScraperError):
 
 class ValidationError(InstagramScraperError):
     """Input validation errors"""
+
     pass
 
 
 class NetworkError(InstagramScraperError):
     """Network related errors"""
+
     pass
 
 
 @dataclass
 class ScrapingOptions:
     """Options for Instagram scraping"""
+
     trim_response: bool = True
     max_retries: int = 3
     timeout: int = 30
@@ -76,14 +81,14 @@ class InstagramScraper:
     def __init__(self):
         """Initialize Instagram scraper with API key validation"""
         self.api_key = os.getenv("SCRAPECREATORS_API_KEY")
-        
+
         # Validate required environment variables
         if not self.api_key or self.api_key == "your_actual_api_key_here":
             raise ValueError(
                 "SCRAPECREATORS_API_KEY environment variable is required and must be set to a valid API key. "
                 "Please update your .env file with your actual ScrapeCreators API key."
             )
-        
+
         self.base_url = "https://api.scrapecreators.com/v1/instagram/post"
         logger.info("Instagram scraper initialized with API key validation")
 
@@ -120,16 +125,18 @@ class InstagramScraper:
             "www.instagr.am",
         ]
         if parsed.netloc.lower() not in valid_domains:
-            raise ValidationError(f"URL domain '{parsed.netloc}' is not a recognized Instagram domain")
+            raise ValidationError(
+                f"URL domain '{parsed.netloc}' is not a recognized Instagram domain"
+            )
 
         # Check if it's a valid Instagram post/reel URL pattern
         path = parsed.path
         valid_patterns = [
-            r'^/p/[A-Za-z0-9_-]+/?$',  # Post URL
-            r'^/reel/[A-Za-z0-9_-]+/?$',  # Reel URL
-            r'^/reels?/[A-Za-z0-9_-]+/?$',  # Alternative reel URL
+            r"^/p/[A-Za-z0-9_-]+/?$",  # Post URL
+            r"^/reel/[A-Za-z0-9_-]+/?$",  # Reel URL
+            r"^/reels?/[A-Za-z0-9_-]+/?$",  # Alternative reel URL
         ]
-        
+
         if not any(re.match(pattern, path) for pattern in valid_patterns):
             logger.warning(f"URL path '{path}' doesn't match expected Instagram post/reel patterns")
 
@@ -246,10 +253,7 @@ class InstagramScraper:
         logger.info(f"Fetching Instagram data for URL: {validated_url}")
 
         # Prepare request parameters
-        params = {
-            "url": validated_url,
-            "trim": str(options.trim_response).lower()
-        }
+        params = {"url": validated_url, "trim": str(options.trim_response).lower()}
 
         try:
             async with httpx.AsyncClient(timeout=options.timeout) as client:
@@ -375,30 +379,30 @@ class InstagramScraper:
     def extract_metadata(self, api_data: Dict[str, Any]) -> VideoMetadata:
         """Extract metadata from API response"""
         media_data = api_data["data"]["xdt_shortcode_media"]
-        
+
         # Extract caption/description
         caption_edges = media_data.get("edge_media_to_caption", {}).get("edges", [])
         caption = ""
         if caption_edges:
             caption = caption_edges[0].get("node", {}).get("text", "")
-        
+
         # Extract hashtags from caption
         hashtags = re.findall(r"#\w+", caption) if caption else []
-        
+
         # Owner info
         owner = media_data.get("owner", {})
-        
+
         # Stats
         like_count = media_data.get("edge_media_preview_like", {}).get("count", 0)
         comment_count = media_data.get("edge_media_to_parent_comment", {}).get("count", 0)
         view_count = media_data.get("video_view_count", 0)
-        
+
         # Duration (in seconds)
         duration_seconds = media_data.get("video_duration")
-        
+
         # Timestamp
         taken_at = media_data.get("taken_at_timestamp")
-        
+
         # Extract music info if available
         music_info = media_data.get("clips_music_attribution_info", {})
         sound_title = music_info.get("song_name")
@@ -425,16 +429,16 @@ class InstagramScraper:
     def get_video_download_url(self, api_data: Dict[str, Any]) -> str:
         """Get video URL from API response"""
         media_data = api_data["data"]["xdt_shortcode_media"]
-        
+
         # Check if it's a video
         if not media_data.get("is_video", False):
             raise APIError("Content is not a video")
-        
+
         # Get video URL
         video_url = media_data.get("video_url")
         if not video_url:
             raise APIError("No video URL found in response")
-        
+
         return video_url
 
     async def download_video_content(self, download_url: str) -> bytes:

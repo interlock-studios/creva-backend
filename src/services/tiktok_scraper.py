@@ -116,14 +116,14 @@ class TikTokScraper:
     def __init__(self):
         """Initialize TikTok scraper with API key validation"""
         self.api_key = os.getenv("SCRAPECREATORS_API_KEY")
-        
+
         # Validate required environment variables
         if not self.api_key or self.api_key == "your_actual_api_key_here":
             raise ValueError(
                 "SCRAPECREATORS_API_KEY environment variable is required and must be set to a valid API key. "
                 "Please update your .env file with your actual ScrapeCreators API key."
             )
-        
+
         self.base_url = "https://api.scrapecreators.com/v2/tiktok/video"
         logger.info("TikTok scraper initialized with API key validation")
 
@@ -238,10 +238,12 @@ class TikTokScraper:
                 # For slideshows, we'll return the first image as the main content
                 # and store all images in metadata
                 slideshow_images = await self.download_slideshow_images(api_data)
-                
+
                 # Use the first image as the main content, or empty bytes if no images
-                video_content = slideshow_images[0] if slideshow_images and slideshow_images[0] else b""
-                
+                video_content = (
+                    slideshow_images[0] if slideshow_images and slideshow_images[0] else b""
+                )
+
                 logger.info(
                     f"Successfully scraped TikTok slideshow. {len(slideshow_images)} images downloaded"
                 )
@@ -249,7 +251,7 @@ class TikTokScraper:
                 # Regular video handling
                 video_url = self.get_video_download_url(api_data)
                 video_content = await self.download_video_content(video_url)
-                
+
                 logger.info(
                     f"Successfully scraped TikTok video. Video size: {len(video_content)} bytes"
                 )
@@ -490,7 +492,7 @@ class TikTokScraper:
                 "transcript": transcript,
                 "raw_api_data": api_data if not options.trim_response else None,
             }
-            
+
             # Only add video_download_url for regular videos, not slideshows
             if not metadata.is_slideshow:
                 result["video_download_url"] = self.get_video_download_url(api_data)
@@ -513,22 +515,26 @@ class TikTokScraper:
 
         # Extract hashtags
         hashtags = re.findall(r"#\w+", description)
-        
+
         # Check if this is a slideshow (image post)
         image_post_info = aweme.get("image_post_info")
         is_slideshow = image_post_info is not None
-        
+
         slideshow_images = None
         slideshow_duration = None
         image_count = None
         duration_seconds = None
-        
+
         if is_slideshow:
             # Extract slideshow-specific data
             slideshow_images = self._extract_slideshow_images(image_post_info)
             image_count = len(slideshow_images) if slideshow_images else 0
             # Calculate total slideshow duration (if available)
-            slideshow_duration = image_post_info.get("video", {}).get("duration", 0) / 1000 if image_post_info.get("video") else None
+            slideshow_duration = (
+                image_post_info.get("video", {}).get("duration", 0) / 1000
+                if image_post_info.get("video")
+                else None
+            )
             duration_seconds = slideshow_duration
             logger.info(f"Detected slideshow with {image_count} images")
         else:
@@ -562,48 +568,43 @@ class TikTokScraper:
     def _extract_slideshow_images(self, image_post_info: Dict[str, Any]) -> List[SlideshowImage]:
         """Extract slideshow images from image_post_info"""
         images = []
-        
+
         # Extract images from image_post_info
         images_data = image_post_info.get("images", [])
-        
+
         for i, img_data in enumerate(images_data):
             # Look for different resolution options, prefer higher quality
             image_url = None
             width = None
             height = None
-            
+
             # Try to get the best quality image URL
             url_list = img_data.get("display_image", {}).get("url_list", [])
             if not url_list:
                 # Fallback to thumb
                 url_list = img_data.get("thumb", {}).get("url_list", [])
-            
+
             if url_list:
                 image_url = url_list[0]  # Take the first URL
-                
+
                 # Extract dimensions if available
                 width = img_data.get("display_image", {}).get("width")
                 height = img_data.get("display_image", {}).get("height")
-                
+
                 if not width or not height:
                     # Fallback to thumb dimensions
                     width = img_data.get("thumb", {}).get("width")
                     height = img_data.get("thumb", {}).get("height")
-                
-                images.append(SlideshowImage(
-                    url=image_url,
-                    width=width,
-                    height=height,
-                    index=i
-                ))
-        
+
+                images.append(SlideshowImage(url=image_url, width=width, height=height, index=i))
+
         logger.info(f"Extracted {len(images)} slideshow images")
         return images
-    
+
     def get_video_download_url(self, api_data: Dict[str, Any]) -> str:
         """Get no-watermark video URL (for regular videos only)"""
         aweme = api_data["aweme_detail"]
-        
+
         # Check if this is a slideshow
         if aweme.get("image_post_info"):
             # For slideshows, return the slideshow video URL if available
@@ -612,7 +613,7 @@ class TikTokScraper:
                 return slideshow_video["play_addr"]["url_list"][0]
             else:
                 raise Exception("This is a slideshow - use get_slideshow_images() instead")
-        
+
         # Regular video handling
         video_info = aweme.get("video", {})
 
@@ -632,12 +633,12 @@ class TikTokScraper:
         """Get slideshow images from API response"""
         aweme = api_data["aweme_detail"]
         image_post_info = aweme.get("image_post_info")
-        
+
         if not image_post_info:
             raise Exception("This is not a slideshow")
-        
+
         return self._extract_slideshow_images(image_post_info)
-    
+
     async def download_video_content(self, download_url: str) -> bytes:
         """Download video content"""
         headers = {
@@ -649,33 +650,37 @@ class TikTokScraper:
             response = await client.get(download_url, headers=headers)
             response.raise_for_status()
             return response.content
-    
+
     async def download_slideshow_images(self, api_data: Dict[str, Any]) -> List[bytes]:
         """Download all images from a slideshow"""
         slideshow_images = self.get_slideshow_images(api_data)
-        
+
         headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
             "Referer": "https://www.tiktok.com/",
         }
-        
+
         image_contents = []
-        
+
         async with httpx.AsyncClient(timeout=60) as client:
             for img in slideshow_images:
                 try:
                     response = await client.get(img.url, headers=headers)
                     response.raise_for_status()
                     image_contents.append(response.content)
-                    logger.info(f"Downloaded slideshow image {img.index + 1}/{len(slideshow_images)}")
+                    logger.info(
+                        f"Downloaded slideshow image {img.index + 1}/{len(slideshow_images)}"
+                    )
                 except Exception as e:
                     logger.error(f"Failed to download slideshow image {img.index}: {e}")
                     # Add empty bytes as placeholder to maintain order
                     image_contents.append(b"")
-        
-        logger.info(f"Downloaded {len([c for c in image_contents if c])} out of {len(slideshow_images)} slideshow images")
+
+        logger.info(
+            f"Downloaded {len([c for c in image_contents if c])} out of {len(slideshow_images)} slideshow images"
+        )
         return image_contents
-    
+
     async def scrape_tiktok_slideshow(
         self, url: str, options: Optional[ScrapingOptions] = None
     ) -> Tuple[List[bytes], VideoMetadata, Optional[str]]:
@@ -689,9 +694,11 @@ class TikTokScraper:
             # Get metadata
             api_data = await self.fetch_tiktok_data(url, options)
             metadata = self.extract_metadata(api_data)
-            
+
             if not metadata.is_slideshow:
-                raise Exception("URL does not contain a slideshow - use scrape_tiktok_complete() for regular videos")
+                raise Exception(
+                    "URL does not contain a slideshow - use scrape_tiktok_complete() for regular videos"
+                )
 
             # Download all slideshow images
             slideshow_images = await self.download_slideshow_images(api_data)

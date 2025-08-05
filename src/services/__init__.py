@@ -11,12 +11,12 @@ from .config_validator import validate_required_env_vars, get_config_with_defaul
 __all__ = [
     "TikTokScraper",
     "TikTokScrapingOptions",
-    "InstagramScraper", 
+    "InstagramScraper",
     "InstagramScrapingOptions",
     "URLRouter",
     "GenAIService",
     "CacheService",
     "QueueService",
     "validate_required_env_vars",
-    "get_config_with_defaults"
+    "get_config_with_defaults",
 ]

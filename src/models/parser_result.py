@@ -1,15 +1,15 @@
-from typing import Optional, List, Dict, Any
+from typing import Optional, List
 from pydantic import BaseModel
 
 
 class SlideshowImage(BaseModel):
     """Individual image in a slideshow"""
-    
+
     url: str
     width: Optional[int] = None
     height: Optional[int] = None
     index: int = 0
-    
+
 
 class VideoMetadata(BaseModel):
     """Metadata from TikTok video or slideshow"""
@@ -29,7 +29,7 @@ class VideoMetadata(BaseModel):
     sound_title: Optional[str] = None
     sound_author: Optional[str] = None
     file_size_bytes: Optional[int] = None
-    
+
     # Slideshow-specific fields
     is_slideshow: bool = False
     slideshow_images: Optional[List[SlideshowImage]] = None

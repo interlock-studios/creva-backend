@@ -21,17 +21,23 @@ class VideoProcessor:
         """Download video using appropriate scraper based on platform"""
         # Detect platform
         platform = self.url_router.detect_platform(url)
-        
+
         if platform is None:
-            raise ValueError(f"Unsupported URL: {url}. Only TikTok and Instagram URLs are supported.")
-        
+            raise ValueError(
+                f"Unsupported URL: {url}. Only TikTok and Instagram URLs are supported."
+            )
+
         logger.info(f"Processing {platform} video: {url}")
-        
+
         # Use appropriate scraper
         if platform == "tiktok":
-            video_content, metadata_obj, transcript_text = await self.tiktok_scraper.scrape_tiktok_complete(url)
+            video_content, metadata_obj, transcript_text = (
+                await self.tiktok_scraper.scrape_tiktok_complete(url)
+            )
         else:  # instagram
-            video_content, metadata_obj, caption_text = await self.instagram_scraper.scrape_instagram_complete(url)
+            video_content, metadata_obj, caption_text = (
+                await self.instagram_scraper.scrape_instagram_complete(url)
+            )
             # Instagram returns caption instead of transcript, but we'll treat it similarly
             transcript_text = caption_text
 
@@ -46,9 +52,9 @@ class VideoProcessor:
             "tags": metadata_obj.hashtags or [],
             "transcript_text": transcript_text,
             # Slideshow-specific metadata
-            "is_slideshow": getattr(metadata_obj, 'is_slideshow', False),
-            "image_count": getattr(metadata_obj, 'image_count', None),
-            "slideshow_duration": getattr(metadata_obj, 'slideshow_duration', None),
+            "is_slideshow": getattr(metadata_obj, "is_slideshow", False),
+            "image_count": getattr(metadata_obj, "image_count", None),
+            "slideshow_duration": getattr(metadata_obj, "slideshow_duration", None),
         }
 
         return video_content, metadata
