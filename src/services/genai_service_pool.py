@@ -1,5 +1,6 @@
 from google import genai
 from google.genai.types import HttpOptions, Part, GenerateContentConfig
+from src.models.parser_result import VideoMetadata
 from google.auth import default
 from google.oauth2 import service_account
 from typing import Dict, Any, Optional, List
@@ -133,6 +134,26 @@ class GenAIServicePool:
     def get_pool_size(self) -> int:
         """Get number of services in pool"""
         return len(self.services)
+    
+    async def analyze_video(
+        self,
+        video_content: bytes,
+        transcript: Optional[str] = None,
+        caption: Optional[str] = None,
+    ) -> Optional[Dict[str, Any]]:
+        """Analyze video using round-robin GenAI service selection"""
+        service = await self.get_next_service()
+        return service.analyze_video_with_transcript(video_content, transcript, caption)
+    
+    async def analyze_slideshow(
+        self,
+        slideshow_images: List[bytes],
+        transcript: Optional[str] = None,
+        caption: Optional[str] = None,
+    ) -> Optional[Dict[str, Any]]:
+        """Analyze slideshow using round-robin GenAI service selection"""
+        service = await self.get_next_service()
+        return service.analyze_slideshow_with_transcript(slideshow_images, transcript, caption)
 
 
 class GenAIService:
@@ -224,7 +245,7 @@ Required JSON structure:
           "rest_seconds": integer or null (defaults to 90 if not specified)
         }
       ],
-      "instructions": "brief instructions or null"
+      "instructions": "detailed instructions or null"
     }
   ],
   "tags": ["array of relevant tags"] or null,
@@ -280,4 +301,122 @@ IMPORTANT: Your response must be ONLY the JSON object, with no markdown formatti
             return json.loads(response_text)
         except Exception as e:
             logger.error(f"Service {self.service_id} - Failed to parse response: {e}")
+            return None
+
+    def analyze_slideshow_with_transcript(
+        self,
+        slideshow_images: List[bytes],
+        transcript: Optional[str] = None,
+        caption: Optional[str] = None,
+    ) -> Optional[Dict[str, Any]]:
+        """Analyze slideshow images with Gemini 2.0 Flash"""
+        
+        # Apply rate limiting for this specific service
+        self._rate_limit()
+        
+        # Build prompt for slideshow analysis
+        prompt = "You are an expert fitness instructor analyzing a TikTok workout slideshow containing multiple images."
+        
+        if transcript:
+            prompt += f"\n\nTRANSCRIPT:\n{transcript}"
+        
+        if caption:
+            prompt += f"\n\nCAPTION:\n{caption}"
+        
+        prompt += f"""
+
+This is a slideshow with {len(slideshow_images)} images showing workout exercises, poses, or fitness content. Analyze ALL the images together to extract the following information. Return your response as a valid JSON object with NO additional text, explanations, or formatting.
+
+Required JSON structure:
+{
+  "title": "descriptive workout title",
+  "description": "brief description of the workout or null",
+  "workout_type": "MUST be one of: push, pull, legs, upper body, lower body, full body, strength, cardio, HIIT, hypertrophy, endurance, power, mobility, flexibility",
+  "duration_minutes": estimated total workout duration in minutes (including rest periods) as integer or null,
+  "difficulty_level": integer from 1 to 10 (1=beginner, 10=expert),
+  "exercises": [
+    {
+      "name": "exercise name",
+      "muscle_groups": ["MUST use exact values from: abs, arms, back, biceps, calves, chest, core, forearms, glutes, hamstrings, lats, legs, lower back, obliques, quads, shoulders, traps, triceps"],
+      "equipment": "equipment needed (examples: Barbell, Dumbbells, Kettlebell, Machine, Cable, Bodyweight, Resistance Band, Medicine Ball, Pull-up Bar, Dip Station, None)",
+      "sets": [
+        {
+          "reps": integer or null,
+          "weight_lbs": number or null,
+          "duration_seconds": integer or null,
+          "distance_miles": number or null,
+          "rest_seconds": integer or null (defaults to 90 if not specified)
+        }
+      ],
+      "instructions": "detailed instructions or null"
+    }
+  ],
+  "tags": ["array of relevant tags"] or null,
+  "creator": "creator name or null"
+}
+
+CRITICAL REQUIREMENTS:
+- Each exercise MUST have at least 1 set
+- Each set MUST include at least ONE measurement (reps, weight_lbs, duration_seconds, or distance_miles)
+- For strength exercises: use reps and optionally weight_lbs
+- For cardio exercises: use duration_seconds or distance_miles
+- For bodyweight exercises: use reps and optionally duration_seconds
+- muscle_groups must use EXACT values from the list above
+- equipment should be descriptive (use common names like those in examples above)
+- workout_type must use EXACT values from the list above
+- Analyze ALL images together to understand the complete workout sequence
+
+IMPORTANT: Your response must be ONLY the JSON object, with no markdown formatting, no code blocks, no explanations before or after."""
+        
+        # Prepare content with multiple images
+        contents = [prompt]
+        
+        # Add all slideshow images to the analysis
+        valid_images = 0
+        for i, image_content in enumerate(slideshow_images):
+            if image_content:  # Skip empty image content
+                try:
+                    contents.append(Part.from_bytes(data=image_content, mime_type="image/jpeg"))
+                    valid_images += 1
+                except Exception as e:
+                    logger.warning(f"Service {self.service_id} - Failed to add image {i} to analysis: {e}")
+        
+        if valid_images == 0:
+            logger.error(f"Service {self.service_id} - No valid images found in slideshow")
+            return None
+        
+        # Generate content with retry logic
+        def make_request():
+            return self.client.models.generate_content(
+                model=self.model,
+                contents=contents,
+                config=GenerateContentConfig(
+                    max_output_tokens=2048,
+                    temperature=0.1,
+                    top_p=0.8,
+                    response_mime_type="application/json",
+                ),
+            )
+        
+        logger.info(f"Service {self.service_id} - Analyzing slideshow with {valid_images} images")
+        response = self._retry_with_backoff(make_request, max_retries=5, base_delay=2)
+        
+        # Parse response
+        try:
+            response_text = response.text.strip()
+            logger.debug(f"Service {self.service_id} - Raw slideshow response: {response_text[:500]}...")
+            
+            # Clean up response if needed
+            if "```json" in response_text:
+                json_start = response_text.find("```json") + 7
+                json_end = response_text.find("```", json_start)
+                response_text = response_text[json_start:json_end].strip()
+            elif "```" in response_text:
+                json_start = response_text.find("```") + 3
+                json_end = response_text.find("```", json_start)
+                response_text = response_text[json_start:json_end].strip()
+            
+            return json.loads(response_text)
+        except Exception as e:
+            logger.error(f"Service {self.service_id} - Failed to parse slideshow response: {e}")
             return None

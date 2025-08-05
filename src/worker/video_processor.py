@@ -45,6 +45,10 @@ class VideoProcessor:
             "caption": metadata_obj.caption or metadata_obj.description or "",
             "tags": metadata_obj.hashtags or [],
             "transcript_text": transcript_text,
+            # Slideshow-specific metadata
+            "is_slideshow": getattr(metadata_obj, 'is_slideshow', False),
+            "image_count": getattr(metadata_obj, 'image_count', None),
+            "slideshow_duration": getattr(metadata_obj, 'slideshow_duration', None),
         }
 
         return video_content, metadata

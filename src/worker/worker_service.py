@@ -75,36 +75,58 @@ class VideoWorker:
                 await self.queue_service.mark_job_complete(job_id, cached_workout)
                 return
             
-            # 1. Download video using video processor (handles both TikTok and Instagram)
-            logger.info(f"Job {job_id} - Downloading and processing video...")
+            # 1. Download content using video processor (handles both TikTok and Instagram)
+            logger.info(f"Job {job_id} - Downloading and processing content...")
             video_content, metadata_dict = await self.video_processor.download_video(url)
+            
+            # Check if this is a slideshow
+            is_slideshow = metadata_dict.get("is_slideshow", False)
             
             # Extract transcript from metadata
             transcript = metadata_dict.get("transcript_text")
+            caption = metadata_dict.get("caption", "") or metadata_dict.get("description", "")
             
             if transcript:
                 logger.info(f"Job {job_id} - Got transcript/caption: {len(transcript)} characters")
             else:
                 logger.info(f"Job {job_id} - No transcript/caption available")
             
-            # 2. Process audio removal and get GenAI service in parallel
-            logger.info(f"Job {job_id} - Processing video and preparing AI service...")
-            silent_video_task = asyncio.create_task(self.video_processor.remove_audio(video_content))
-            genai_service_task = asyncio.create_task(self.genai_pool.get_next_service())
-            
-            # Wait for both operations to complete
-            silent_video, genai_service = await asyncio.gather(
-                silent_video_task,
-                genai_service_task
-            )
-            
-            # 3. Analyze with Gemini
-            caption = metadata_dict.get("caption", "") or metadata_dict.get("description", "")
-            logger.info(f"Job {job_id} - Analyzing with GenAI service {genai_service.service_id}...")
-            
-            workout_json = genai_service.analyze_video_with_transcript(
-                silent_video, transcript, caption
-            )
+            if is_slideshow:
+                # Handle slideshow content
+                logger.info(f"Job {job_id} - Processing slideshow with {metadata_dict.get('image_count', 0)} images")
+                
+                # For slideshows, get all images and analyze directly
+                platform = self.video_processor.url_router.detect_platform(url)
+                if platform == "tiktok":
+                    # Get all slideshow images
+                    slideshow_images, slideshow_metadata, slideshow_transcript = await self.video_processor.tiktok_scraper.scrape_tiktok_slideshow(url)
+                    
+                    # Use the slideshow-specific transcript if available
+                    if slideshow_transcript:
+                        transcript = slideshow_transcript
+                    
+                    # Analyze slideshow with GenAI
+                    logger.info(f"Job {job_id} - Analyzing slideshow with AI...")
+                    workout_json = await self.genai_pool.analyze_slideshow(
+                        slideshow_images, transcript, caption
+                    )
+                else:
+                    # Instagram slideshows (if supported in the future)
+                    logger.warning(f"Job {job_id} - Instagram slideshows not yet supported")
+                    raise Exception("Instagram slideshows not yet supported")
+            else:
+                # Handle regular video content
+                logger.info(f"Job {job_id} - Processing regular video")
+                
+                # 2. Process audio removal for video analysis
+                logger.info(f"Job {job_id} - Removing audio from video...")
+                silent_video = await self.video_processor.remove_audio(video_content)
+                
+                # 3. Analyze with Gemini
+                logger.info(f"Job {job_id} - Analyzing video with AI...")
+                workout_json = await self.genai_pool.analyze_video(
+                    silent_video, transcript, caption
+                )
             
             if not workout_json:
                 raise Exception("Could not extract workout information from video")
