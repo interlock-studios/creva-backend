@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import JSONResponse
@@ -33,6 +33,14 @@ from src.services.cache_service import CacheService
 from src.services.queue_service import QueueService
 from src.worker.video_processor import VideoProcessor
 from src.services.config_validator import validate_required_env_vars, get_config_with_defaults
+from src.services.appcheck_middleware import (
+    AppCheckMiddleware, 
+    verify_appcheck_token, 
+    optional_appcheck_token,
+    get_appcheck_service,
+    get_appcheck_claims,
+    is_appcheck_verified
+)
 
 load_dotenv()
 
@@ -83,6 +91,83 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+)
+
+# App Check middleware - configure based on your requirements
+# Set required=False for development, True for production
+APPCHECK_REQUIRED = os.getenv("APPCHECK_REQUIRED", "false").lower() == "true"
+APPCHECK_SKIP_PATHS = ["/health", "/docs", "/redoc", "/openapi.json", "/test-api"]
+
+# Add App Check middleware
+# Note: Using BaseHTTPMiddleware instead of custom class for better FastAPI compatibility
+from starlette.middleware.base import BaseHTTPMiddleware
+
+class AppCheckHTTPMiddleware(BaseHTTPMiddleware):
+    def __init__(self, app, skip_paths: list = None, required: bool = True):
+        super().__init__(app)
+        self.skip_paths = skip_paths or ["/health", "/docs", "/redoc", "/openapi.json"]
+        self.required = required
+        self.appcheck_service = get_appcheck_service()
+    
+    async def dispatch(self, request: Request, call_next):
+        # Skip verification for certain paths
+        if request.url.path in self.skip_paths:
+            return await call_next(request)
+        
+        # Get App Check token from header
+        appcheck_token = request.headers.get("X-Firebase-AppCheck")
+        
+        if not appcheck_token:
+            if self.required:
+                logger.warning(f"Missing App Check token for {request.url.path}")
+                return JSONResponse(
+                    status_code=401,
+                    content={"detail": "App Check token required"},
+                    headers={"WWW-Authenticate": "X-Firebase-AppCheck"}
+                )
+            else:
+                logger.info(f"App Check token missing but not required for {request.url.path}")
+                request.state.appcheck_verified = False
+                return await call_next(request)
+        
+        # Verify the token (simplified for middleware)
+        try:
+            verification_result = self.appcheck_service.verify_token(appcheck_token)
+            
+            if verification_result and verification_result.get("valid"):
+                request.state.appcheck_verified = True
+                request.state.appcheck_claims = verification_result
+                logger.debug(f"App Check verified for app: {verification_result.get('app_id')}")
+                return await call_next(request)
+            else:
+                request.state.appcheck_verified = False
+                if self.required:
+                    error_msg = verification_result.get("error", "Invalid App Check token") if verification_result else "Invalid App Check token"
+                    logger.warning(f"Invalid App Check token for {request.url.path}: {error_msg}")
+                    return JSONResponse(
+                        status_code=401,
+                        content={"detail": f"Invalid App Check token: {error_msg}"},
+                        headers={"WWW-Authenticate": "X-Firebase-AppCheck"}
+                    )
+                else:
+                    logger.info(f"Invalid App Check token but not required for {request.url.path}")
+                    return await call_next(request)
+                    
+        except Exception as e:
+            logger.error(f"Error in App Check middleware: {str(e)}")
+            if self.required:
+                return JSONResponse(
+                    status_code=503,
+                    content={"detail": "App Check verification service unavailable"}
+                )
+            else:
+                request.state.appcheck_verified = False
+                return await call_next(request)
+
+app.add_middleware(
+    AppCheckHTTPMiddleware,
+    skip_paths=APPCHECK_SKIP_PATHS,
+    required=APPCHECK_REQUIRED
 )
 
 
@@ -138,6 +223,7 @@ genai_service = GenAIService()
 video_processor = VideoProcessor()
 cache_service = CacheService()
 queue_service = QueueService()
+appcheck_service = get_appcheck_service()
 
 # Track active direct processing
 import threading
@@ -228,10 +314,22 @@ async def process_video_direct(url: str, request_id: str):
 
 
 @app.post("/process")
-async def process_video(request: ProcessRequest, req: Request):
+async def process_video(
+    request: ProcessRequest, 
+    req: Request,
+    appcheck_claims: dict = Depends(optional_appcheck_token)
+):
     """Hybrid processing: try direct first, fall back to queue if busy"""
 
     request_id = getattr(req.state, "request_id", "unknown")
+    
+    # Log App Check status
+    if appcheck_claims:
+        logger.info(f"Request verified with App Check - App ID: {appcheck_claims.get('app_id')} - Request ID: {request_id}")
+    elif APPCHECK_REQUIRED:
+        logger.warning(f"App Check required but not provided - Request ID: {request_id}")
+    else:
+        logger.debug(f"App Check not provided (optional) - Request ID: {request_id}")
 
     # Check cache first
     cached_workout = cache_service.get_cached_workout(request.url)
@@ -395,6 +493,16 @@ async def health():
         health_status["services"]["tiktok_scraper"] = f"error: {str(e)}"
         health_status["status"] = "degraded"
 
+    # Check App Check service
+    try:
+        app_check_healthy = appcheck_service.is_healthy()
+        health_status["services"]["app_check"] = "healthy" if app_check_healthy else "unhealthy"
+        if not app_check_healthy:
+            health_status["status"] = "degraded"
+    except Exception as e:
+        health_status["services"]["app_check"] = f"error: {str(e)}"
+        health_status["status"] = "degraded"
+
     return health_status
 
 
@@ -420,6 +528,9 @@ async def status():
     # Get queue stats
     queue_stats = queue_service.get_queue_stats()
 
+    # Get App Check stats
+    appcheck_stats = appcheck_service.get_stats()
+
     return {
         "status": "operational",
         "timestamp": datetime.now().isoformat(),
@@ -443,6 +554,10 @@ async def status():
         },
         "cache": cache_stats,
         "queue": queue_stats,
+        "app_check": {
+            "required": APPCHECK_REQUIRED,
+            "stats": appcheck_stats
+        },
         "cloud_run": {
             "max_instances": 50,
             "concurrency_per_instance": 80,
@@ -559,6 +674,42 @@ async def invalidate_cache_by_url(request: ProcessRequest):
         "url": request.url,
         "invalidated": success,
         "cache_key": cache_service._generate_cache_key(request.url),
+    }
+
+
+@app.post("/test-appcheck")
+async def test_appcheck(
+    req: Request,
+    appcheck_claims: dict = Depends(verify_appcheck_token)
+):
+    """Test endpoint that requires valid App Check token"""
+    request_id = getattr(req.state, "request_id", "unknown")
+    
+    return {
+        "status": "success",
+        "message": "App Check token verified successfully",
+        "request_id": request_id,
+        "app_check_claims": {
+            "app_id": appcheck_claims.get("app_id"),
+            "iss": appcheck_claims.get("iss"),
+            "aud": appcheck_claims.get("aud"),
+            "verified_at": appcheck_claims.get("verified_at")
+        }
+    }
+
+
+@app.get("/appcheck-status")
+async def appcheck_status():
+    """Get App Check service status and configuration"""
+    if environment == "production":
+        raise HTTPException(status_code=404, detail="Not found")
+    
+    return {
+        "app_check_enabled": True,
+        "app_check_required": APPCHECK_REQUIRED,
+        "skip_paths": APPCHECK_SKIP_PATHS,
+        "service_stats": appcheck_service.get_stats(),
+        "service_healthy": appcheck_service.is_healthy()
     }
 
 
