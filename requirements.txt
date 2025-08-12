@@ -21,5 +21,8 @@ python-dotenv==1.0.0
 google-cloud-firestore==2.19.0
 firebase-admin==6.5.0
 
+# Monitoring
+google-cloud-monitoring==2.27.0
+
 # Health check
 requests==2.32.3

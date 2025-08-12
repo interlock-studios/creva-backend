@@ -12,6 +12,8 @@ from contextlib import asynccontextmanager
 from dotenv import load_dotenv
 from collections import defaultdict
 import asyncio
+import threading
+from google.cloud import monitoring_v3
 
 from src.services.tiktok_scraper import (
     TikTokScraper,
@@ -118,6 +120,9 @@ class AppCheckHTTPMiddleware(BaseHTTPMiddleware):
         appcheck_token = request.headers.get("X-Firebase-AppCheck")
         
         if not appcheck_token:
+            # Record unverified request metric
+            record_appcheck_metric("unverified", request.url.path)
+            
             if self.required:
                 logger.warning(f"Missing App Check token for {request.url.path}")
                 return JSONResponse(
@@ -135,11 +140,18 @@ class AppCheckHTTPMiddleware(BaseHTTPMiddleware):
             verification_result = self.appcheck_service.verify_token(appcheck_token)
             
             if verification_result and verification_result.get("valid"):
+                # Record verified request metric
+                app_id = verification_result.get('app_id', 'unknown')
+                record_appcheck_metric("verified", request.url.path, app_id)
+                
                 request.state.appcheck_verified = True
                 request.state.appcheck_claims = verification_result
-                logger.debug(f"App Check verified for app: {verification_result.get('app_id')}")
+                logger.debug(f"App Check verified for app: {app_id}")
                 return await call_next(request)
             else:
+                # Record invalid token metric
+                record_appcheck_metric("invalid", request.url.path)
+                
                 request.state.appcheck_verified = False
                 if self.required:
                     error_msg = verification_result.get("error", "Invalid App Check token") if verification_result else "Invalid App Check token"
@@ -225,9 +237,51 @@ cache_service = CacheService()
 queue_service = QueueService()
 appcheck_service = get_appcheck_service()
 
-# Track active direct processing
-import threading
+# Initialize Google Cloud Monitoring
+try:
+    monitoring_client = monitoring_v3.MetricServiceClient()
+    project_name = f"projects/{project_id}"
+    logger.info("Google Cloud Monitoring initialized successfully")
+except Exception as e:
+    logger.warning(f"Failed to initialize Google Cloud Monitoring: {e}")
+    monitoring_client = None
+    project_name = None
 
+# App Check metrics tracking
+appcheck_metrics = {
+    "verified_requests": 0,
+    "unverified_requests": 0,
+    "invalid_tokens": 0,
+    "total_requests": 0
+}
+appcheck_metrics_lock = threading.Lock()
+
+def record_appcheck_metric(metric_type: str, path: str = "", app_id: str = ""):
+    """Record App Check metrics for monitoring"""
+    global appcheck_metrics
+    with appcheck_metrics_lock:
+        appcheck_metrics["total_requests"] += 1
+        if metric_type == "verified":
+            appcheck_metrics["verified_requests"] += 1
+        elif metric_type == "unverified":
+            appcheck_metrics["unverified_requests"] += 1
+        elif metric_type == "invalid":
+            appcheck_metrics["invalid_tokens"] += 1
+    
+    # Log structured metrics for Cloud Logging
+    logger.info(json.dumps({
+        "event_type": "appcheck_metric",
+        "metric": metric_type,
+        "path": path,
+        "app_id": app_id,
+        "timestamp": datetime.utcnow().isoformat(),
+        "cumulative_verified": appcheck_metrics["verified_requests"],
+        "cumulative_unverified": appcheck_metrics["unverified_requests"],
+        "cumulative_invalid": appcheck_metrics["invalid_tokens"],
+        "total_requests": appcheck_metrics["total_requests"]
+    }))
+
+# Track active direct processing
 active_direct_processing = 0
 active_processing_lock = threading.Lock()
 MAX_DIRECT_PROCESSING = 5  # Process directly if under this limit
@@ -556,7 +610,8 @@ async def status():
         "queue": queue_stats,
         "app_check": {
             "required": APPCHECK_REQUIRED,
-            "stats": appcheck_stats
+            "stats": appcheck_stats,
+            "metrics": appcheck_metrics.copy()  # Current session metrics
         },
         "cloud_run": {
             "max_instances": 50,
