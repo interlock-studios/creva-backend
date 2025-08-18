@@ -1,0 +1,3 @@
+"""
+Exception handling tests
+"""

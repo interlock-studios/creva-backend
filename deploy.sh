@@ -196,6 +196,61 @@ SERVICE_URL=$(gcloud run services describe "${SERVICE_NAME}" \
     --region "${REGION}" \
     --format 'value(status.url)')
 
+# Validate deployment health
+print_status "Validating deployment health..."
+
+# Wait for service to be ready (max 5 minutes)
+for i in {1..30}; do
+    print_status "Health check attempt $i/30..."
+    
+    if curl -f -s --max-time 10 "${SERVICE_URL}/health" > /dev/null; then
+        print_status "✅ Health check passed!"
+        break
+    fi
+    
+    if [ $i -eq 30 ]; then
+        print_error "❌ Health check failed after 5 minutes"
+        
+        if [[ "${ENVIRONMENT}" == "production" ]]; then
+            print_error "Rolling back deployment..."
+            
+            # Get previous revision
+            PREVIOUS_REVISION=$(gcloud run revisions list \
+                --service="${SERVICE_NAME}" --region="${REGION}" \
+                --format='value(metadata.name)' --limit=2 | tail -n 1)
+            
+            if [ ! -z "$PREVIOUS_REVISION" ]; then
+                print_warning "Rolling back to revision: $PREVIOUS_REVISION"
+                gcloud run services update-traffic "${SERVICE_NAME}" \
+                    --to-revisions="$PREVIOUS_REVISION=100" \
+                    --region="${REGION}"
+            fi
+        fi
+        
+        exit 1
+    fi
+    
+    sleep 10
+done
+
+# Run smoke tests
+print_status "Running smoke tests..."
+
+# Test health endpoint structure
+HEALTH_RESPONSE=$(curl -s "${SERVICE_URL}/health")
+if ! echo "$HEALTH_RESPONSE" | jq -e '.status' > /dev/null 2>&1; then
+    print_error "❌ Health endpoint returned invalid JSON"
+    exit 1
+fi
+
+HEALTH_STATUS=$(echo "$HEALTH_RESPONSE" | jq -r '.status')
+if [ "$HEALTH_STATUS" != "healthy" ] && [ "$HEALTH_STATUS" != "degraded" ]; then
+    print_error "❌ Health status is: $HEALTH_STATUS"
+    exit 1
+fi
+
+print_status "✅ Health validation passed!"
+
 # If staging, show how to route traffic
 if [[ "${ENVIRONMENT}" != "production" ]]; then
     print_warning "Deployed to staging. To route traffic to this revision:"

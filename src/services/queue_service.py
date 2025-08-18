@@ -1,4 +1,5 @@
 from google.cloud import firestore
+from google.cloud.firestore import FieldFilter
 from google.cloud.firestore import Client
 import logging
 import os
@@ -35,7 +36,7 @@ class QueueService:
             logger.warning(f"Firestore connection failed: {e}. Queue will be disabled.")
             self.db = None
 
-    async def enqueue_video(self, url: str, request_id: str, priority: str = "normal") -> str:
+    async def enqueue_video(self, url: str, request_id: str, priority: str = "normal", localization: Optional[str] = None) -> str:
         """Add video to processing queue"""
         if not self.db:
             raise Exception("Queue service not available")
@@ -52,6 +53,7 @@ class QueueService:
             "max_attempts": 3,
             "last_error": None,
             "worker_id": None,
+            "localization": localization,
         }
 
         self.queue_collection.document(job_id).set(job_data)
@@ -65,10 +67,10 @@ class QueueService:
             return None
 
         try:
-            query = self.queue_collection.where("url", "==", url)
+            query = self.queue_collection.where(filter=FieldFilter("url", "==", url))
 
             if status:
-                query = query.where("status", "==", status)
+                query = query.where(filter=FieldFilter("status", "==", status))
 
             # Get most recent job for this URL
             query = query.order_by("created_at", direction=firestore.Query.DESCENDING).limit(1)
@@ -93,7 +95,7 @@ class QueueService:
             try:
                 # Find the oldest pending jobs
                 query = (
-                    self.queue_collection.where("status", "==", "pending")
+                    self.queue_collection.where(filter=FieldFilter("status", "==", "pending"))
                     .order_by("created_at")
                     .limit(5)  # Get a few in case of race conditions
                 )
@@ -250,8 +252,8 @@ class QueueService:
 
             # Clean up old queue entries
             old_jobs = (
-                self.queue_collection.where("status", "in", ["completed", "failed"])
-                .where("created_at", "<", cutoff_date)
+                self.queue_collection.where(filter=FieldFilter("status", "in", ["completed", "failed"]))
+                .where(filter=FieldFilter("created_at", "<", cutoff_date))
                 .stream()
             )
 
@@ -299,7 +301,7 @@ class QueueService:
             # Count jobs by status
             for status in ["pending", "processing", "completed", "failed"]:
                 count = len(
-                    list(self.queue_collection.where("status", "==", status).limit(1000).stream())
+                    list(self.queue_collection.where(filter=FieldFilter("status", "==", status)).limit(1000).stream())
                 )
                 stats["queue_stats"][status] = count
 

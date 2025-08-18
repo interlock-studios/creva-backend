@@ -6,14 +6,20 @@ import json
 import os
 import time
 import random
+import asyncio
 
 
 class GenAIService:
-    def __init__(self):
-        # Get project ID from environment variable
-        project_id = os.getenv("GOOGLE_CLOUD_PROJECT_ID")
+    def __init__(self, config=None):
+        # Get configuration
+        if config is None:
+            from src.services.config_validator import AppConfig
+            config = AppConfig.from_env()
+        
+        # Get project ID from configuration
+        project_id = config.project_id
         if not project_id:
-            raise ValueError("GOOGLE_CLOUD_PROJECT_ID environment variable not set")
+            raise ValueError("GOOGLE_CLOUD_PROJECT_ID not set in configuration")
 
         # Initialize Google Gen AI SDK with Vertex AI backend
         self.client = genai.Client(
@@ -24,10 +30,13 @@ class GenAIService:
         )
         self.model = "gemini-2.0-flash-lite"
         self.last_request_time = 0
-        self.min_request_interval = 1.0  # Minimum 1 second between requests
+        self.min_request_interval = config.rate_limiting.genai_min_interval
+        self.max_retries = config.rate_limiting.genai_max_retries
 
-    def _retry_with_backoff(self, func, max_retries=3, base_delay=1):
+    async def _retry_with_backoff(self, func, max_retries=None, base_delay=1):
         """Retry function with exponential backoff for 429 errors"""
+        if max_retries is None:
+            max_retries = self.max_retries
         for attempt in range(max_retries):
             try:
                 return func()
@@ -44,32 +53,33 @@ class GenAIService:
                         f"WARNING - Got 429 error, retrying in {delay:.2f} seconds "
                         f"(attempt {attempt + 1}/{max_retries})"
                     )
-                    time.sleep(delay)
+                    await asyncio.sleep(delay)
                 else:
                     # Non-429 error, don't retry
                     raise e
         return None
 
-    def _rate_limit(self):
+    async def _rate_limit(self):
         """Ensure minimum time between requests"""
         current_time = time.time()
         time_since_last_request = current_time - self.last_request_time
         if time_since_last_request < self.min_request_interval:
             sleep_time = self.min_request_interval - time_since_last_request
             print(f"INFO - Rate limiting: waiting {sleep_time:.2f} seconds")
-            time.sleep(sleep_time)
+            await asyncio.sleep(sleep_time)
         self.last_request_time = time.time()
 
-    def analyze_video_with_transcript(
+    async def analyze_video_with_transcript(
         self,
         video_content: bytes,
         transcript: Optional[str] = None,
         caption: Optional[str] = None,
+        localization: Optional[str] = None,
     ) -> Optional[Dict[str, Any]]:
         """Analyze video with Gemini 2.0 Flash using Google Gen AI SDK"""
 
         # Apply rate limiting
-        self._rate_limit()
+        await self._rate_limit()
 
         # Build prompt
         prompt = "You are an expert fitness instructor analyzing a TikTok workout video."
@@ -80,9 +90,14 @@ class GenAIService:
         if caption:
             prompt += f"\n\nCAPTION:\n{caption}"
 
-        prompt += """
+        # Add localization instructions if specified
+        localization_instruction = ""
+        if localization:
+            localization_instruction = f"\n\nIMPORTANT: Provide all text content (title, description, exercise names, instructions) in {localization} language. Maintain the exact JSON structure but translate all human-readable text fields."
 
-Analyze this workout video and extract the following information. Return your response as a valid JSON object with NO additional text, explanations, or formatting.
+        prompt += "\n\nAnalyze this workout video and extract the following information. Return your response as a valid JSON object with NO additional text, explanations, or formatting."
+        prompt += localization_instruction
+        prompt += """
 
 Required JSON structure:
 {
@@ -170,16 +185,17 @@ IMPORTANT: Your response must be ONLY the JSON object, with no markdown formatti
                 print("ERROR - Could not access response object")
             return None
 
-    def analyze_slideshow_with_transcript(
+    async def analyze_slideshow_with_transcript(
         self,
         slideshow_images: List[bytes],
         transcript: Optional[str] = None,
         caption: Optional[str] = None,
+        localization: Optional[str] = None,
     ) -> Optional[Dict[str, Any]]:
         """Analyze slideshow images with Gemini 2.0 Flash"""
         
         # Apply rate limiting
-        self._rate_limit()
+        await self._rate_limit()
         
         # Build prompt for slideshow analysis
         prompt = "You are an expert fitness instructor analyzing a TikTok workout slideshow containing multiple images."
@@ -190,8 +206,14 @@ IMPORTANT: Your response must be ONLY the JSON object, with no markdown formatti
         if caption:
             prompt += f"\n\nCAPTION:\n{caption}"
         
+        # Add localization instructions if specified
+        localization_instruction = ""
+        if localization:
+            localization_instruction = f"\n\nIMPORTANT: Provide all text content (title, description, exercise names, instructions) in {localization} language. Maintain the exact JSON structure but translate all human-readable text fields."
+
         image_count = len(slideshow_images)
         prompt += f"\n\nThis is a slideshow with {image_count} images showing workout exercises, poses, or fitness content. Analyze ALL the images together to extract the following information. Return your response as a valid JSON object with NO additional text, explanations, or formatting."
+        prompt += localization_instruction
         
         prompt += """
 

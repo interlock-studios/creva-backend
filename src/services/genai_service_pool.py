@@ -142,20 +142,22 @@ class GenAIServicePool:
         video_content: bytes,
         transcript: Optional[str] = None,
         caption: Optional[str] = None,
+        localization: Optional[str] = None,
     ) -> Optional[Dict[str, Any]]:
         """Analyze video using round-robin GenAI service selection"""
         service = await self.get_next_service()
-        return service.analyze_video_with_transcript(video_content, transcript, caption)
+        return service.analyze_video_with_transcript(video_content, transcript, caption, localization)
 
     async def analyze_slideshow(
         self,
         slideshow_images: List[bytes],
         transcript: Optional[str] = None,
         caption: Optional[str] = None,
+        localization: Optional[str] = None,
     ) -> Optional[Dict[str, Any]]:
         """Analyze slideshow using round-robin GenAI service selection"""
         service = await self.get_next_service()
-        return service.analyze_slideshow_with_transcript(slideshow_images, transcript, caption)
+        return service.analyze_slideshow_with_transcript(slideshow_images, transcript, caption, localization)
 
 
 class GenAIService:
@@ -209,6 +211,7 @@ class GenAIService:
         video_content: bytes,
         transcript: Optional[str] = None,
         caption: Optional[str] = None,
+        localization: Optional[str] = None,
     ) -> Optional[Dict[str, Any]]:
         """Analyze video with Gemini 2.0 Flash"""
 
@@ -224,9 +227,14 @@ class GenAIService:
         if caption:
             prompt += f"\n\nCAPTION:\n{caption}"
 
-        prompt += """
+        # Add localization instructions if specified
+        localization_instruction = ""
+        if localization:
+            localization_instruction = f"\n\nIMPORTANT: Provide all text content (title, description, exercise names, instructions) in {localization} language. Maintain the exact JSON structure but translate all human-readable text fields."
 
-Analyze this workout video and extract the following information. Return your response as a valid JSON object with NO additional text, explanations, or formatting.
+        prompt += "\n\nAnalyze this workout video and extract the following information. Return your response as a valid JSON object with NO additional text, explanations, or formatting."
+        prompt += localization_instruction
+        prompt += """
 
 Required JSON structure:
 {
@@ -312,6 +320,7 @@ IMPORTANT: Your response must be ONLY the JSON object, with no markdown formatti
         slideshow_images: List[bytes],
         transcript: Optional[str] = None,
         caption: Optional[str] = None,
+        localization: Optional[str] = None,
     ) -> Optional[Dict[str, Any]]:
         """Analyze slideshow images with Gemini 2.0 Flash"""
 
@@ -327,8 +336,14 @@ IMPORTANT: Your response must be ONLY the JSON object, with no markdown formatti
         if caption:
             prompt += f"\n\nCAPTION:\n{caption}"
 
+        # Add localization instructions if specified
+        localization_instruction = ""
+        if localization:
+            localization_instruction = f"\n\nIMPORTANT: Provide all text content (title, description, exercise names, instructions) in {localization} language. Maintain the exact JSON structure but translate all human-readable text fields."
+
         image_count = len(slideshow_images)
         prompt += f"\n\nThis is a slideshow with {image_count} images showing workout exercises, poses, or fitness content. Analyze ALL the images together to extract the following information. Return your response as a valid JSON object with NO additional text, explanations, or formatting."
+        prompt += localization_instruction
 
         prompt += """
 

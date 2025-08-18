@@ -168,20 +168,88 @@ steps:
           --set-secrets SCRAPECREATORS_API_KEY=scrapecreators-api-key:latest \
           --service-account "$${WORKER_SA}"
 
-  # Step 8: Run smoke tests
+  # Step 8: Validate deployment health
   - name: 'gcr.io/cloud-builders/gcloud'
-    id: 'smoke-test'
+    id: 'validate-deployment'
     entrypoint: 'bash'
     args:
       - '-c'
       - |
-        echo "Running smoke tests..."
+        echo "Validating deployment health..."
+        
+        # Get service URL
         SERVICE_URL=$(gcloud run services describe ${_SERVICE_NAME} \
           --platform managed --region ${_REGION} --format 'value(status.url)')
         
-        # Test health endpoint
-        curl -f "$${SERVICE_URL}/health" || exit 1
-        echo "Health check passed!"
+        # Wait for service to be ready (max 5 minutes)
+        for i in {1..30}; do
+          echo "Health check attempt $i/30..."
+          
+          if curl -f -s --max-time 10 "$${SERVICE_URL}/health" > /dev/null; then
+            echo "✅ Health check passed!"
+            break
+          fi
+          
+          if [ $i -eq 30 ]; then
+            echo "❌ Health check failed after 5 minutes"
+            echo "Rolling back deployment..."
+            
+            # Get previous revision
+            PREVIOUS_REVISION=$(gcloud run revisions list \
+              --service=${_SERVICE_NAME} --region=${_REGION} \
+              --format='value(metadata.name)' --limit=2 | tail -n 1)
+            
+            if [ ! -z "$PREVIOUS_REVISION" ]; then
+              echo "Rolling back to revision: $PREVIOUS_REVISION"
+              gcloud run services update-traffic ${_SERVICE_NAME} \
+                --to-revisions=$PREVIOUS_REVISION=100 \
+                --region=${_REGION}
+            fi
+            
+            exit 1
+          fi
+          
+          sleep 10
+        done
+        
+        # Run comprehensive smoke tests
+        echo "Running smoke tests..."
+        
+        # Test health endpoint with detailed validation
+        HEALTH_RESPONSE=$(curl -s "$${SERVICE_URL}/health")
+        echo "Health response: $HEALTH_RESPONSE"
+        
+        # Validate health response structure
+        if ! echo "$HEALTH_RESPONSE" | jq -e '.status' > /dev/null; then
+          echo "❌ Health endpoint returned invalid JSON"
+          exit 1
+        fi
+        
+        HEALTH_STATUS=$(echo "$HEALTH_RESPONSE" | jq -r '.status')
+        if [ "$HEALTH_STATUS" != "healthy" ] && [ "$HEALTH_STATUS" != "degraded" ]; then
+          echo "❌ Health status is: $HEALTH_STATUS"
+          exit 1
+        fi
+        
+        # Test status endpoint
+        curl -f "$${SERVICE_URL}/status" | jq .status || {
+          echo "❌ Status endpoint failed"
+          exit 1
+        }
+        
+        # Test API structure (should return 422 for invalid input, not 500)
+        HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
+          -X POST "$${SERVICE_URL}/process" \
+          -H "Content-Type: application/json" \
+          -d '{"url": "invalid-url"}')
+        
+        if [ "$HTTP_CODE" != "422" ]; then
+          echo "❌ Process endpoint validation failed (expected 422, got $HTTP_CODE)"
+          exit 1
+        fi
+        
+        echo "✅ All smoke tests passed!"
+        echo "✅ Deployment validation complete!"
 
 # Store images in Artifact Registry
 images:

@@ -65,13 +65,14 @@ class VideoWorker:
         """Process a single video job"""
         job_id = job["job_id"]
         url = job["url"]
+        localization = job.get("localization")
         start_time = time.time()
 
         try:
             logger.info(f"Processing job {job_id} - URL: {url[:50]}...")
 
             # Check cache first (in case it was processed by another worker)
-            cached_workout = self.cache_service.get_cached_workout(url)
+            cached_workout = self.cache_service.get_cached_workout(url, localization)
             if cached_workout:
                 logger.info(f"Job {job_id} - Found in cache, marking complete")
                 await self.queue_service.mark_job_complete(job_id, cached_workout)
@@ -131,7 +132,7 @@ class VideoWorker:
                 # 3. Analyze with Gemini
                 logger.info(f"Job {job_id} - Analyzing video with AI...")
                 workout_json = await self.genai_pool.analyze_video(
-                    silent_video, transcript, caption
+                    silent_video, transcript, caption, localization
                 )
 
             if not workout_json:
@@ -146,7 +147,7 @@ class VideoWorker:
                 "worker_id": WORKER_ID,
                 "platform": metadata_dict.get("platform", "unknown"),
             }
-            self.cache_service.cache_workout(url, workout_json, cache_metadata)
+            self.cache_service.cache_workout(url, workout_json, cache_metadata, localization)
 
             # 6. Mark job complete
             await self.queue_service.mark_job_complete(job_id, workout_json)

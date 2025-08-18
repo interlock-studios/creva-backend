@@ -73,18 +73,27 @@ class CacheService:
             logger.warning(f"Failed to normalize URL {url}: {e}")
             return url.strip().lower()
 
-    def _generate_cache_key(self, tiktok_url: str) -> str:
-        """Generate cache key from TikTok URL (Firestore document ID)"""
+    def _generate_cache_key(self, tiktok_url: str, localization: Optional[str] = None) -> str:
+        """Generate cache key from TikTok URL and optional localization (Firestore document ID)"""
         normalized_url = self._normalize_tiktok_url(tiktok_url)
-        url_hash = hashlib.sha256(normalized_url.encode()).hexdigest()[:16]
+        
+        # Include localization in cache key if provided
+        cache_input = normalized_url
+        if localization:
+            # Normalize localization to lowercase for consistent caching
+            normalized_localization = localization.lower().strip()
+            cache_input = f"{normalized_url}|{normalized_localization}"
+        
+        url_hash = hashlib.sha256(cache_input.encode()).hexdigest()[:16]
         return url_hash  # Just the hash, no prefix needed for Firestore
 
-    def get_cached_workout(self, tiktok_url: str) -> Optional[Dict[str, Any]]:
+    async def get_cached_workout(self, tiktok_url: str, localization: Optional[str] = None) -> Optional[Dict[str, Any]]:
         """
-        Retrieve cached workout data for a TikTok URL.
+        Retrieve cached workout data for a TikTok URL and localization.
 
         Args:
             tiktok_url: The TikTok video URL
+            localization: Optional localization parameter (e.g., "Spanish", "es")
 
         Returns:
             Cached workout JSON if found, None otherwise
@@ -93,7 +102,7 @@ class CacheService:
             return None
 
         try:
-            cache_key = self._generate_cache_key(tiktok_url)
+            cache_key = self._generate_cache_key(tiktok_url, localization)
             doc_ref = self.cache_collection.document(cache_key)
             doc = doc_ref.get()
 
@@ -126,30 +135,34 @@ class CacheService:
 
                 # Log cache hit
                 created_at = cached_data.get("created_at")
-                logger.info(f"Cache HIT for URL: {tiktok_url[:50]}... (cached at: {created_at})")
+                localization_info = f" [{localization}]" if localization else ""
+                logger.info(f"Cache HIT{localization_info} for URL: {tiktok_url[:50]}... (cached at: {created_at})")
 
                 return cached_data.get("workout_json")
             else:
-                logger.info(f"Cache MISS for URL: {tiktok_url[:50]}...")
+                localization_info = f" [{localization}]" if localization else ""
+                logger.info(f"Cache MISS{localization_info} for URL: {tiktok_url[:50]}...")
                 return None
 
         except Exception as e:
             logger.error(f"Error retrieving from cache: {e}")
             return None
 
-    def cache_workout(
+    async def cache_workout(
         self,
         tiktok_url: str,
         workout_json: Dict[str, Any],
         metadata: Optional[Dict[str, Any]] = None,
+        localization: Optional[str] = None,
     ) -> bool:
         """
-        Cache workout data for a TikTok URL.
+        Cache workout data for a TikTok URL and localization.
 
         Args:
             tiktok_url: The TikTok video URL
             workout_json: The processed workout JSON
             metadata: Optional metadata about the video
+            localization: Optional localization parameter (e.g., "Spanish", "es")
 
         Returns:
             True if cached successfully, False otherwise
@@ -158,7 +171,7 @@ class CacheService:
             return False
 
         try:
-            cache_key = self._generate_cache_key(tiktok_url)
+            cache_key = self._generate_cache_key(tiktok_url, localization)
 
             now = datetime.utcnow()
             expires_at = now + timedelta(hours=self.default_ttl_hours)
@@ -169,6 +182,7 @@ class CacheService:
                 "created_at": now,
                 "expires_at": expires_at,
                 "tiktok_url": tiktok_url,
+                "localization": localization,
                 "ttl_hours": self.default_ttl_hours,
             }
 
@@ -176,8 +190,9 @@ class CacheService:
             doc_ref = self.cache_collection.document(cache_key)
             doc_ref.set(cache_data)
 
+            localization_info = f" [{localization}]" if localization else ""
             logger.info(
-                f"Cache STORED for URL: {tiktok_url[:50]}... (TTL: {self.default_ttl_hours}h)"
+                f"Cache STORED{localization_info} for URL: {tiktok_url[:50]}... (TTL: {self.default_ttl_hours}h)"
             )
             return True
 
@@ -185,12 +200,13 @@ class CacheService:
             logger.error(f"Error caching workout: {e}")
             return False
 
-    def invalidate_cache(self, tiktok_url: str) -> bool:
+    def invalidate_cache(self, tiktok_url: str, localization: Optional[str] = None) -> bool:
         """
-        Invalidate cached workout for a specific TikTok URL.
+        Invalidate cached workout for a specific TikTok URL and localization.
 
         Args:
             tiktok_url: The TikTok video URL
+            localization: Optional localization parameter (e.g., "Spanish", "es")
 
         Returns:
             True if invalidated successfully, False otherwise
@@ -199,16 +215,18 @@ class CacheService:
             return False
 
         try:
-            cache_key = self._generate_cache_key(tiktok_url)
+            cache_key = self._generate_cache_key(tiktok_url, localization)
             doc_ref = self.cache_collection.document(cache_key)
 
             # Check if document exists before deleting
             if doc_ref.get().exists:
                 doc_ref.delete()
-                logger.info(f"Cache INVALIDATED for URL: {tiktok_url[:50]}...")
+                localization_info = f" [{localization}]" if localization else ""
+                logger.info(f"Cache INVALIDATED{localization_info} for URL: {tiktok_url[:50]}...")
                 return True
             else:
-                logger.info(f"No cache entry found to invalidate for URL: {tiktok_url[:50]}...")
+                localization_info = f" [{localization}]" if localization else ""
+                logger.info(f"No cache entry found to invalidate{localization_info} for URL: {tiktok_url[:50]}...")
                 return False
 
         except Exception as e:

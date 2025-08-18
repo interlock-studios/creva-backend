@@ -18,6 +18,11 @@ curl -X POST "https://workout-parser-ty6tkvdynq-uc.a.run.app/process" \
 curl -X POST "https://workout-parser-ty6tkvdynq-uc.a.run.app/process" \
   -H "Content-Type: application/json" \
   -d '{"url": "https://www.instagram.com/reel/CS7CshJjb15/"}'
+
+# With Localization (NEW!)
+curl -X POST "https://workout-parser-ty6tkvdynq-uc.a.run.app/process" \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://www.tiktok.com/@lastairbender222/video/7518493301046119710", "localization": "Spanish"}'
 ```
 
 ## 🎯 How It Works
@@ -124,16 +129,26 @@ make deploy       # Deploy to production
 
 ### `POST /process`
 Process a TikTok or Instagram video
+
+**Parameters:**
+- `url` (required): TikTok or Instagram video URL
+- `localization` (optional): Language for response text (e.g., "Spanish", "French", "es", "fr")
+
 ```bash
-# TikTok
+# Basic usage
 curl -X POST http://localhost:8080/process \
   -H "Content-Type: application/json" \
   -d '{"url": "https://www.tiktok.com/@user/video/123"}'
 
-# Instagram
+# With Spanish localization
 curl -X POST http://localhost:8080/process \
   -H "Content-Type: application/json" \
-  -d '{"url": "https://www.instagram.com/reel/ABC123/"}'
+  -d '{"url": "https://www.tiktok.com/@user/video/123", "localization": "Spanish"}'
+
+# With language code
+curl -X POST http://localhost:8080/process \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://www.instagram.com/reel/ABC123/", "localization": "fr"}'
 ```
 
 ### `GET /status/{job_id}`
@@ -146,6 +161,65 @@ curl http://localhost:8080/status/req123_1234567890
 Health check
 ```bash
 curl http://localhost:8080/health
+```
+
+## 🌍 Localization Support
+
+The API now supports **optional localization** to get workout responses in different languages!
+
+### How to Use Localization
+
+Simply add the `localization` parameter to your request:
+
+```json
+{
+  "url": "https://www.tiktok.com/@user/video/123",
+  "localization": "Spanish"
+}
+```
+
+### Supported Formats
+
+- **Language names**: "Spanish", "French", "Portuguese", "Chinese", "German", "Italian", etc.
+- **Language codes**: "es", "fr", "pt", "zh", "de", "it", etc.
+
+### What Gets Localized
+
+When you specify a localization, the following fields are translated:
+- ✅ **title** - Workout title
+- ✅ **description** - Workout description  
+- ✅ **exercise names** - Names of exercises
+- ✅ **instructions** - Exercise instructions
+- ❌ **JSON structure** - Stays the same
+- ❌ **workout_type** - Stays in English (for consistency)
+- ❌ **muscle_groups** - Stays in English (for consistency)
+
+### Example Responses
+
+**English (default):**
+```json
+{
+  "title": "Full Body HIIT Workout",
+  "exercises": [
+    {
+      "name": "Burpees", 
+      "instructions": "Start standing, drop to plank, jump back up"
+    }
+  ]
+}
+```
+
+**Spanish (`"localization": "Spanish"`):**
+```json
+{
+  "title": "Entrenamiento HIIT de Cuerpo Completo",
+  "exercises": [
+    {
+      "name": "Burpees",
+      "instructions": "Comienza de pie, baja a plancha, salta hacia arriba"
+    }
+  ]
+}
 ```
 
 ## 🔧 How Processing Works
@@ -187,6 +261,40 @@ make deploy
 ```
 
 Your API will be live at: `https://workout-parser-xxx.run.app`
+
+## 📊 Monitoring & Analytics
+
+### **🚀 Sets AI Analytics Dashboard**
+Monitor your production deployment with our comprehensive analytics dashboard:
+
+**[📈 Live Monitoring Dashboard](https://console.cloud.google.com/monitoring/dashboards/builder/30243d62-f048-4ab4-b684-35395428c310;duration=P1D?project=sets-ai&inv=1&invt=Ab51dQ&pageState=(%22eventTypes%22:(%22selected%22:%5B%22CLOUD_ALERTING_ALERT%22,%22CLOUD_RUN_DEPLOYMENT%22%5D))**
+
+### What You Can Monitor:
+- **🔥 Real-time API Performance** - Request rates, response times, error rates
+- **📱 Platform Usage** - TikTok vs Instagram processing breakdown
+- **🎯 Cache Hit Rates** - See how much traffic is served instantly from cache
+- **🔄 Queue Metrics** - Background job processing status and throughput
+- **⚡ GenAI Usage** - AI service performance and rate limiting
+- **🌍 Geographic Distribution** - Where your users are coming from
+- **📊 Business Metrics** - Daily/weekly/monthly usage trends
+- **🚨 Alerts & Incidents** - Get notified of any issues immediately
+
+### Key Metrics Tracked:
+- **API Health**: Uptime, response times, error rates
+- **Processing Pipeline**: Video download success rates, AI analysis performance
+- **Resource Usage**: CPU, memory, and storage utilization
+- **Cost Optimization**: Track spending and optimize resource allocation
+- **User Experience**: End-to-end request latency and success rates
+
+### Setting Up Alerts:
+The dashboard includes pre-configured alerts for:
+- High error rates (>5%)
+- Slow response times (>30s)
+- Queue backlog buildup
+- GenAI rate limit hits
+- Service downtime
+
+**💡 Pro Tip**: Bookmark the dashboard and check it regularly to understand your usage patterns and optimize performance!
 
 ## 🔍 Troubleshooting
 
