@@ -1,9 +1,9 @@
-# TikTok Workout Parser - Makefile
+# TikTok Workout Parser V2 - Makefile
 # Standardized commands for development and deployment
 
 # Variables
 PROJECT_ID := sets-ai
-SERVICE_NAME := workout-parser
+SERVICE_NAME := workout-parser-v2
 REGION := us-central1
 PYTHON := python3.11
 VENV := .venv
@@ -18,7 +18,7 @@ NC := \033[0m # No Color
 
 .PHONY: help
 help: ## Display this help message
-	@echo "$(GREEN)TikTok Workout Parser - Available Commands$(NC)"
+	@echo "$(GREEN)TikTok Workout Parser V2 - Available Commands$(NC)"
 	@echo ""
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "$(YELLOW)%-20s$(NC) %s\n", $$1, $$2}'
 
