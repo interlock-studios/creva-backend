@@ -180,6 +180,8 @@ gcloud secrets add-iam-policy-binding "scrapecreators-api-key" \
 DEPLOY_ARGS+=(
     "--set-env-vars" "GOOGLE_CLOUD_PROJECT_ID=${PROJECT_ID}"
     "--set-env-vars" "ENVIRONMENT=${ENVIRONMENT}"
+    "--set-env-vars" "RATE_LIMIT_REQUESTS=999999"
+    "--set-env-vars" "RATE_LIMIT_WINDOW=60"
     "--set-secrets" "SCRAPECREATORS_API_KEY=scrapecreators-api-key:latest"
 )
 
@@ -300,7 +302,7 @@ gcloud run deploy workout-parser-worker \
     --port 8081 \
     --command python \
     --args=-m,src.worker.worker_service \
-    --set-env-vars "GOOGLE_CLOUD_PROJECT_ID=${PROJECT_ID},ENVIRONMENT=${ENVIRONMENT},WORKER_BATCH_SIZE=10,WORKER_POLLING_INTERVAL=1" \
+    --set-env-vars "GOOGLE_CLOUD_PROJECT_ID=${PROJECT_ID},ENVIRONMENT=${ENVIRONMENT},WORKER_BATCH_SIZE=10,WORKER_POLLING_INTERVAL=1,RATE_LIMIT_REQUESTS=999999,RATE_LIMIT_WINDOW=60" \
     --set-secrets "SCRAPECREATORS_API_KEY=scrapecreators-api-key:latest" \
     --service-account "${WORKER_SA}" || {
     print_warning "Worker deployment failed, but API is deployed successfully"
