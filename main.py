@@ -88,46 +88,47 @@ APPCHECK_SKIP_PATHS = config.app_check.skip_paths
 # Note: Using BaseHTTPMiddleware instead of custom class for better FastAPI compatibility
 from starlette.middleware.base import BaseHTTPMiddleware
 
+
 class AppCheckHTTPMiddleware(BaseHTTPMiddleware):
     def __init__(self, app, skip_paths: list = None, required: bool = True):
         super().__init__(app)
         self.skip_paths = skip_paths or ["/health", "/docs", "/redoc", "/openapi.json"]
         self.required = required
         self.appcheck_service = get_appcheck_service()
-    
+
     async def dispatch(self, request: Request, call_next):
         # Skip verification for certain paths
         if request.url.path in self.skip_paths:
             return await call_next(request)
-        
+
         # Get App Check token from header
         appcheck_token = request.headers.get("X-Firebase-AppCheck")
-        
+
         if not appcheck_token:
             # Record unverified request metric
             record_appcheck_metric("unverified", request.url.path)
-            
+
             if self.required:
                 logger.warning(f"Missing App Check token for {request.url.path}")
                 return JSONResponse(
                     status_code=401,
                     content={"detail": "App Check token required"},
-                    headers={"WWW-Authenticate": "X-Firebase-AppCheck"}
+                    headers={"WWW-Authenticate": "X-Firebase-AppCheck"},
                 )
             else:
                 logger.info(f"App Check token missing but not required for {request.url.path}")
                 request.state.appcheck_verified = False
                 return await call_next(request)
-        
+
         # Verify the token (simplified for middleware)
         try:
             verification_result = self.appcheck_service.verify_token(appcheck_token)
-            
+
             if verification_result and verification_result.get("valid"):
                 # Record verified request metric
-                app_id = verification_result.get('app_id', 'unknown')
+                app_id = verification_result.get("app_id", "unknown")
                 record_appcheck_metric("verified", request.url.path, app_id)
-                
+
                 request.state.appcheck_verified = True
                 request.state.appcheck_claims = verification_result
                 logger.debug(f"App Check verified for app: {app_id}")
@@ -135,35 +136,38 @@ class AppCheckHTTPMiddleware(BaseHTTPMiddleware):
             else:
                 # Record invalid token metric
                 record_appcheck_metric("invalid", request.url.path)
-                
+
                 request.state.appcheck_verified = False
                 if self.required:
-                    error_msg = verification_result.get("error", "Invalid App Check token") if verification_result else "Invalid App Check token"
+                    error_msg = (
+                        verification_result.get("error", "Invalid App Check token")
+                        if verification_result
+                        else "Invalid App Check token"
+                    )
                     logger.warning(f"Invalid App Check token for {request.url.path}: {error_msg}")
                     return JSONResponse(
                         status_code=401,
                         content={"detail": f"Invalid App Check token: {error_msg}"},
-                        headers={"WWW-Authenticate": "X-Firebase-AppCheck"}
+                        headers={"WWW-Authenticate": "X-Firebase-AppCheck"},
                     )
                 else:
                     logger.info(f"Invalid App Check token but not required for {request.url.path}")
                     return await call_next(request)
-                    
+
         except Exception as e:
             logger.error(f"Error in App Check middleware: {str(e)}")
             if self.required:
                 return JSONResponse(
                     status_code=503,
-                    content={"detail": "App Check verification service unavailable"}
+                    content={"detail": "App Check verification service unavailable"},
                 )
             else:
                 request.state.appcheck_verified = False
                 return await call_next(request)
 
+
 app.add_middleware(
-    AppCheckHTTPMiddleware,
-    skip_paths=APPCHECK_SKIP_PATHS,
-    required=APPCHECK_REQUIRED
+    AppCheckHTTPMiddleware, skip_paths=APPCHECK_SKIP_PATHS, required=APPCHECK_REQUIRED
 )
 
 
@@ -191,16 +195,18 @@ appcheck_metrics = {
     "verified_requests": 0,
     "unverified_requests": 0,
     "invalid_tokens": 0,
-    "total_requests": 0
+    "total_requests": 0,
 }
 appcheck_metrics_lock = threading.Lock()
+
 
 def log_structured_metric(metric_data: dict):
     """Log structured data for Google Cloud Logging to parse as JSON"""
     from src.utils.logging import log_business_event
-    
+
     # Use our structured logging for consistency
     log_business_event("appcheck_metric", metric_data)
+
 
 def record_appcheck_metric(metric_type: str, path: str = "", app_id: str = ""):
     """Record App Check metrics for monitoring"""
@@ -213,18 +219,21 @@ def record_appcheck_metric(metric_type: str, path: str = "", app_id: str = ""):
             appcheck_metrics["unverified_requests"] += 1
         elif metric_type == "invalid":
             appcheck_metrics["invalid_tokens"] += 1
-    
+
     # Log structured metrics for Cloud Logging
-    log_structured_metric({
-        "event_type": "appcheck_metric",
-        "metric": metric_type,
-        "path": path,
-        "app_id": app_id,
-        "cumulative_verified": appcheck_metrics["verified_requests"],
-        "cumulative_unverified": appcheck_metrics["unverified_requests"],
-        "cumulative_invalid": appcheck_metrics["invalid_tokens"],
-        "total_requests": appcheck_metrics["total_requests"]
-    })
+    log_structured_metric(
+        {
+            "event_type": "appcheck_metric",
+            "metric": metric_type,
+            "path": path,
+            "app_id": app_id,
+            "cumulative_verified": appcheck_metrics["verified_requests"],
+            "cumulative_unverified": appcheck_metrics["unverified_requests"],
+            "cumulative_invalid": appcheck_metrics["invalid_tokens"],
+            "total_requests": appcheck_metrics["total_requests"],
+        }
+    )
+
 
 # Track active direct processing (shared state for routes)
 active_direct_processing = 0
@@ -279,15 +288,6 @@ async def rate_limit_middleware(request: Request, call_next):
     rate_limit_store[client_ip].append(current_time)
 
     return await call_next(request)
-
-
-
-
-
-
-
-
-
 
 
 if __name__ == "__main__":

@@ -14,8 +14,9 @@ class GenAIService:
         # Get configuration
         if config is None:
             from src.services.config_validator import AppConfig
+
             config = AppConfig.from_env()
-        
+
         # Get project ID from configuration
         project_id = config.project_id
         if not project_id:
@@ -193,19 +194,19 @@ IMPORTANT: Your response must be ONLY the JSON object, with no markdown formatti
         localization: Optional[str] = None,
     ) -> Optional[Dict[str, Any]]:
         """Analyze slideshow images with Gemini 2.0 Flash"""
-        
+
         # Apply rate limiting
         await self._rate_limit()
-        
+
         # Build prompt for slideshow analysis
         prompt = "You are an expert fitness instructor analyzing a TikTok workout slideshow containing multiple images."
-        
+
         if transcript:
             prompt += f"\n\nTRANSCRIPT:\n{transcript}"
-        
+
         if caption:
             prompt += f"\n\nCAPTION:\n{caption}"
-        
+
         # Add localization instructions if specified
         localization_instruction = ""
         if localization:
@@ -214,7 +215,7 @@ IMPORTANT: Your response must be ONLY the JSON object, with no markdown formatti
         image_count = len(slideshow_images)
         prompt += f"\n\nThis is a slideshow with {image_count} images showing workout exercises, poses, or fitness content. Analyze ALL the images together to extract the following information. Return your response as a valid JSON object with NO additional text, explanations, or formatting."
         prompt += localization_instruction
-        
+
         prompt += """
 
 Required JSON structure:
@@ -257,10 +258,10 @@ CRITICAL REQUIREMENTS:
 - Analyze ALL images together to understand the complete workout sequence
 
 IMPORTANT: Your response must be ONLY the JSON object, with no markdown formatting, no code blocks, no explanations before or after."""
-        
+
         # Prepare content with multiple images
         contents = [prompt]
-        
+
         # Add all slideshow images to the analysis
         valid_images = 0
         for i, image_content in enumerate(slideshow_images):
@@ -270,11 +271,11 @@ IMPORTANT: Your response must be ONLY the JSON object, with no markdown formatti
                     valid_images += 1
                 except Exception as e:
                     print(f"WARNING - Failed to add image {i} to analysis: {e}")
-        
+
         if valid_images == 0:
             print("ERROR - No valid images found in slideshow")
             return None
-        
+
         # Generate content with retry logic
         def make_request():
             return self.client.models.generate_content(
@@ -287,15 +288,15 @@ IMPORTANT: Your response must be ONLY the JSON object, with no markdown formatti
                     response_mime_type="application/json",
                 ),
             )
-        
+
         print(f"INFO - Analyzing slideshow with {valid_images} images")
         response = self._retry_with_backoff(make_request, max_retries=5, base_delay=2)
-        
+
         # Parse response
         try:
             response_text = response.text.strip()
             print(f"DEBUG - Raw slideshow response: {response_text[:500]}...")
-            
+
             # Clean up response if needed
             if "```json" in response_text:
                 json_start = response_text.find("```json") + 7
@@ -305,7 +306,7 @@ IMPORTANT: Your response must be ONLY the JSON object, with no markdown formatti
                 json_start = response_text.find("```") + 3
                 json_end = response_text.find("```", json_start)
                 response_text = response_text[json_start:json_end].strip()
-            
+
             return json.loads(response_text)
         except Exception as e:
             print(f"ERROR - Failed to parse slideshow response: {e}")

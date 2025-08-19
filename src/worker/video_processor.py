@@ -10,8 +10,12 @@ from src.services.tiktok_scraper import TikTokScraper
 from src.services.instagram_scraper import InstagramScraper
 from src.services.url_router import URLRouter
 from src.exceptions import (
-    VideoProcessingError, VideoDownloadError, VideoFormatError, 
-    UnsupportedPlatformError, TikTokAPIError, InstagramAPIError
+    VideoProcessingError,
+    VideoDownloadError,
+    VideoFormatError,
+    UnsupportedPlatformError,
+    TikTokAPIError,
+    InstagramAPIError,
 )
 
 logger = logging.getLogger(__name__)
@@ -66,7 +70,7 @@ class VideoProcessor:
             raise UnsupportedPlatformError(
                 message=f"Unsupported URL: {url}. Only TikTok and Instagram URLs are supported.",
                 url=url,
-                detected_platform=None
+                detected_platform=None,
             )
 
         logger.info(f"Processing {platform} video: {url}")
@@ -86,15 +90,11 @@ class VideoProcessor:
         except Exception as e:
             if platform == "tiktok":
                 raise TikTokAPIError(
-                    message=f"Failed to download TikTok video: {str(e)}",
-                    url=url,
-                    cause=e
+                    message=f"Failed to download TikTok video: {str(e)}", url=url, cause=e
                 )
             else:
                 raise InstagramAPIError(
-                    message=f"Failed to download Instagram video: {str(e)}",
-                    url=url,
-                    cause=e
+                    message=f"Failed to download Instagram video: {str(e)}", url=url, cause=e
                 )
 
         # Convert metadata to dict format (same format for both platforms)
@@ -117,20 +117,18 @@ class VideoProcessor:
 
     async def remove_audio(self, video_content: bytes) -> bytes:
         """Remove audio from video with guaranteed cleanup"""
-        with self.temp_file(suffix=".mp4") as input_path, \
-             self.temp_file(suffix=".mp4") as output_path:
-            
+        with self.temp_file(suffix=".mp4") as input_path, self.temp_file(
+            suffix=".mp4"
+        ) as output_path:
+
             # Write input video
             try:
                 with open(input_path, "wb") as f:
                     f.write(video_content)
             except IOError as e:
                 logger.error(f"Failed to write input video file: {e}")
-                raise VideoProcessingError(
-                    message=f"Failed to write video content: {e}",
-                    cause=e
-                )
-            
+                raise VideoProcessingError(message=f"Failed to write video content: {e}", cause=e)
+
             # Process with ffmpeg
             try:
                 (
@@ -144,41 +142,37 @@ class VideoProcessor:
                     .overwrite_output()
                     .run(capture_stdout=True, capture_stderr=True)
                 )
-                
+
                 # Read output
                 try:
                     with open(output_path, "rb") as f:
                         silent_video = f.read()
-                    
+
                     if not silent_video:
                         raise VideoFormatError(
                             message="FFmpeg produced empty output file",
-                            format_info="Empty output after audio removal"
+                            format_info="Empty output after audio removal",
                         )
-                    
+
                     logger.debug(f"Successfully processed video: {len(silent_video)} bytes")
                     return silent_video
-                    
+
                 except IOError as e:
                     logger.error(f"Failed to read processed video file: {e}")
                     raise VideoProcessingError(
-                        message=f"Failed to read processed video: {e}",
-                        cause=e
+                        message=f"Failed to read processed video: {e}", cause=e
                     )
-                    
+
             except ffmpeg.Error as e:
                 stderr_output = e.stderr.decode() if e.stderr else "No error details"
                 logger.error(f"FFmpeg processing failed: {stderr_output}")
                 raise VideoFormatError(
                     message=f"Video processing failed: {stderr_output}",
                     format_info="FFmpeg processing error",
-                    cause=e
+                    cause=e,
                 )
             except Exception as e:
                 logger.error(f"Unexpected error during video processing: {e}")
-                raise VideoProcessingError(
-                    message=f"Video processing failed: {str(e)}",
-                    cause=e
-                )
-        
+                raise VideoProcessingError(message=f"Video processing failed: {str(e)}", cause=e)
+
         # Temp files automatically cleaned up by context managers

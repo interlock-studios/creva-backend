@@ -6,6 +6,10 @@ import os
 from typing import Optional, Dict, Any
 from datetime import datetime, timedelta
 from urllib.parse import urlparse, parse_qs, urlencode
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 logger = logging.getLogger(__name__)
 
@@ -76,18 +80,20 @@ class CacheService:
     def _generate_cache_key(self, tiktok_url: str, localization: Optional[str] = None) -> str:
         """Generate cache key from TikTok URL and optional localization (Firestore document ID)"""
         normalized_url = self._normalize_tiktok_url(tiktok_url)
-        
+
         # Include localization in cache key if provided
         cache_input = normalized_url
         if localization:
             # Normalize localization to lowercase for consistent caching
             normalized_localization = localization.lower().strip()
             cache_input = f"{normalized_url}|{normalized_localization}"
-        
+
         url_hash = hashlib.sha256(cache_input.encode()).hexdigest()[:16]
         return url_hash  # Just the hash, no prefix needed for Firestore
 
-    async def get_cached_workout(self, tiktok_url: str, localization: Optional[str] = None) -> Optional[Dict[str, Any]]:
+    async def get_cached_workout(
+        self, tiktok_url: str, localization: Optional[str] = None
+    ) -> Optional[Dict[str, Any]]:
         """
         Retrieve cached workout data for a TikTok URL and localization.
 
@@ -136,7 +142,9 @@ class CacheService:
                 # Log cache hit
                 created_at = cached_data.get("created_at")
                 localization_info = f" [{localization}]" if localization else ""
-                logger.info(f"Cache HIT{localization_info} for URL: {tiktok_url[:50]}... (cached at: {created_at})")
+                logger.info(
+                    f"Cache HIT{localization_info} for URL: {tiktok_url[:50]}... (cached at: {created_at})"
+                )
 
                 return cached_data.get("workout_json")
             else:
@@ -226,7 +234,9 @@ class CacheService:
                 return True
             else:
                 localization_info = f" [{localization}]" if localization else ""
-                logger.info(f"No cache entry found to invalidate{localization_info} for URL: {tiktok_url[:50]}...")
+                logger.info(
+                    f"No cache entry found to invalidate{localization_info} for URL: {tiktok_url[:50]}..."
+                )
                 return False
 
         except Exception as e:

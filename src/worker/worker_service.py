@@ -72,7 +72,7 @@ class VideoWorker:
             logger.info(f"Processing job {job_id} - URL: {url[:50]}...")
 
             # Check cache first (in case it was processed by another worker)
-            cached_workout = self.cache_service.get_cached_workout(url, localization)
+            cached_workout = await self.cache_service.get_cached_workout(url, localization)
             if cached_workout:
                 logger.info(f"Job {job_id} - Found in cache, marking complete")
                 await self.queue_service.mark_job_complete(job_id, cached_workout)
@@ -147,7 +147,7 @@ class VideoWorker:
                 "worker_id": WORKER_ID,
                 "platform": metadata_dict.get("platform", "unknown"),
             }
-            self.cache_service.cache_workout(url, workout_json, cache_metadata, localization)
+            await self.cache_service.cache_workout(url, workout_json, cache_metadata, localization)
 
             # 6. Mark job complete
             await self.queue_service.mark_job_complete(job_id, workout_json)
@@ -157,7 +157,8 @@ class VideoWorker:
 
         except Exception as e:
             process_time = time.time() - start_time
-            error_msg = str(e)
+            # Ensure error message is a clean string without object references
+            error_msg = f"{type(e).__name__}: {str(e)}"
             logger.error(f"Job {job_id} - Failed after {process_time:.2f}s: {error_msg}")
 
             # Mark job as failed (will retry if under max attempts)

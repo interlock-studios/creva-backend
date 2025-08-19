@@ -9,7 +9,7 @@ from .base import (
     ServiceUnavailableError,
     RateLimitExceededError,
     AuthenticationError,
-    ProcessingError
+    ProcessingError,
 )
 
 from .video_processing import (
@@ -17,7 +17,7 @@ from .video_processing import (
     VideoDownloadError,
     VideoFormatError,
     TranscriptionError,
-    UnsupportedPlatformError
+    UnsupportedPlatformError,
 )
 
 from .external_services import (
@@ -26,31 +26,29 @@ from .external_services import (
     InstagramAPIError,
     GenAIServiceError,
     CacheServiceError,
-    QueueServiceError
+    QueueServiceError,
 )
 
 __all__ = [
     # Base exceptions
-    'SetsAIException',
-    'ValidationError',
-    'NotFoundError', 
-    'ServiceUnavailableError',
-    'RateLimitExceededError',
-    'AuthenticationError',
-    'ProcessingError',
-    
+    "SetsAIException",
+    "ValidationError",
+    "NotFoundError",
+    "ServiceUnavailableError",
+    "RateLimitExceededError",
+    "AuthenticationError",
+    "ProcessingError",
     # Video processing exceptions
-    'VideoProcessingError',
-    'VideoDownloadError',
-    'VideoFormatError',
-    'TranscriptionError',
-    'UnsupportedPlatformError',
-    
+    "VideoProcessingError",
+    "VideoDownloadError",
+    "VideoFormatError",
+    "TranscriptionError",
+    "UnsupportedPlatformError",
     # External service exceptions
-    'ExternalServiceError',
-    'TikTokAPIError',
-    'InstagramAPIError',
-    'GenAIServiceError',
-    'CacheServiceError',
-    'QueueServiceError'
+    "ExternalServiceError",
+    "TikTokAPIError",
+    "InstagramAPIError",
+    "GenAIServiceError",
+    "CacheServiceError",
+    "QueueServiceError",
 ]

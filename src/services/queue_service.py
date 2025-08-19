@@ -8,6 +8,10 @@ from typing import Optional, Dict, Any, List
 from datetime import datetime, timedelta
 import time
 import asyncio
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 # Suppress Firestore deprecation warnings for now
 warnings.filterwarnings("ignore", message="Detected filter using positional arguments")
@@ -36,7 +40,13 @@ class QueueService:
             logger.warning(f"Firestore connection failed: {e}. Queue will be disabled.")
             self.db = None
 
-    async def enqueue_video(self, url: str, request_id: str, priority: str = "normal", localization: Optional[str] = None) -> str:
+    async def enqueue_video(
+        self,
+        url: str,
+        request_id: str,
+        priority: str = "normal",
+        localization: Optional[str] = None,
+    ) -> str:
         """Add video to processing queue"""
         if not self.db:
             raise Exception("Queue service not available")
@@ -185,8 +195,18 @@ class QueueService:
                 attempts = job_data.get("attempts", 0)
                 max_attempts = job_data.get("max_attempts", 3)
 
+                # Sanitize error message to ensure it's serializable
+                try:
+                    # Try to serialize the error to catch any non-serializable objects
+                    import json
+                    json.dumps(error)
+                    sanitized_error = error
+                except (TypeError, ValueError):
+                    # If error contains non-serializable objects, create a clean string
+                    sanitized_error = f"Error occurred: {type(error).__name__}"
+                
                 update_data = {
-                    "last_error": error,
+                    "last_error": sanitized_error,
                     "failed_at": datetime.utcnow(),
                     "worker_id": None,
                 }
@@ -252,7 +272,9 @@ class QueueService:
 
             # Clean up old queue entries
             old_jobs = (
-                self.queue_collection.where(filter=FieldFilter("status", "in", ["completed", "failed"]))
+                self.queue_collection.where(
+                    filter=FieldFilter("status", "in", ["completed", "failed"])
+                )
                 .where(filter=FieldFilter("created_at", "<", cutoff_date))
                 .stream()
             )
@@ -301,7 +323,11 @@ class QueueService:
             # Count jobs by status
             for status in ["pending", "processing", "completed", "failed"]:
                 count = len(
-                    list(self.queue_collection.where(filter=FieldFilter("status", "==", status)).limit(1000).stream())
+                    list(
+                        self.queue_collection.where(filter=FieldFilter("status", "==", status))
+                        .limit(1000)
+                        .stream()
+                    )
                 )
                 stats["queue_stats"][status] = count
 

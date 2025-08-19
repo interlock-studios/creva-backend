@@ -49,6 +49,7 @@ from dataclasses import dataclass
 @dataclass
 class ProcessingConfig:
     """Video processing configuration"""
+
     max_direct_processing: int = 5
     direct_processing_timeout: float = 30.0
     video_processing_timeout: float = 300.0
@@ -59,6 +60,7 @@ class ProcessingConfig:
 @dataclass
 class RateLimitConfig:
     """Rate limiting configuration"""
+
     requests_per_window: int = 10
     window_seconds: int = 60
     genai_min_interval: float = 1.0
@@ -68,6 +70,7 @@ class RateLimitConfig:
 @dataclass
 class CacheConfig:
     """Caching configuration"""
+
     ttl_hours: int = 168  # 1 week
     max_cache_size_mb: int = 1000
     cleanup_interval_hours: int = 24
@@ -76,6 +79,7 @@ class CacheConfig:
 @dataclass
 class WorkerConfig:
     """Worker service configuration"""
+
     polling_interval: float = 5.0
     batch_size: int = 1
     shutdown_timeout: int = 30
@@ -84,9 +88,10 @@ class WorkerConfig:
 @dataclass
 class AppCheckConfig:
     """App Check configuration"""
+
     required: bool = False
     skip_paths: List[str] = None
-    
+
     def __post_init__(self):
         if self.skip_paths is None:
             self.skip_paths = ["/health", "/docs", "/redoc", "/openapi.json", "/test-api"]
@@ -95,6 +100,7 @@ class AppCheckConfig:
 @dataclass
 class AppConfig:
     """Main application configuration"""
+
     environment: str
     project_id: str
     processing: ProcessingConfig
@@ -102,9 +108,9 @@ class AppConfig:
     caching: CacheConfig
     worker: WorkerConfig
     app_check: AppCheckConfig
-    
+
     @classmethod
-    def from_env(cls) -> 'AppConfig':
+    def from_env(cls) -> "AppConfig":
         """Create configuration from environment variables"""
         return cls(
             environment=os.getenv("ENVIRONMENT", "production"),
@@ -114,28 +120,32 @@ class AppConfig:
                 direct_processing_timeout=float(os.getenv("DIRECT_PROCESSING_TIMEOUT", "30.0")),
                 video_processing_timeout=float(os.getenv("VIDEO_PROCESSING_TIMEOUT", "300.0")),
                 max_video_size_mb=int(os.getenv("MAX_VIDEO_SIZE_MB", "100")),
-                max_concurrent_processing=int(os.getenv("MAX_CONCURRENT_PROCESSING", "50"))
+                max_concurrent_processing=int(os.getenv("MAX_CONCURRENT_PROCESSING", "50")),
             ),
             rate_limiting=RateLimitConfig(
                 requests_per_window=int(os.getenv("RATE_LIMIT_REQUESTS", "10")),
                 window_seconds=int(os.getenv("RATE_LIMIT_WINDOW", "60")),
                 genai_min_interval=float(os.getenv("GENAI_MIN_INTERVAL", "1.0")),
-                genai_max_retries=int(os.getenv("GENAI_MAX_RETRIES", "3"))
+                genai_max_retries=int(os.getenv("GENAI_MAX_RETRIES", "3")),
             ),
             caching=CacheConfig(
                 ttl_hours=int(os.getenv("CACHE_TTL_HOURS", "168")),
                 max_cache_size_mb=int(os.getenv("MAX_CACHE_SIZE_MB", "1000")),
-                cleanup_interval_hours=int(os.getenv("CACHE_CLEANUP_INTERVAL", "24"))
+                cleanup_interval_hours=int(os.getenv("CACHE_CLEANUP_INTERVAL", "24")),
             ),
             worker=WorkerConfig(
                 polling_interval=float(os.getenv("WORKER_POLLING_INTERVAL", "5.0")),
                 batch_size=int(os.getenv("WORKER_BATCH_SIZE", "1")),
-                shutdown_timeout=int(os.getenv("WORKER_SHUTDOWN_TIMEOUT", "30"))
+                shutdown_timeout=int(os.getenv("WORKER_SHUTDOWN_TIMEOUT", "30")),
             ),
             app_check=AppCheckConfig(
                 required=os.getenv("APPCHECK_REQUIRED", "false").lower() == "true",
-                skip_paths=os.getenv("APPCHECK_SKIP_PATHS", "").split(",") if os.getenv("APPCHECK_SKIP_PATHS") else None
-            )
+                skip_paths=(
+                    os.getenv("APPCHECK_SKIP_PATHS", "").split(",")
+                    if os.getenv("APPCHECK_SKIP_PATHS")
+                    else None
+                ),
+            ),
         )
 
 

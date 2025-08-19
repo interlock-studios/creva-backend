@@ -146,7 +146,9 @@ class GenAIServicePool:
     ) -> Optional[Dict[str, Any]]:
         """Analyze video using round-robin GenAI service selection"""
         service = await self.get_next_service()
-        return service.analyze_video_with_transcript(video_content, transcript, caption, localization)
+        return await service.analyze_video_with_transcript(
+            video_content, transcript, caption, localization
+        )
 
     async def analyze_slideshow(
         self,
@@ -157,7 +159,9 @@ class GenAIServicePool:
     ) -> Optional[Dict[str, Any]]:
         """Analyze slideshow using round-robin GenAI service selection"""
         service = await self.get_next_service()
-        return service.analyze_slideshow_with_transcript(slideshow_images, transcript, caption, localization)
+        return await service.analyze_slideshow_with_transcript(
+            slideshow_images, transcript, caption, localization
+        )
 
 
 class GenAIService:
@@ -196,17 +200,17 @@ class GenAIService:
                     raise e
         return None
 
-    def _rate_limit(self):
+    async def _rate_limit(self):
         """Ensure minimum time between requests for this service"""
         current_time = time.time()
         time_since_last_request = current_time - self.last_request_time
         if time_since_last_request < self.min_request_interval:
             sleep_time = self.min_request_interval - time_since_last_request
             logger.debug(f"Service {self.service_id} - Rate limiting: waiting {sleep_time:.2f}s")
-            time.sleep(sleep_time)
+            await asyncio.sleep(sleep_time)
         self.last_request_time = time.time()
 
-    def analyze_video_with_transcript(
+    async def analyze_video_with_transcript(
         self,
         video_content: bytes,
         transcript: Optional[str] = None,
@@ -216,7 +220,7 @@ class GenAIService:
         """Analyze video with Gemini 2.0 Flash"""
 
         # Apply rate limiting for this specific service
-        self._rate_limit()
+        await self._rate_limit()
 
         # Build prompt
         prompt = "You are an expert fitness instructor analyzing a TikTok workout video."
@@ -315,7 +319,7 @@ IMPORTANT: Your response must be ONLY the JSON object, with no markdown formatti
             logger.error(f"Service {self.service_id} - Failed to parse response: {e}")
             return None
 
-    def analyze_slideshow_with_transcript(
+    async def analyze_slideshow_with_transcript(
         self,
         slideshow_images: List[bytes],
         transcript: Optional[str] = None,
@@ -325,7 +329,7 @@ IMPORTANT: Your response must be ONLY the JSON object, with no markdown formatti
         """Analyze slideshow images with Gemini 2.0 Flash"""
 
         # Apply rate limiting for this specific service
-        self._rate_limit()
+        await self._rate_limit()
 
         # Build prompt for slideshow analysis
         prompt = "You are an expert fitness instructor analyzing a TikTok workout slideshow containing multiple images."

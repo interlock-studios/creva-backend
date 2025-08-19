@@ -1,6 +1,7 @@
 """
 Health check endpoints
 """
+
 from fastapi import APIRouter, Request
 from datetime import datetime
 import logging
@@ -78,21 +79,21 @@ async def status():
     import time
     import os
     import asyncio
-    
+
     current_time = time.time()
-    
+
     # Get rate limiting info from main app (we'll need to refactor this)
     # For now, return basic status
-    
+
     # Get cache stats
     cache_stats = cache_service.get_cache_stats()
-    
+
     # Get queue stats
     queue_stats = queue_service.get_queue_stats()
-    
+
     # Get App Check stats
     appcheck_stats = appcheck_service.get_stats()
-    
+
     return {
         "status": "operational",
         "timestamp": datetime.now().isoformat(),
