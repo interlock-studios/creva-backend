@@ -135,8 +135,8 @@ async def process_video(
         logger.info(f"Returning cached result - Request ID: {request_id}, URL: {request.url}")
         return WorkoutData(**cached_workout)
 
-    # Check if already in queue
-    existing_job = await queue_service.get_job_by_url(request.url, status="pending")
+    # Check if already in queue (with localization)
+    existing_job = await queue_service.get_job_by_url(request.url, status="pending", localization=request.localization)
     if existing_job:
         logger.info(
             f"Video already queued - Request ID: {request_id}, Job ID: {existing_job['job_id']}"
@@ -148,7 +148,7 @@ async def process_video(
             check_url=f"/status/{existing_job['job_id']}",
         )
 
-    processing_job = await queue_service.get_job_by_url(request.url, status="processing")
+    processing_job = await queue_service.get_job_by_url(request.url, status="processing", localization=request.localization)
     if processing_job:
         logger.info(
             f"Video already processing - Request ID: {request_id}, Job ID: {processing_job['job_id']}"

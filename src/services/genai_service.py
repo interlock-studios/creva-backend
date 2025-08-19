@@ -156,7 +156,7 @@ IMPORTANT: Your response must be ONLY the JSON object, with no markdown formatti
                 ),
             )
 
-        response = self._retry_with_backoff(make_request, max_retries=5, base_delay=2)
+        response = await self._retry_with_backoff(make_request, max_retries=5, base_delay=2)
 
         # Parse response
         try:
@@ -290,7 +290,7 @@ IMPORTANT: Your response must be ONLY the JSON object, with no markdown formatti
             )
 
         print(f"INFO - Analyzing slideshow with {valid_images} images")
-        response = self._retry_with_backoff(make_request, max_retries=5, base_delay=2)
+        response = await self._retry_with_backoff(make_request, max_retries=5, base_delay=2)
 
         # Parse response
         try:

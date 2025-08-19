@@ -71,18 +71,25 @@ class QueueService:
 
         return job_id
 
-    async def get_job_by_url(self, url: str, status: Optional[str] = None) -> Optional[Dict]:
-        """Check if URL is already in queue with optional status filter"""
+    async def get_job_by_url(self, url: str, status: Optional[str] = None, localization: Optional[str] = None) -> Optional[Dict]:
+        """Check if URL+localization combo is already in queue with optional status filter"""
         if not self.db:
             return None
 
         try:
             query = self.queue_collection.where(filter=FieldFilter("url", "==", url))
 
+            # Add localization filter if provided
+            if localization:
+                query = query.where(filter=FieldFilter("localization", "==", localization))
+            else:
+                # If no localization specified, only match jobs with no localization
+                query = query.where(filter=FieldFilter("localization", "==", None))
+
             if status:
                 query = query.where(filter=FieldFilter("status", "==", status))
 
-            # Get most recent job for this URL
+            # Get most recent job for this URL+localization combo
             query = query.order_by("created_at", direction=firestore.Query.DESCENDING).limit(1)
 
             docs = query.stream()
@@ -92,7 +99,7 @@ class QueueService:
             return None
 
         except Exception as e:
-            logger.error(f"Error checking job by URL: {e}")
+            logger.error(f"Error checking job by URL+localization: {e}")
             return None
 
     async def get_next_job(self, worker_id: str) -> Optional[Dict]:
