@@ -94,7 +94,7 @@ class GenAIService:
         # Add localization instructions if specified
         localization_instruction = ""
         if localization:
-            localization_instruction = f"\n\nIMPORTANT: Provide all text content (title, description, exercise names, instructions) in {localization} language. Maintain the exact JSON structure but translate all human-readable text fields."
+            localization_instruction = f"\n\nIMPORTANT: Provide all text content (title, description, exercise names, instructions, AND equipment names) in {localization} language. Translate ALL human-readable text fields including equipment names like 'Dumbbells' → 'Mancuernas' (Spanish), 'Barbell' → 'Barra' (Spanish), etc. Maintain the exact JSON structure but translate all text."
 
         prompt += "\n\nAnalyze this workout video and extract the following information. Return your response as a valid JSON object with NO additional text, explanations, or formatting."
         prompt += localization_instruction
@@ -111,7 +111,7 @@ Required JSON structure:
     {
       "name": "exercise name",
       "muscle_groups": ["MUST use exact values from: abs, arms, back, biceps, calves, chest, core, forearms, glutes, hamstrings, lats, legs, lower back, obliques, quads, shoulders, traps, triceps"],
-      "equipment": "equipment needed (examples: Barbell, Dumbbells, Kettlebell, Machine, Cable, Bodyweight, Resistance Band, Medicine Ball, Pull-up Bar, Dip Station, None)",
+      "equipment": "equipment needed - TRANSLATE if localization specified (examples: Barbell/Barra, Dumbbells/Mancuernas, Kettlebell/Pesa Rusa, Machine/Máquina, Cable/Cable, Bodyweight/Peso Corporal, Resistance Band/Banda de Resistencia, None/Ninguno)",
       "sets": [
         {
           "reps": integer or null,
@@ -210,7 +210,7 @@ IMPORTANT: Your response must be ONLY the JSON object, with no markdown formatti
         # Add localization instructions if specified
         localization_instruction = ""
         if localization:
-            localization_instruction = f"\n\nIMPORTANT: Provide all text content (title, description, exercise names, instructions) in {localization} language. Maintain the exact JSON structure but translate all human-readable text fields."
+            localization_instruction = f"\n\nIMPORTANT: Provide all text content (title, description, exercise names, instructions, AND equipment names) in {localization} language. Translate ALL human-readable text fields including equipment names like 'Dumbbells' → 'Mancuernas' (Spanish), 'Barbell' → 'Barra' (Spanish), etc. Maintain the exact JSON structure but translate all text."
 
         image_count = len(slideshow_images)
         prompt += f"\n\nThis is a slideshow with {image_count} images showing workout exercises, poses, or fitness content. Analyze ALL the images together to extract the following information. Return your response as a valid JSON object with NO additional text, explanations, or formatting."
@@ -229,7 +229,7 @@ Required JSON structure:
     {
       "name": "exercise name",
       "muscle_groups": ["MUST use exact values from: abs, arms, back, biceps, calves, chest, core, forearms, glutes, hamstrings, lats, legs, lower back, obliques, quads, shoulders, traps, triceps"],
-      "equipment": "equipment needed (examples: Barbell, Dumbbells, Kettlebell, Machine, Cable, Bodyweight, Resistance Band, Medicine Ball, Pull-up Bar, Dip Station, None)",
+      "equipment": "equipment needed - TRANSLATE if localization specified (examples: Barbell/Barra, Dumbbells/Mancuernas, Kettlebell/Pesa Rusa, Machine/Máquina, Cable/Cable, Bodyweight/Peso Corporal, Resistance Band/Banda de Resistencia, None/Ninguno)",
       "sets": [
         {
           "reps": integer or null,

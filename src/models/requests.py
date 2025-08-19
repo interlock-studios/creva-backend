@@ -12,7 +12,7 @@ class ProcessRequest(BaseModel):
 
     url: str = Field(..., description="TikTok or Instagram video URL")
     localization: Optional[str] = Field(
-        None, description="Optional language/locale code (e.g., 'es', 'fr', 'pt', 'zh')"
+        None, description="Optional language code or name (e.g., 'es', 'Spanish', 'zh', 'Chinese', 'Tamil')"
     )
 
     @field_validator("url")
@@ -45,18 +45,20 @@ class ProcessRequest(BaseModel):
     @field_validator("localization")
     @classmethod
     def validate_localization(cls, v):
-        """Validate localization code"""
+        """Validate localization - accepts language codes or full language names"""
         if v is None:
             return v
 
-        v = v.strip().lower()
+        v = v.strip()
         if not v:
             return None
 
-        # Basic validation for common language codes
-        if len(v) < 2 or len(v) > 5:
-            raise ValueError("Localization code must be 2-5 characters")
+        # Accept any reasonable language identifier (2-20 characters)
+        # This allows both codes like "es", "zh" and full names like "Spanish", "Chinese"
+        if len(v) < 2 or len(v) > 20:
+            raise ValueError("Localization must be 2-20 characters")
 
+        # Return original case for better AI understanding
         return v
 
 
