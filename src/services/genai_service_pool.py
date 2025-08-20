@@ -234,7 +234,7 @@ class GenAIService:
         # Add localization instructions if specified
         localization_instruction = ""
         if localization:
-            localization_instruction = f"\n\nIMPORTANT: Provide all text content (title, description, exercise names, instructions) in {localization} language. Maintain the exact JSON structure but translate all human-readable text fields."
+            localization_instruction = f"\n\nIMPORTANT: Provide ALL text content (title, description, exercise names, instructions, AND equipment names) in {localization} language ONLY. Translate ALL human-readable text fields including equipment names consistently in the specified language. Maintain the exact JSON structure but translate all text to {localization}."
 
         prompt += "\n\nAnalyze this workout video and extract the following information. Return your response as a valid JSON object with NO additional text, explanations, or formatting."
         prompt += localization_instruction
@@ -251,7 +251,7 @@ Required JSON structure:
     {
       "name": "exercise name",
       "muscle_groups": ["MUST use exact values from: abs, arms, back, biceps, calves, chest, core, forearms, glutes, hamstrings, lats, legs, lower back, obliques, quads, shoulders, traps, triceps"],
-      "equipment": "equipment needed (examples: Barbell, Dumbbells, Kettlebell, Machine, Cable, Bodyweight, Resistance Band, Medicine Ball, Pull-up Bar, Dip Station, None)",
+      "equipment": "equipment needed - MUST be translated to the specified language if localization is provided (examples: Barbell, Dumbbells, Kettlebell, Machine, Cable, Bodyweight, Resistance Band, Medicine Ball, Pull-up Bar, Dip Station, None)",
       "sets": [
         {
           "reps": integer or null,
@@ -277,6 +277,8 @@ CRITICAL REQUIREMENTS:
 - muscle_groups must use EXACT values from the list above
 - equipment should be descriptive (use common names like those in examples above)
 - workout_type must use EXACT values from the list above
+
+CRITICAL CONSISTENCY RULE: If localization is specified, ALL text fields (title, description, exercise names, instructions, equipment names) MUST be in the SAME target language consistently throughout the entire response.
 
 IMPORTANT: Your response must be ONLY the JSON object, with no markdown formatting, no code blocks, no explanations before or after."""
 
@@ -343,7 +345,7 @@ IMPORTANT: Your response must be ONLY the JSON object, with no markdown formatti
         # Add localization instructions if specified
         localization_instruction = ""
         if localization:
-            localization_instruction = f"\n\nIMPORTANT: Provide all text content (title, description, exercise names, instructions) in {localization} language. Maintain the exact JSON structure but translate all human-readable text fields."
+            localization_instruction = f"\n\nIMPORTANT: Provide ALL text content (title, description, exercise names, instructions, AND equipment names) in {localization} language ONLY. Translate ALL human-readable text fields including equipment names consistently in the specified language. Maintain the exact JSON structure but translate all text to {localization}."
 
         image_count = len(slideshow_images)
         prompt += f"\n\nThis is a slideshow with {image_count} images showing workout exercises, poses, or fitness content. Analyze ALL the images together to extract the following information. Return your response as a valid JSON object with NO additional text, explanations, or formatting."
@@ -362,7 +364,7 @@ Required JSON structure:
     {
       "name": "exercise name",
       "muscle_groups": ["MUST use exact values from: abs, arms, back, biceps, calves, chest, core, forearms, glutes, hamstrings, lats, legs, lower back, obliques, quads, shoulders, traps, triceps"],
-      "equipment": "equipment needed (examples: Barbell, Dumbbells, Kettlebell, Machine, Cable, Bodyweight, Resistance Band, Medicine Ball, Pull-up Bar, Dip Station, None)",
+      "equipment": "equipment needed - MUST be translated to the specified language if localization is provided (examples: Barbell, Dumbbells, Kettlebell, Machine, Cable, Bodyweight, Resistance Band, Medicine Ball, Pull-up Bar, Dip Station, None)",
       "sets": [
         {
           "reps": integer or null,
@@ -389,6 +391,8 @@ CRITICAL REQUIREMENTS:
 - equipment should be descriptive (use common names like those in examples above)
 - workout_type must use EXACT values from the list above
 - Analyze ALL images together to understand the complete workout sequence
+
+CRITICAL CONSISTENCY RULE: If localization is specified, ALL text fields (title, description, exercise names, instructions, equipment names) MUST be in the SAME target language consistently throughout the entire response.
 
 IMPORTANT: Your response must be ONLY the JSON object, with no markdown formatting, no code blocks, no explanations before or after."""
 
