@@ -189,6 +189,14 @@ test-api: ## Test the deployed API
 		echo "Testing $$SERVICE_URL/health"; \
 		curl -s "$$SERVICE_URL/health" | jq .
 
+.PHONY: dashboard
+dashboard: ## Deploy V2 monitoring dashboard with V1 comparison
+	@echo "$(GREEN)Deploying V2 Analytics Dashboard...$(NC)"
+	@DASHBOARD_ID=$$(gcloud monitoring dashboards create --config-from-file=monitoring/sets_ai_v2_working_dashboard.json --format="value(name)"); \
+		DASHBOARD_SHORT_ID=$$(basename "$$DASHBOARD_ID"); \
+		echo "$(GREEN)✅ Dashboard created: $$DASHBOARD_SHORT_ID$(NC)"; \
+		echo "$(BLUE)🌐 Dashboard URL: https://console.cloud.google.com/monitoring/dashboards/custom/$$DASHBOARD_SHORT_ID?project=$(PROJECT_ID)$(NC)"
+
 .PHONY: clean
 clean: ## Clean up temporary files
 	@echo "$(GREEN)Cleaning up...$(NC)"
