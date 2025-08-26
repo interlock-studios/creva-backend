@@ -9,6 +9,7 @@ import shutil
 from src.services.tiktok_scraper import TikTokScraper
 from src.services.instagram_scraper import InstagramScraper
 from src.services.url_router import URLRouter
+
 from src.exceptions import (
     VideoProcessingError,
     VideoDownloadError,
@@ -26,6 +27,8 @@ class VideoProcessor:
         self.tiktok_scraper = TikTokScraper()
         self.instagram_scraper = InstagramScraper()
         self.url_router = URLRouter()
+        
+
 
     @contextmanager
     def temp_file(self, suffix: str = ".mp4") -> Generator[str, None, None]:
@@ -75,16 +78,12 @@ class VideoProcessor:
 
         logger.info(f"Processing {platform} video: {url}")
 
-        # Use appropriate scraper
+        # Use appropriate scraper directly
         try:
             if platform == "tiktok":
-                video_content, metadata_obj, transcript_text = (
-                    await self.tiktok_scraper.scrape_tiktok_complete(url)
-                )
+                video_content, metadata_obj, transcript_text = await self.tiktok_scraper.scrape_tiktok_complete(url)
             else:  # instagram
-                video_content, metadata_obj, caption_text = (
-                    await self.instagram_scraper.scrape_instagram_complete(url)
-                )
+                video_content, metadata_obj, caption_text = await self.instagram_scraper.scrape_instagram_complete(url)
                 # Instagram returns caption instead of transcript, but we'll treat it similarly
                 transcript_text = caption_text
         except Exception as e:

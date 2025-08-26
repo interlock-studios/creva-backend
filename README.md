@@ -138,12 +138,12 @@ Process a TikTok or Instagram video
 # Basic usage
 curl -X POST http://localhost:8080/process \
   -H "Content-Type: application/json" \
-  -d '{"url": "https://www.tiktok.com/@user/video/123"}'
+  -d '{"url": "https://www.tiktok.com/@lastairbender222/video/7518493301046119710"}'
 
 # With Spanish localization
 curl -X POST http://localhost:8080/process \
   -H "Content-Type: application/json" \
-  -d '{"url": "https://www.tiktok.com/@user/video/123", "localization": "Spanish"}'
+  -d '{"url": "https://www.tiktok.com/@lastairbender222/video/7518493301046119710", "localization": "Spanish"}'
 
 # With language code
 curl -X POST http://localhost:8080/process \

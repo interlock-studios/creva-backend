@@ -53,11 +53,11 @@ Advanced usage with options:
             options
         )
     except ValidationError as e:
-        print(f"Invalid URL: {e}")
+        logger.error(f"Invalid URL: {e}")
     except APIError as e:
-        print(f"API error: {e}, Status: {e.status_code}")
+        logger.error(f"API error: {e}, Status: {e.status_code}")
     except NetworkError as e:
-        print(f"Network error: {e}")
+        logger.error(f"Network error: {e}")
 
 Environment Variables:
     SCRAPECREATORS_API_KEY: Your ScrapeCreators API key (required)

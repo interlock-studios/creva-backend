@@ -2,11 +2,12 @@ from google import genai
 from google.genai.types import HttpOptions, Part, GenerateContentConfig
 from typing import Dict, Any, Optional, List
 import json
-
-import os
+import logging
 import time
 import random
 import asyncio
+
+logger = logging.getLogger(__name__)
 
 
 class GenAIService:
@@ -45,13 +46,13 @@ class GenAIService:
                 error_str = str(e)
                 if "429" in error_str or "RESOURCE_EXHAUSTED" in error_str:
                     if attempt == max_retries - 1:
-                        print(f"ERROR - Max retries ({max_retries}) reached for 429 error")
+                        logger.error(f"Max retries ({max_retries}) reached for 429 error")
                         raise e
 
                     # Exponential backoff with jitter
                     delay = base_delay * (2**attempt) + random.uniform(0, 1)
-                    print(
-                        f"WARNING - Got 429 error, retrying in {delay:.2f} seconds "
+                    logger.warning(
+                        f"Got 429 error, retrying in {delay:.2f} seconds "
                         f"(attempt {attempt + 1}/{max_retries})"
                     )
                     await asyncio.sleep(delay)
@@ -66,7 +67,7 @@ class GenAIService:
         time_since_last_request = current_time - self.last_request_time
         if time_since_last_request < self.min_request_interval:
             sleep_time = self.min_request_interval - time_since_last_request
-            print(f"INFO - Rate limiting: waiting {sleep_time:.2f} seconds")
+            logger.info(f"Rate limiting: waiting {sleep_time:.2f} seconds")
             await asyncio.sleep(sleep_time)
         self.last_request_time = time.time()
 
@@ -164,7 +165,7 @@ IMPORTANT: Your response must be ONLY the JSON object, with no markdown formatti
         try:
             # Get the response text from the new API structure
             response_text = response.text.strip()
-            print(f"DEBUG - Raw Gemini response: {response_text[:500]}...")  # Log first 500 chars
+            logger.debug(f"Raw Gemini response: {response_text[:500]}...")  # Log first 500 chars
 
             # Try to extract JSON from the response
             # Sometimes Gemini adds markdown formatting or explanations
@@ -181,11 +182,11 @@ IMPORTANT: Your response must be ONLY the JSON object, with no markdown formatti
 
             return json.loads(response_text)
         except Exception as e:
-            print(f"ERROR - Failed to parse Gemini response: {e}")
+            logger.error(f"Failed to parse Gemini response: {e}")
             try:
-                print(f"ERROR - Full response object: {response}")
+                logger.error(f"Full response object: {response}")
             except Exception:
-                print("ERROR - Could not access response object")
+                logger.error("Could not access response object")
             return None
 
     async def analyze_slideshow_with_transcript(
@@ -274,10 +275,10 @@ IMPORTANT: Your response must be ONLY the JSON object, with no markdown formatti
                     contents.append(Part.from_bytes(data=image_content, mime_type="image/jpeg"))
                     valid_images += 1
                 except Exception as e:
-                    print(f"WARNING - Failed to add image {i} to analysis: {e}")
+                    logger.warning(f"Failed to add image {i} to analysis: {e}")
 
         if valid_images == 0:
-            print("ERROR - No valid images found in slideshow")
+            logger.error("No valid images found in slideshow")
             return None
 
         # Generate content with retry logic
@@ -293,13 +294,13 @@ IMPORTANT: Your response must be ONLY the JSON object, with no markdown formatti
                 ),
             )
 
-        print(f"INFO - Analyzing slideshow with {valid_images} images")
+        logger.info(f"Analyzing slideshow with {valid_images} images")
         response = await self._retry_with_backoff(make_request, max_retries=5, base_delay=2)
 
         # Parse response
         try:
             response_text = response.text.strip()
-            print(f"DEBUG - Raw slideshow response: {response_text[:500]}...")
+            logger.debug(f"Raw slideshow response: {response_text[:500]}...")
 
             # Clean up response if needed
             if "```json" in response_text:
@@ -313,5 +314,5 @@ IMPORTANT: Your response must be ONLY the JSON object, with no markdown formatti
 
             return json.loads(response_text)
         except Exception as e:
-            print(f"ERROR - Failed to parse slideshow response: {e}")
+            logger.error(f"Failed to parse slideshow response: {e}")
             return None

@@ -9,6 +9,7 @@ import logging
 from src.models.requests import CacheInvalidationRequest
 from src.models.responses import TestAPIResponse, CacheInvalidationResponse, AppCheckStatusResponse
 from src.services.cache_service import CacheService
+from src.services.queue_service import QueueService
 from src.services.tiktok_scraper import (
     TikTokScraper,
     ScrapingOptions as TikTokScrapingOptions,
@@ -31,6 +32,7 @@ router = APIRouter(prefix="", tags=["admin"])
 
 # Initialize services
 cache_service = CacheService()
+queue_service = QueueService()
 tiktok_scraper = TikTokScraper()
 instagram_scraper = InstagramScraper()
 appcheck_service = get_appcheck_service()
@@ -175,3 +177,72 @@ async def appcheck_status():
         service_stats=appcheck_service.get_stats(),
         service_healthy=appcheck_service.is_healthy(),
     )
+
+
+# Queue Management Endpoints
+
+@router.get("/queue/stats")
+async def get_queue_stats():
+    """Get comprehensive queue statistics"""
+    if config["environment"] == "production":
+        raise HTTPException(status_code=404, detail="Not found")
+    
+    return queue_service.get_queue_stats()
+
+
+@router.get("/queue/metrics")
+async def get_queue_metrics():
+    """Get detailed queue metrics for monitoring"""
+    if config["environment"] == "production":
+        raise HTTPException(status_code=404, detail="Not found")
+    
+    return queue_service.get_detailed_queue_metrics()
+
+
+@router.get("/queue/dead-letter")
+async def get_dead_letter_jobs(limit: int = 50):
+    """Get jobs from dead letter queue"""
+    if config["environment"] == "production":
+        raise HTTPException(status_code=404, detail="Not found")
+    
+    if limit > 100:
+        limit = 100  # Prevent excessive queries
+    
+    jobs = await queue_service.get_dead_letter_jobs(limit)
+    return {
+        "total": len(jobs),
+        "jobs": jobs
+    }
+
+
+@router.post("/queue/dead-letter/{job_id}/retry")
+async def retry_dead_letter_job(job_id: str):
+    """Retry a job from dead letter queue"""
+    if config["environment"] == "production":
+        raise HTTPException(status_code=404, detail="Not found")
+    
+    success = await queue_service.retry_dead_letter_job(job_id)
+    if success:
+        return {"status": "success", "message": f"Job {job_id} moved back to main queue"}
+    else:
+        raise HTTPException(status_code=404, detail=f"Job {job_id} not found in dead letter queue")
+
+
+@router.post("/queue/cleanup")
+async def cleanup_old_jobs(days: int = 7):
+    """Clean up old completed/failed jobs"""
+    if config["environment"] == "production":
+        raise HTTPException(status_code=404, detail="Not found")
+    
+    if days < 1:
+        raise HTTPException(status_code=400, detail="Days must be at least 1")
+    
+    deleted_count = await queue_service.cleanup_old_jobs(days)
+    return {
+        "status": "success",
+        "message": f"Cleaned up {deleted_count} old jobs",
+        "deleted_count": deleted_count
+    }
+
+
+

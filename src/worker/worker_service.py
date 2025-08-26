@@ -52,6 +52,12 @@ class VideoWorker:
     def __init__(self):
         self.running = False
         self.tasks = set()
+        self._task_cleanup_lock = asyncio.Lock()
+        
+        # Exponential backoff for polling
+        self._consecutive_empty_polls = 0
+        self._max_backoff = 30.0  # Max 30 seconds between polls
+        self._base_polling_interval = POLLING_INTERVAL
 
         # Initialize services
         self.genai_pool = GenAIServicePool()
@@ -161,8 +167,57 @@ class VideoWorker:
             error_msg = f"{type(e).__name__}: {str(e)}"
             logger.error(f"Job {job_id} - Failed after {process_time:.2f}s: {error_msg}")
 
+            # Classify error for better retry logic
+            is_retryable = self._is_retryable_error(e)
+            if not is_retryable:
+                # For non-retryable errors, mark as failed immediately
+                logger.error(f"Job {job_id} - Non-retryable error, moving to dead letter queue: {error_msg}")
+                # Force max attempts to move to dead letter queue
+                job["attempts"] = job.get("max_attempts", 3)
+            
             # Mark job as failed (will retry if under max attempts)
             await self.queue_service.mark_job_failed(job_id, error_msg)
+
+    def _is_retryable_error(self, error: Exception) -> bool:
+        """Determine if an error is worth retrying"""
+        # Import here to avoid circular imports
+        from src.exceptions import VideoFormatError, UnsupportedPlatformError
+        from src.utils.circuit_breaker import CircuitBreakerOpenError
+        
+        # Non-retryable errors
+        non_retryable_types = (
+            VideoFormatError,
+            UnsupportedPlatformError,
+            ValueError,  # Usually indicates bad input data
+            KeyError,    # Usually indicates malformed data
+        )
+        
+        # Circuit breaker errors are retryable (service might recover)
+        if isinstance(error, CircuitBreakerOpenError):
+            return True
+        
+        # Check for non-retryable error types
+        if isinstance(error, non_retryable_types):
+            return False
+        
+        # Check error message for non-retryable patterns
+        error_msg = str(error).lower()
+        non_retryable_patterns = [
+            "invalid url",
+            "malformed url", 
+            "video not found",
+            "private video",
+            "video unavailable",
+            "unsupported format",
+            "invalid video id",
+        ]
+        
+        for pattern in non_retryable_patterns:
+            if pattern in error_msg:
+                return False
+        
+        # Default to retryable for network/API errors
+        return True
 
     async def worker_loop(self):
         """Main worker loop"""
@@ -180,16 +235,33 @@ class VideoWorker:
                     job = await self.queue_service.get_next_job(WORKER_ID)
 
                     if job:
-                        # Process job asynchronously
+                        # Reset backoff when we find work
+                        self._consecutive_empty_polls = 0
+                        
+                        # Process job asynchronously with robust cleanup
                         task = asyncio.create_task(self.process_video_job(job))
                         self.tasks.add(task)
-                        task.add_done_callback(self.tasks.discard)
+                        
+                        # Robust task cleanup with error handling
+                        def cleanup_task(finished_task):
+                            asyncio.create_task(self._safe_task_cleanup(finished_task))
+                        
+                        task.add_done_callback(cleanup_task)
                         logger.info(
                             f"Started processing job {job['job_id']} ({active_tasks + 1}/{WORKER_BATCH_SIZE} active)"
                         )
                     else:
-                        # No jobs available, wait before polling again
-                        await asyncio.sleep(POLLING_INTERVAL)
+                        # No jobs available, use exponential backoff
+                        self._consecutive_empty_polls += 1
+                        backoff_time = min(
+                            self._max_backoff,
+                            self._base_polling_interval * (2 ** min(self._consecutive_empty_polls - 1, 5))
+                        )
+                        
+                        if self._consecutive_empty_polls > 1:
+                            logger.debug(f"No jobs found, backing off for {backoff_time:.1f}s (attempt {self._consecutive_empty_polls})")
+                        
+                        await asyncio.sleep(backoff_time)
                 else:
                     # At capacity, wait a bit before checking again
                     await asyncio.sleep(0.05)  # Check more frequently when at capacity
@@ -223,6 +295,27 @@ class VideoWorker:
                     task.cancel()
 
         logger.info(f"Worker {WORKER_ID} stopped")
+
+    async def _safe_task_cleanup(self, task):
+        """Safely remove completed task from tracking set"""
+        async with self._task_cleanup_lock:
+            try:
+                self.tasks.discard(task)
+                
+                # Log any task exceptions for debugging
+                if task.done() and not task.cancelled():
+                    try:
+                        task.result()  # This will raise if the task had an exception
+                    except Exception as e:
+                        logger.warning(f"Task completed with exception: {e}")
+                        
+            except Exception as e:
+                logger.error(f"Error during task cleanup: {e}")
+                # Ensure task is removed even if cleanup fails
+                try:
+                    self.tasks.discard(task)
+                except:
+                    pass
 
 
 # For Cloud Run health checks (optional)

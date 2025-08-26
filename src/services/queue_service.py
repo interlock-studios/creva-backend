@@ -1,11 +1,10 @@
 from google.cloud import firestore
 from google.cloud.firestore import FieldFilter
-from google.cloud.firestore import Client
 import logging
 import os
 import warnings
 from typing import Optional, Dict, Any, List
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import time
 import asyncio
 from dotenv import load_dotenv
@@ -33,6 +32,7 @@ class QueueService:
             self.db = firestore.Client(project=self.project_id)
             self.queue_collection = self.db.collection("processing_queue")
             self.results_collection = self.db.collection("processing_results")
+            self.dead_letter_collection = self.db.collection("processing_dead_letter")
 
             logger.info(f"Queue service connected to Firestore in project: {self.project_id}")
 
@@ -53,12 +53,18 @@ class QueueService:
 
         job_id = f"{request_id}_{int(time.time() * 1000)}"
 
+        # Convert priority to numeric value for sorting
+        priority_values = {"high": 1, "normal": 2, "low": 3}
+        priority_value = priority_values.get(priority, 2)  # Default to normal
+
         job_data = {
             "url": url,
             "request_id": request_id,
             "job_id": job_id,
             "status": "pending",
-            "created_at": datetime.utcnow(),
+            "priority": priority,
+            "priority_value": priority_value,
+            "created_at": datetime.now(timezone.utc),
             "attempts": 0,
             "max_attempts": 3,
             "last_error": None,
@@ -103,57 +109,102 @@ class QueueService:
             return None
 
     async def get_next_job(self, worker_id: str) -> Optional[Dict]:
-        """Get next pending job for worker to process"""
+        """Get next pending job for worker to process using atomic transactions"""
         if not self.db:
             return None
 
         # Try up to 3 times to claim a job (in case of race conditions)
         for attempt in range(3):
             try:
-                # Find the oldest pending jobs
-                query = (
-                    self.queue_collection.where(filter=FieldFilter("status", "==", "pending"))
-                    .order_by("created_at")
-                    .limit(5)  # Get a few in case of race conditions
-                )
+                # Find pending jobs - fallback to simple query if index not ready
+                current_time = datetime.now(timezone.utc)
+                try:
+                    # Try priority-based query first (requires composite index)
+                    query = (
+                        self.queue_collection.where(filter=FieldFilter("status", "==", "pending"))
+                        .order_by("priority_value")  # High priority first (1 < 2 < 3)
+                        .order_by("created_at")      # Then oldest first
+                        .limit(10)  # Get more to account for retry delays
+                    )
+                    docs = list(query.stream())
+                except Exception as index_error:
+                    # Fallback to simple query if composite index not ready
+                    if "index" in str(index_error).lower():
+                        logger.info("Composite index not ready, using fallback query")
+                        query = (
+                            self.queue_collection.where(filter=FieldFilter("status", "==", "pending"))
+                            .order_by("created_at")  # Simple query - just oldest first
+                            .limit(10)
+                        )
+                        docs = list(query.stream())
+                    else:
+                        raise index_error
 
-                docs = list(query.stream())
                 if not docs:
                     return None
 
-                # Try to claim each job until we succeed
+                # Try to claim each job until we succeed using transactions
                 for doc in docs:
-                    job_data = doc.to_dict()
                     job_id = doc.id
-
-                    # Check if job is still pending (to avoid race condition)
-                    current_status = job_data.get("status")
-                    if current_status != "pending":
-                        logger.debug(f"Job {job_id} already claimed (status: {current_status})")
+                    job_data = doc.to_dict()
+                    
+                    # Check if job is ready to retry (respect retry delays)
+                    retry_after = job_data.get("retry_after")
+                    if retry_after and current_time < retry_after:
+                        logger.debug(f"Job {job_id} not ready for retry until {retry_after}")
                         continue
-
-                    # Try to claim the job atomically
+                    
+                    # Use atomic transaction to prevent race conditions
+                    transaction = self.db.transaction()
+                    job_ref = self.queue_collection.document(job_id)
+                    
                     try:
-                        # Use conditional update to prevent race conditions
-                        doc.reference.update(
-                            {
+                        @firestore.transactional
+                        def claim_job_transaction(transaction, job_ref):
+                            # Get current job state within transaction
+                            job_snapshot = job_ref.get(transaction=transaction)
+                            if not job_snapshot.exists:
+                                return None
+                            
+                            job_data = job_snapshot.to_dict()
+                            current_status = job_data.get("status")
+                            
+                            # Only claim if still pending
+                            if current_status != "pending":
+                                return None
+                            
+                            # Double-check retry delay within transaction
+                            retry_after = job_data.get("retry_after")
+                            if retry_after and current_time < retry_after:
+                                return None
+                            
+                            # Atomically update to processing
+                            transaction.update(job_ref, {
                                 "status": "processing",
                                 "worker_id": worker_id,
-                                "started_at": datetime.utcnow(),
+                                "started_at": datetime.now(timezone.utc),
                                 "attempts": job_data.get("attempts", 0) + 1,
-                            }
-                        )
-
-                        logger.info(f"Worker {worker_id} claimed job {job_id}")
-                        return {"job_id": job_id, **job_data}
+                                "retry_after": None,  # Clear retry delay
+                            })
+                            
+                            return {"job_id": job_id, **job_data}
+                        
+                        # Execute transaction
+                        result = claim_job_transaction(transaction, job_ref)
+                        if result:
+                            logger.info(f"Worker {worker_id} claimed job {job_id}")
+                            return result
+                            
                     except Exception as e:
-                        # Another worker might have claimed it
+                        # Transaction failed (likely another worker claimed it)
                         logger.debug(f"Failed to claim job {job_id}: {e}")
                         continue
 
                 # If we get here, all jobs were already claimed
                 if attempt < 2:
-                    await asyncio.sleep(0.1)  # Brief pause before retry
+                    # Exponential backoff
+                    backoff_time = 0.1 * (2 ** attempt)
+                    await asyncio.sleep(backoff_time)
 
             except Exception as e:
                 logger.error(f"Error getting next job: {e}")
@@ -172,14 +223,14 @@ class QueueService:
                 {
                     "job_id": job_id,
                     "result": result,
-                    "completed_at": datetime.utcnow(),
+                    "completed_at": datetime.now(timezone.utc),
                     "status": "completed",
                 }
             )
 
             # Update queue status
             self.queue_collection.document(job_id).update(
-                {"status": "completed", "completed_at": datetime.utcnow()}
+                {"status": "completed", "completed_at": datetime.now(timezone.utc)}
             )
 
             logger.info(f"Job {job_id} marked as complete")
@@ -189,7 +240,7 @@ class QueueService:
             raise
 
     async def mark_job_failed(self, job_id: str, error: str):
-        """Mark job as failed"""
+        """Mark job as failed with dead letter queue support"""
         if not self.db:
             return
 
@@ -214,23 +265,101 @@ class QueueService:
                 
                 update_data = {
                     "last_error": sanitized_error,
-                    "failed_at": datetime.utcnow(),
+                    "failed_at": datetime.now(timezone.utc),
                     "worker_id": None,
                 }
 
-                # If we've exceeded max attempts, mark as failed
+                # If we've exceeded max attempts, move to dead letter queue
                 if attempts >= max_attempts:
-                    update_data["status"] = "failed"
-                    logger.error(f"Job {job_id} failed after {attempts} attempts: {error}")
+                    # Move to dead letter queue for investigation
+                    dead_letter_data = {
+                        **job_data,
+                        "final_error": sanitized_error,
+                        "total_attempts": attempts,
+                        "moved_to_dlq_at": datetime.now(timezone.utc),
+                        "original_job_id": job_id,
+                    }
+                    
+                    # Add to dead letter queue
+                    self.dead_letter_collection.document(job_id).set(dead_letter_data)
+                    
+                    # Remove from main queue
+                    job_ref.delete()
+                    
+                    logger.error(f"Job {job_id} moved to dead letter queue after {attempts} attempts: {error}")
                 else:
-                    # Otherwise, mark as pending for retry
+                    # Otherwise, mark as pending for retry with exponential backoff
+                    retry_delay = min(300, 30 * (2 ** (attempts - 1)))  # Max 5 minutes
                     update_data["status"] = "pending"
-                    logger.warning(f"Job {job_id} failed attempt {attempts}, will retry: {error}")
-
-                job_ref.update(update_data)
+                    update_data["retry_after"] = datetime.now(timezone.utc) + timedelta(seconds=retry_delay)
+                    job_ref.update(update_data)
+                    logger.warning(f"Job {job_id} failed attempt {attempts}, will retry in {retry_delay}s: {error}")
 
         except Exception as e:
             logger.error(f"Error marking job failed: {e}")
+
+    async def get_dead_letter_jobs(self, limit: int = 100) -> List[Dict]:
+        """Get jobs from dead letter queue for investigation"""
+        if not self.db:
+            return []
+
+        try:
+            docs = (
+                self.dead_letter_collection
+                .order_by("moved_to_dlq_at", direction=firestore.Query.DESCENDING)
+                .limit(limit)
+                .stream()
+            )
+            
+            return [{"job_id": doc.id, **doc.to_dict()} for doc in docs]
+        except Exception as e:
+            logger.error(f"Error getting dead letter jobs: {e}")
+            return []
+
+    async def retry_dead_letter_job(self, job_id: str) -> bool:
+        """Move job from dead letter queue back to main queue for retry"""
+        if not self.db:
+            return False
+
+        try:
+            # Get job from dead letter queue
+            dlq_doc = self.dead_letter_collection.document(job_id).get()
+            if not dlq_doc.exists:
+                logger.warning(f"Job {job_id} not found in dead letter queue")
+                return False
+
+            dlq_data = dlq_doc.to_dict()
+            
+            # Reset job for retry
+            retry_job_data = {
+                "url": dlq_data["url"],
+                "request_id": dlq_data["request_id"],
+                "job_id": job_id,
+                "status": "pending",
+                "priority": dlq_data.get("priority", "normal"),
+                "priority_value": dlq_data.get("priority_value", 2),
+                "created_at": datetime.now(timezone.utc),
+                "attempts": 0,
+                "max_attempts": 3,
+                "last_error": None,
+                "worker_id": None,
+                "localization": dlq_data.get("localization"),
+                "retried_from_dlq": True,
+                "original_failure": dlq_data.get("final_error"),
+            }
+
+            # Add back to main queue
+            self.queue_collection.document(job_id).set(retry_job_data)
+            
+            # Remove from dead letter queue
+            self.dead_letter_collection.document(job_id).delete()
+            
+            logger.info(f"Job {job_id} moved from dead letter queue back to main queue")
+            return True
+
+        except Exception as e:
+            logger.error(f"Error retrying dead letter job {job_id}: {e}")
+            return False
 
     async def get_job_result(self, job_id: str) -> Optional[Dict]:
         """Get result for completed job"""
@@ -268,78 +397,225 @@ class QueueService:
             logger.error(f"Error getting job result: {e}")
             return {"status": "error", "error": str(e)}
 
-    async def cleanup_old_jobs(self, days: int = 7):
-        """Clean up old completed/failed jobs"""
+    async def cleanup_old_jobs(self, days: int = 7, batch_size: int = 100):
+        """Clean up old completed/failed jobs with optimized batching"""
         if not self.db:
             return 0
 
         try:
-            cutoff_date = datetime.utcnow() - timedelta(days=days)
-            deleted_count = 0
+            cutoff_date = datetime.now(timezone.utc) - timedelta(days=days)
+            total_deleted = 0
 
-            # Clean up old queue entries
-            old_jobs = (
-                self.queue_collection.where(
-                    filter=FieldFilter("status", "in", ["completed", "failed"])
+            # Process in smaller batches to avoid timeouts
+            while True:
+                # Get a batch of old jobs
+                old_jobs_query = (
+                    self.queue_collection.where(
+                        filter=FieldFilter("status", "in", ["completed", "failed"])
+                    )
+                    .where(filter=FieldFilter("created_at", "<", cutoff_date))
+                    .limit(batch_size)
                 )
-                .where(filter=FieldFilter("created_at", "<", cutoff_date))
-                .stream()
-            )
 
-            batch = self.db.batch()
-            batch_size = 0
+                docs = list(old_jobs_query.stream())
+                if not docs:
+                    break  # No more jobs to clean up
 
-            for doc in old_jobs:
-                batch.delete(doc.reference)
+                # Delete this batch
+                batch = self.db.batch()
+                batch_count = 0
 
-                # Also delete corresponding result if exists
-                result_ref = self.results_collection.document(doc.id)
-                batch.delete(result_ref)
+                for doc in docs:
+                    # Delete queue entry
+                    batch.delete(doc.reference)
+                    batch_count += 1
 
-                batch_size += 2
-                deleted_count += 1
+                    # Delete corresponding result if exists
+                    result_ref = self.results_collection.document(doc.id)
+                    batch.delete(result_ref)
+                    batch_count += 1
 
-                # Commit batch every 250 operations (Firestore limit is 500)
-                if batch_size >= 250:
+                    # Commit when approaching Firestore limit
+                    if batch_count >= 450:  # Leave some margin under 500 limit
+                        batch.commit()
+                        batch = self.db.batch()
+                        batch_count = 0
+
+                # Commit remaining deletions in this batch
+                if batch_count > 0:
                     batch.commit()
-                    batch = self.db.batch()
-                    batch_size = 0
 
-            # Commit remaining deletions
-            if batch_size > 0:
-                batch.commit()
+                deleted_in_batch = len(docs)
+                total_deleted += deleted_in_batch
+                
+                logger.debug(f"Cleaned up batch of {deleted_in_batch} jobs")
 
-            logger.info(f"Cleaned up {deleted_count} old jobs")
-            return deleted_count
+                # If we got fewer docs than requested, we're done
+                if deleted_in_batch < batch_size:
+                    break
+
+                # Small delay between batches to avoid overwhelming Firestore
+                await asyncio.sleep(0.1)
+
+            # Also clean up old dead letter queue entries
+            dlq_deleted = await self._cleanup_old_dead_letter_jobs(cutoff_date, batch_size)
+            
+            logger.info(f"Cleaned up {total_deleted} old jobs and {dlq_deleted} dead letter jobs")
+            return total_deleted + dlq_deleted
 
         except Exception as e:
             logger.error(f"Error cleaning up old jobs: {e}")
             return 0
 
+    async def _cleanup_old_dead_letter_jobs(self, cutoff_date: datetime, batch_size: int = 100):
+        """Clean up old dead letter queue entries"""
+        total_deleted = 0
+        
+        try:
+            while True:
+                # Get a batch of old dead letter jobs
+                old_dlq_query = (
+                    self.dead_letter_collection.where(
+                        filter=FieldFilter("moved_to_dlq_at", "<", cutoff_date)
+                    )
+                    .limit(batch_size)
+                )
+
+                docs = list(old_dlq_query.stream())
+                if not docs:
+                    break
+
+                # Delete this batch
+                batch = self.db.batch()
+                for doc in docs:
+                    batch.delete(doc.reference)
+
+                batch.commit()
+                
+                deleted_in_batch = len(docs)
+                total_deleted += deleted_in_batch
+
+                if deleted_in_batch < batch_size:
+                    break
+
+                await asyncio.sleep(0.1)
+
+            return total_deleted
+
+        except Exception as e:
+            logger.error(f"Error cleaning up dead letter jobs: {e}")
+            return 0
+
     def get_queue_stats(self) -> Dict[str, Any]:
-        """Get queue statistics"""
+        """Get comprehensive queue statistics with optimized queries"""
         if not self.db:
             return {"status": "disabled"}
 
         try:
             stats = {
                 "status": "active",
+                "timestamp": datetime.now(timezone.utc).isoformat(),
                 "queue_stats": {"pending": 0, "processing": 0, "completed": 0, "failed": 0},
+                "priority_stats": {"high": 0, "normal": 0, "low": 0},
+                "dead_letter_stats": {"total": 0},
+
             }
 
-            # Count jobs by status
-            for status in ["pending", "processing", "completed", "failed"]:
+            # Count jobs by status (limit to avoid expensive queries)
+            for status in ["pending", "processing"]:  # Only count active jobs
                 count = len(
                     list(
                         self.queue_collection.where(filter=FieldFilter("status", "==", status))
-                        .limit(1000)
+                        .limit(1000)  # Reasonable limit for active monitoring
                         .stream()
                     )
                 )
                 stats["queue_stats"][status] = count
 
+            # Count pending jobs by priority
+            pending_jobs = (
+                self.queue_collection.where(filter=FieldFilter("status", "==", "pending"))
+                .limit(1000)
+                .stream()
+            )
+            
+            for doc in pending_jobs:
+                job_data = doc.to_dict()
+                priority = job_data.get("priority", "normal")
+                stats["priority_stats"][priority] = stats["priority_stats"].get(priority, 0) + 1
+
+            # Count dead letter queue entries
+            dlq_count = len(
+                list(
+                    self.dead_letter_collection.limit(1000).stream()
+                )
+            )
+            stats["dead_letter_stats"]["total"] = dlq_count
+
+
+
             return stats
 
         except Exception as e:
             logger.error(f"Error getting queue stats: {e}")
+            return {"status": "error", "error": str(e)}
+
+    def get_detailed_queue_metrics(self) -> Dict[str, Any]:
+        """Get detailed metrics for monitoring dashboards"""
+        if not self.db:
+            return {"status": "disabled"}
+
+        try:
+            metrics = {
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "queue_depth": 0,
+                "processing_rate": 0,
+                "error_rate": 0,
+                "average_processing_time": 0,
+                "oldest_pending_job_age": 0,
+            }
+
+            # Get queue depth (pending jobs)
+            pending_count = len(
+                list(
+                    self.queue_collection.where(filter=FieldFilter("status", "==", "pending"))
+                    .limit(1000)
+                    .stream()
+                )
+            )
+            metrics["queue_depth"] = pending_count
+
+            # Get oldest pending job age
+            if pending_count > 0:
+                oldest_job = (
+                    self.queue_collection.where(filter=FieldFilter("status", "==", "pending"))
+                    .order_by("created_at")
+                    .limit(1)
+                    .stream()
+                )
+                
+                for doc in oldest_job:
+                    job_data = doc.to_dict()
+                    created_at = job_data.get("created_at")
+                    if created_at:
+                        age_seconds = (datetime.now(timezone.utc) - created_at).total_seconds()
+                        metrics["oldest_pending_job_age"] = age_seconds
+                    break
+
+            # Calculate processing rate (jobs completed in last hour)
+            one_hour_ago = datetime.now(timezone.utc) - timedelta(hours=1)
+            recent_completed = len(
+                list(
+                    self.queue_collection.where(filter=FieldFilter("status", "==", "completed"))
+                    .where(filter=FieldFilter("completed_at", ">=", one_hour_ago))
+                    .limit(1000)
+                    .stream()
+                )
+            )
+            metrics["processing_rate"] = recent_completed
+
+            return metrics
+
+        except Exception as e:
+            logger.error(f"Error getting detailed queue metrics: {e}")
             return {"status": "error", "error": str(e)}
