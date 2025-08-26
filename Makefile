@@ -230,9 +230,10 @@ setup-gcp: ## Setup Google Cloud project and services
 setup-firestore: ## Setup Firestore database and indexes
 	@echo "$(GREEN)Setting up Firestore database...$(NC)"
 	@gcloud firestore databases create --location=$(REGION) --type=firestore-native || echo "$(YELLOW)Firestore database already exists$(NC)"
+	@echo "$(GREEN)Deploying Firestore indexes...$(NC)"
+	@chmod +x scripts/deploy_indexes.sh
+	@./scripts/deploy_indexes.sh
 	@echo "$(GREEN)Firestore setup complete$(NC)"
-	@echo "$(YELLOW)If you get index errors when using the queue, click this link to create the required index:$(NC)"
-	@echo "https://console.firebase.google.com/v1/r/project/$(PROJECT_ID)/firestore/indexes?create_composite=ClBwcm9qZWN0cy9zZXRzLWFpL2RhdGFiYXNlcy8oZGVmYXVsdCkvY29sbGVjdGlvbkdyb3Vwcy9wcm9jZXNzaW5nX3F1ZXVlL2luZGV4ZXMvXxABGgoKBnN0YXR1cxABGgcKA3VybBABGg4KCmNyZWF0ZWRfYXQQAhoMCghfX25hbWVfXxAC"
 
 .PHONY: validate
 validate: lint security test ## Run all validation checks

@@ -130,7 +130,7 @@ class QueueService:
                 except Exception as index_error:
                     # Fallback to simple query if composite index not ready
                     if "index" in str(index_error).lower():
-                        logger.info("Composite index not ready, using fallback query")
+                        logger.debug(f"Composite index not ready, using fallback query: {index_error}")
                         query = (
                             self.queue_collection.where(filter=FieldFilter("status", "==", "pending"))
                             .order_by("created_at")  # Simple query - just oldest first
@@ -138,6 +138,7 @@ class QueueService:
                         )
                         docs = list(query.stream())
                     else:
+                        logger.error(f"Error getting next job: {index_error}")
                         raise index_error
 
                 if not docs:
