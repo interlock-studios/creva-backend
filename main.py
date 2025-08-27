@@ -17,7 +17,7 @@ from google.cloud import monitoring_v3
 # Import API routers
 from src.api import health_router, process_router, admin_router
 from src.services.config_validator import validate_required_env_vars, AppConfig
-from src.services.appcheck_middleware import get_appcheck_service
+from src.auth import get_appcheck_service
 from src.utils.logging import StructuredLogger, RequestLoggingMiddleware
 from src.utils.error_handlers import register_error_handlers
 
@@ -68,16 +68,41 @@ app.include_router(admin_router)
 # Register error handlers
 register_error_handlers(app)
 
-# Security middleware
-app.add_middleware(TrustedHostMiddleware, allowed_hosts=["*"])  # Configure based on your domain
+# Enhanced Security Configuration
+from src.middleware.security import (
+    SecurityMiddleware, 
+    SecurityHeadersMiddleware, 
+    RequestSizeLimitMiddleware
+)
+from src.config.security import security_config
 
-# CORS middleware
+# Security middleware - Configure trusted hosts based on environment
+app.add_middleware(TrustedHostMiddleware, allowed_hosts=security_config.trusted_hosts)
+
+# CORS middleware - Mobile-friendly configuration
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Configure based on your frontend domains
+    allow_origins=security_config.cors_origins,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=[
+        "X-Firebase-AppCheck",
+        "Content-Type", 
+        "Authorization",
+        "Accept",
+        "Origin",
+        "User-Agent",
+        "X-Requested-With",
+    ],
+)
+
+# Add security headers
+app.add_middleware(SecurityHeadersMiddleware)
+
+# Add request size limits
+app.add_middleware(
+    RequestSizeLimitMiddleware, 
+    max_size=security_config.request_limits["max_request_size"]
 )
 
 # App Check middleware - use centralized configuration
@@ -105,8 +130,11 @@ class AppCheckHTTPMiddleware(BaseHTTPMiddleware):
         appcheck_token = request.headers.get("X-Firebase-AppCheck")
 
         if not appcheck_token:
-            # Record unverified request metric
-            record_appcheck_metric("unverified", request.url.path)
+            # Record unverified request metric with IP
+            client_ip = request.headers.get("X-Forwarded-For", request.client.host)
+            if "," in client_ip:
+                client_ip = client_ip.split(",")[0].strip()
+            record_appcheck_metric("unverified", request.url.path, ip=client_ip)
 
             if self.required:
                 logger.warning(f"Missing App Check token for {request.url.path}")
@@ -125,17 +153,23 @@ class AppCheckHTTPMiddleware(BaseHTTPMiddleware):
             verification_result = self.appcheck_service.verify_token(appcheck_token)
 
             if verification_result and verification_result.get("valid"):
-                # Record verified request metric
+                # Record verified request metric with IP
                 app_id = verification_result.get("app_id", "unknown")
-                record_appcheck_metric("verified", request.url.path, app_id)
+                client_ip = request.headers.get("X-Forwarded-For", request.client.host)
+                if "," in client_ip:
+                    client_ip = client_ip.split(",")[0].strip()
+                record_appcheck_metric("verified", request.url.path, app_id, client_ip)
 
                 request.state.appcheck_verified = True
                 request.state.appcheck_claims = verification_result
                 logger.debug(f"App Check verified for app: {app_id}")
                 return await call_next(request)
             else:
-                # Record invalid token metric
-                record_appcheck_metric("invalid", request.url.path)
+                # Record invalid token metric with IP
+                client_ip = request.headers.get("X-Forwarded-For", request.client.host)
+                if "," in client_ip:
+                    client_ip = client_ip.split(",")[0].strip()
+                record_appcheck_metric("invalid", request.url.path, ip=client_ip)
 
                 request.state.appcheck_verified = False
                 if self.required:
@@ -170,6 +204,12 @@ app.add_middleware(
     AppCheckHTTPMiddleware, skip_paths=APPCHECK_SKIP_PATHS, required=APPCHECK_REQUIRED
 )
 
+# Add enhanced security middleware (includes rate limiting, threat detection)
+security_config = {
+    "skip_paths": APPCHECK_SKIP_PATHS,
+    "environment": environment
+}
+app.add_middleware(SecurityMiddleware, config=security_config)
 
 # Add structured logging middleware
 app.add_middleware(RequestLoggingMiddleware)
@@ -208,8 +248,8 @@ def log_structured_metric(metric_data: dict):
     log_business_event("appcheck_metric", metric_data)
 
 
-def record_appcheck_metric(metric_type: str, path: str = "", app_id: str = ""):
-    """Record App Check metrics for monitoring"""
+def record_appcheck_metric(metric_type: str, path: str = "", app_id: str = "", ip: str = ""):
+    """Record App Check metrics for monitoring with enhanced security tracking"""
     global appcheck_metrics
     with appcheck_metrics_lock:
         appcheck_metrics["total_requests"] += 1
@@ -220,6 +260,68 @@ def record_appcheck_metric(metric_type: str, path: str = "", app_id: str = ""):
         elif metric_type == "invalid":
             appcheck_metrics["invalid_tokens"] += 1
 
+    # Enhanced security logging with App Check readiness metrics
+    severity = "info"
+    readiness_score = 0
+    
+    if metric_type == "verified":
+        severity = "info"
+        readiness_score = 100  # Verified requests contribute positively
+        logger.info(
+            "App Check token verified",
+            extra={
+                "security_event": "appcheck_verified",
+                "ip_address": ip,
+                "path": path,
+                "app_id": app_id,
+                "severity": "info",
+                "readiness_score": readiness_score,
+                "timestamp": datetime.utcnow().isoformat()
+            }
+        )
+    elif metric_type == "invalid":
+        severity = "warning"
+        readiness_score = -50  # Invalid tokens hurt readiness
+        logger.warning(
+            "Invalid App Check token detected",
+            extra={
+                "security_event": "invalid_appcheck_token",
+                "ip_address": ip,
+                "path": path,
+                "app_id": app_id,
+                "severity": "medium",
+                "readiness_score": readiness_score,
+                "timestamp": datetime.utcnow().isoformat()
+            }
+        )
+    elif metric_type == "unverified":
+        severity = "info"
+        readiness_score = -10  # Unverified requests slightly hurt readiness
+        logger.info(
+            "Unverified App Check request",
+            extra={
+                "security_event": "appcheck_bypass_attempt",
+                "ip_address": ip,
+                "path": path,
+                "severity": "low",
+                "readiness_score": readiness_score,
+                "timestamp": datetime.utcnow().isoformat()
+            }
+        )
+
+    # Calculate App Check readiness percentage
+    total_requests = appcheck_metrics["total_requests"]
+    verified_requests = appcheck_metrics["verified_requests"]
+    readiness_percentage = (verified_requests / total_requests * 100) if total_requests > 0 else 0
+    
+    # Determine readiness status
+    if readiness_percentage >= 80:
+        readiness_status = "READY"
+    elif readiness_percentage >= 50:
+        readiness_status = "CAUTION"
+    else:
+        readiness_status = "NOT_READY"
+    
     # Log structured metrics for Cloud Logging
     log_structured_metric(
         {
@@ -227,10 +329,16 @@ def record_appcheck_metric(metric_type: str, path: str = "", app_id: str = ""):
             "metric": metric_type,
             "path": path,
             "app_id": app_id,
+            "ip_address": ip,
+            "severity": severity,
+            "readiness_score": readiness_score,
+            "readiness_percentage": readiness_percentage,
+            "readiness_status": readiness_status,
             "cumulative_verified": appcheck_metrics["verified_requests"],
             "cumulative_unverified": appcheck_metrics["unverified_requests"],
             "cumulative_invalid": appcheck_metrics["invalid_tokens"],
             "total_requests": appcheck_metrics["total_requests"],
+            "timestamp": datetime.utcnow().isoformat()
         }
     )
 
@@ -240,54 +348,22 @@ active_direct_processing = 0
 active_processing_lock = threading.Lock()
 MAX_DIRECT_PROCESSING = config.processing.max_direct_processing
 
-# Rate limiting configuration
+# Legacy rate limiting configuration (now handled by SecurityMiddleware)
+# Keeping for backward compatibility with config
 RATE_LIMIT_REQUESTS = config.rate_limiting.requests_per_window
 RATE_LIMIT_WINDOW = config.rate_limiting.window_seconds
-rate_limit_store = defaultdict(list)
 
 # Request queue management
 MAX_CONCURRENT_PROCESSING = config.processing.max_concurrent_processing
 processing_semaphore = asyncio.Semaphore(MAX_CONCURRENT_PROCESSING)
 
 
-# Rate limiting middleware
-@app.middleware("http")
-async def rate_limit_middleware(request: Request, call_next):
-    # Skip rate limiting for health checks
-    if request.url.path == "/health":
-        return await call_next(request)
-
-    # Get client IP (handle proxy headers)
-    client_ip = request.headers.get("X-Forwarded-For", request.client.host)
-    if "," in client_ip:
-        client_ip = client_ip.split(",")[0].strip()
-
-    current_time = time.time()
-
-    # Clean old entries
-    rate_limit_store[client_ip] = [
-        req_time
-        for req_time in rate_limit_store[client_ip]
-        if current_time - req_time < RATE_LIMIT_WINDOW
-    ]
-
-    # Check rate limit
-    if len(rate_limit_store[client_ip]) >= RATE_LIMIT_REQUESTS:
-        logger.warning(f"Rate limit exceeded for IP: {client_ip}")
-        return JSONResponse(
-            status_code=429,
-            content={
-                "error": "Rate limit exceeded",
-                "detail": f"Too many requests. Limit: {RATE_LIMIT_REQUESTS} requests per {RATE_LIMIT_WINDOW} seconds",
-                "retry_after": RATE_LIMIT_WINDOW,
-            },
-            headers={"Retry-After": str(RATE_LIMIT_WINDOW)},
-        )
-
-    # Add current request
-    rate_limit_store[client_ip].append(current_time)
-
-    return await call_next(request)
+# Legacy rate limiting middleware removed - now handled by SecurityMiddleware
+# The new SecurityMiddleware provides enhanced rate limiting with:
+# - Per-user limits using App Check app_id
+# - Per-IP limits as fallback
+# - Different limits for different endpoints
+# - Threat detection and automatic IP blocking
 
 
 if __name__ == "__main__":

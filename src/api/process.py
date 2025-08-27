@@ -20,7 +20,7 @@ from src.services.cache_service import CacheService
 from src.services.queue_service import QueueService
 from src.services.genai_service import GenAIService
 from src.worker.video_processor import VideoProcessor
-from src.services.appcheck_middleware import optional_appcheck_token
+from src.auth import optional_appcheck_token
 from src.exceptions import NotFoundError, ProcessingError
 
 logger = StructuredLogger(__name__)

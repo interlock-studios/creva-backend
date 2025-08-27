@@ -8,7 +8,7 @@ import logging
 
 from src.services.cache_service import CacheService
 from src.services.queue_service import QueueService
-from src.services.appcheck_middleware import get_appcheck_service
+from src.auth import get_appcheck_service
 from src.services.config_validator import get_config_with_defaults
 
 logger = logging.getLogger(__name__)
@@ -22,6 +22,7 @@ config = get_config_with_defaults()
 
 
 @router.get("/health")
+@router.head("/health")
 async def health():
     """Health check endpoint with service validation"""
     health_status = {

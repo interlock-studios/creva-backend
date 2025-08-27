@@ -24,7 +24,7 @@ from src.services.instagram_scraper import (
     NetworkError as InstagramNetworkError,
     ValidationError as InstagramValidationError,
 )
-from src.services.appcheck_middleware import verify_appcheck_token, get_appcheck_service
+from src.auth import verify_appcheck_token, get_appcheck_service
 from src.services.config_validator import get_config_with_defaults
 
 logger = logging.getLogger(__name__)
