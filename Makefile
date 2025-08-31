@@ -250,12 +250,21 @@ test-api-all: ## Test the deployed API in all regions
 	done
 
 .PHONY: dashboard
-dashboard: ## Deploy V2 monitoring dashboard with V1 comparison
-	@echo "$(GREEN)Deploying V2 Analytics Dashboard...$(NC)"
-	@DASHBOARD_ID=$$(gcloud monitoring dashboards create --config-from-file=monitoring/sets_ai_v2_working_dashboard.json --format="value(name)"); \
+dashboard: ## Deploy Security & App Check Dashboard
+	@echo "$(GREEN)Deploying Security & App Check Dashboard...$(NC)"
+	@DASHBOARD_ID=$$(gcloud monitoring dashboards create --config-from-file=monitoring/dashboards/production_dashboard.json --format="value(name)"); \
 		DASHBOARD_SHORT_ID=$$(basename "$$DASHBOARD_ID"); \
 		echo "$(GREEN)✅ Dashboard created: $$DASHBOARD_SHORT_ID$(NC)"; \
 		echo "$(BLUE)🌐 Dashboard URL: https://console.cloud.google.com/monitoring/dashboards/custom/$$DASHBOARD_SHORT_ID?project=$(PROJECT_ID)$(NC)"
+
+.PHONY: dashboard-update
+dashboard-update: ## Update existing Security & App Check Dashboard
+	@echo "$(GREEN)Updating Security & App Check Dashboard...$(NC)"
+	@echo "$(YELLOW)Please provide the dashboard ID (from the URL): $(NC)"
+	@read -p "Dashboard ID: " DASHBOARD_ID; \
+		gcloud monitoring dashboards update $$DASHBOARD_ID --config-from-file=monitoring/dashboards/production_dashboard.json; \
+		echo "$(GREEN)✅ Dashboard updated: $$DASHBOARD_ID$(NC)"; \
+		echo "$(BLUE)🌐 Dashboard URL: https://console.cloud.google.com/monitoring/dashboards/custom/$$DASHBOARD_ID?project=$(PROJECT_ID)$(NC)"
 
 .PHONY: clean
 clean: ## Clean up temporary files

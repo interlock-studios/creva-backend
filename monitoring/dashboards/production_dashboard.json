@@ -1,201 +1,485 @@
 {
-  "displayName": "🚀 Sets AI V2 Enhanced Analytics & V1 Comparison",
+  "displayName": "🛡️ Sets AI - Global Security & Performance Dashboard",
+  "etag": "7be816f85e390c0cc35b47eca4b01d40",
   "mosaicLayout": {
-    "columns": 12,
+    "columns": 48,
     "tiles": [
       {
-        "width": 3,
-        "height": 3,
+        "height": 12,
         "widget": {
-          "title": "🔥 V2 Total Requests",
           "scorecard": {
-            "timeSeriesQuery": {
-              "timeSeriesFilter": {
-                "filter": "metric.type=\"run.googleapis.com/request_count\" AND resource.labels.service_name=\"workout-parser-v2\"",
-                "aggregation": {
-                  "alignmentPeriod": "300s",
-                  "perSeriesAligner": "ALIGN_SUM",
-                  "crossSeriesReducer": "REDUCE_SUM"
-                }
-              }
-            },
             "sparkChartView": {
               "sparkChartType": "SPARK_LINE"
-            }
-          }
-        }
-      },
-      {
-        "xPos": 3,
-        "width": 3,
-        "height": 3,
-        "widget": {
-          "title": "📈 V1 Total Requests",
-          "scorecard": {
+            },
             "timeSeriesQuery": {
               "timeSeriesFilter": {
-                "filter": "metric.type=\"run.googleapis.com/request_count\" AND resource.labels.service_name=\"workout-parser\"",
                 "aggregation": {
-                  "alignmentPeriod": "300s",
-                  "perSeriesAligner": "ALIGN_SUM",
-                  "crossSeriesReducer": "REDUCE_SUM"
-                }
+                  "alignmentPeriod": "3600s",
+                  "crossSeriesReducer": "REDUCE_SUM",
+                  "perSeriesAligner": "ALIGN_SUM"
+                },
+                "filter": "metric.type=\"run.googleapis.com/request_count\" AND resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"workout-parser-v2\""
               }
-            },
-            "sparkChartView": {
-              "sparkChartType": "SPARK_LINE"
             }
-          }
-        }
+          },
+          "title": "🌍 Global Requests/Hour"
+        },
+        "width": 16
       },
       {
-        "xPos": 6,
-        "width": 3,
-        "height": 3,
+        "height": 12,
         "widget": {
-          "title": "🚫 Invalid Tokens",
           "scorecard": {
-            "timeSeriesQuery": {
-              "timeSeriesFilter": {
-                "filter": "metric.type=\"logging.googleapis.com/user/appcheck_invalid_tokens\"",
-                "aggregation": {
-                  "alignmentPeriod": "300s",
-                  "perSeriesAligner": "ALIGN_SUM",
-                  "crossSeriesReducer": "REDUCE_SUM"
-                }
-              }
-            },
             "sparkChartView": {
               "sparkChartType": "SPARK_LINE"
+            },
+            "timeSeriesQuery": {
+              "outputFullDuration": true,
+              "timeSeriesFilter": {
+                "aggregation": {
+                  "alignmentPeriod": "300s",
+                  "crossSeriesReducer": "REDUCE_PERCENTILE_95",
+                  "perSeriesAligner": "ALIGN_DELTA"
+                },
+                "filter": "metric.type=\"run.googleapis.com/request_latencies\" resource.type=\"cloud_run_revision\" resource.label.\"service_name\"=\"workout-parser-v2\""
+              }
             }
-          }
-        }
+          },
+          "title": "⚡ Global P95 Latency"
+        },
+        "width": 16,
+        "xPos": 16
       },
       {
-        "xPos": 9,
-        "width": 3,
-        "height": 3,
+        "height": 12,
         "widget": {
-          "title": "📊 Total API Requests",
           "scorecard": {
-            "timeSeriesQuery": {
-              "timeSeriesFilter": {
-                "filter": "metric.type=\"run.googleapis.com/request_count\" AND resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"workout-parser\"",
-                "aggregation": {
-                  "alignmentPeriod": "300s",
-                  "perSeriesAligner": "ALIGN_SUM",
-                  "crossSeriesReducer": "REDUCE_SUM"
-                }
-              }
-            },
             "sparkChartView": {
-              "sparkChartType": "SPARK_LINE"
+              "sparkChartType": "SPARK_BAR"
+            },
+            "timeSeriesQuery": {
+              "outputFullDuration": true,
+              "timeSeriesFilter": {
+                "aggregation": {
+                  "alignmentPeriod": "3600s",
+                  "crossSeriesReducer": "REDUCE_SUM",
+                  "perSeriesAligner": "ALIGN_SUM"
+                },
+                "filter": "metric.type=\"logging.googleapis.com/user/appcheck_invalid_requests\""
+              }
             }
-          }
-        }
+          },
+          "title": "🚫 Global Invalid Tokens"
+        },
+        "width": 16,
+        "xPos": 32
       },
       {
-        "yPos": 3,
-        "width": 12,
-        "height": 4,
+        "height": 16,
         "widget": {
-          "title": "📊 App Check Request Trends (Last 6 Hours)",
+          "title": "🚦 App Check Readiness - Global Verified Requests",
           "xyChart": {
+            "chartOptions": {
+              "mode": "COLOR"
+            },
             "dataSets": [
               {
-                "timeSeriesQuery": {
-                  "timeSeriesFilter": {
-                    "filter": "metric.type=\"logging.googleapis.com/user/appcheck_verified_requests\"",
-                    "aggregation": {
-                      "alignmentPeriod": "300s",
-                      "perSeriesAligner": "ALIGN_RATE",
-                      "crossSeriesReducer": "REDUCE_SUM"
-                    }
-                  }
-                },
+                "legendTemplate": "✅ Verified/min",
                 "plotType": "LINE",
                 "targetAxis": "Y1",
-                "legendTemplate": "✅ Verified (req/min)"
+                "timeSeriesQuery": {
+                  "timeSeriesFilter": {
+                    "aggregation": {
+                      "alignmentPeriod": "300s",
+                      "crossSeriesReducer": "REDUCE_SUM",
+                      "perSeriesAligner": "ALIGN_RATE"
+                    },
+                    "filter": "metric.type=\"logging.googleapis.com/user/appcheck_verified_requests\""
+                  }
+                }
               },
               {
-                "timeSeriesQuery": {
-                  "timeSeriesFilter": {
-                    "filter": "metric.type=\"logging.googleapis.com/user/appcheck_unverified_requests\"",
-                    "aggregation": {
-                      "alignmentPeriod": "300s",
-                      "perSeriesAligner": "ALIGN_RATE",
-                      "crossSeriesReducer": "REDUCE_SUM"
-                    }
-                  }
-                },
+                "legendTemplate": "❌ Unverified/min",
                 "plotType": "LINE",
                 "targetAxis": "Y1",
-                "legendTemplate": "❌ Unverified (req/min)"
+                "timeSeriesQuery": {
+                  "timeSeriesFilter": {
+                    "aggregation": {
+                      "alignmentPeriod": "300s",
+                      "crossSeriesReducer": "REDUCE_SUM",
+                      "perSeriesAligner": "ALIGN_RATE"
+                    },
+                    "filter": "metric.type=\"logging.googleapis.com/user/appcheck_unverified_requests\""
+                  }
+                }
               },
               {
-                "timeSeriesQuery": {
-                  "timeSeriesFilter": {
-                    "filter": "metric.type=\"logging.googleapis.com/user/appcheck_invalid_tokens\"",
-                    "aggregation": {
-                      "alignmentPeriod": "300s",
-                      "perSeriesAligner": "ALIGN_RATE",
-                      "crossSeriesReducer": "REDUCE_SUM"
-                    }
-                  }
-                },
+                "legendTemplate": "🚫 Invalid/min",
                 "plotType": "LINE",
                 "targetAxis": "Y1",
-                "legendTemplate": "🚫 Invalid (req/min)"
+                "timeSeriesQuery": {
+                  "timeSeriesFilter": {
+                    "aggregation": {
+                      "alignmentPeriod": "300s",
+                      "crossSeriesReducer": "REDUCE_SUM",
+                      "perSeriesAligner": "ALIGN_RATE"
+                    },
+                    "filter": "metric.type=\"logging.googleapis.com/user/appcheck_invalid_requests\""
+                  }
+                }
               }
             ],
-            "timeshiftDuration": "0s",
             "yAxis": {
               "label": "Requests per minute",
               "scale": "LINEAR"
-            },
-            "chartOptions": {
-              "mode": "COLOR"
             }
           }
-        }
+        },
+        "width": 24,
+        "yPos": 12
       },
       {
-        "yPos": 7,
-        "width": 6,
-        "height": 4,
+        "height": 16,
         "widget": {
-          "title": "🚀 API Performance Metrics",
+          "title": "🌐 Regional Performance Comparison",
           "xyChart": {
+            "chartOptions": {
+              "mode": "COLOR"
+            },
             "dataSets": [
               {
-                "timeSeriesQuery": {
-                  "timeSeriesFilter": {
-                    "filter": "metric.type=\"run.googleapis.com/request_latencies\" AND resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"workout-parser\"",
-                    "aggregation": {
-                      "alignmentPeriod": "60s",
-                      "perSeriesAligner": "ALIGN_DELTA",
-                      "crossSeriesReducer": "REDUCE_PERCENTILE_95"
-                    }
-                  }
-                },
+                "legendTemplate": "🇺🇸 US-Central",
                 "plotType": "LINE",
                 "targetAxis": "Y1",
-                "legendTemplate": "95th Percentile Latency"
+                "timeSeriesQuery": {
+                  "timeSeriesFilter": {
+                    "aggregation": {
+                      "alignmentPeriod": "300s",
+                      "crossSeriesReducer": "REDUCE_SUM",
+                      "perSeriesAligner": "ALIGN_RATE"
+                    },
+                    "filter": "metric.type=\"run.googleapis.com/request_count\" AND resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"workout-parser-v2\" AND resource.labels.location=\"us-central1\""
+                  }
+                }
               },
               {
-                "timeSeriesQuery": {
-                  "timeSeriesFilter": {
-                    "filter": "metric.type=\"run.googleapis.com/request_latencies\" AND resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"workout-parser\"",
-                    "aggregation": {
-                      "alignmentPeriod": "60s",
-                      "perSeriesAligner": "ALIGN_DELTA",
-                      "crossSeriesReducer": "REDUCE_MEAN"
-                    }
-                  }
-                },
+                "legendTemplate": "🗽 US-East",
                 "plotType": "LINE",
                 "targetAxis": "Y1",
-                "legendTemplate": "Average Latency"
+                "timeSeriesQuery": {
+                  "timeSeriesFilter": {
+                    "aggregation": {
+                      "alignmentPeriod": "300s",
+                      "crossSeriesReducer": "REDUCE_SUM",
+                      "perSeriesAligner": "ALIGN_RATE"
+                    },
+                    "filter": "metric.type=\"run.googleapis.com/request_count\" AND resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"workout-parser-v2\" AND resource.labels.location=\"us-east1\""
+                  }
+                }
+              },
+              {
+                "legendTemplate": "🇪🇺 Europe",
+                "plotType": "LINE",
+                "targetAxis": "Y1",
+                "timeSeriesQuery": {
+                  "timeSeriesFilter": {
+                    "aggregation": {
+                      "alignmentPeriod": "300s",
+                      "crossSeriesReducer": "REDUCE_SUM",
+                      "perSeriesAligner": "ALIGN_RATE"
+                    },
+                    "filter": "metric.type=\"run.googleapis.com/request_count\" AND resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"workout-parser-v2\" AND resource.labels.location=\"europe-west1\""
+                  }
+                }
+              },
+              {
+                "legendTemplate": "🌏 Asia-Pacific",
+                "plotType": "LINE",
+                "targetAxis": "Y1",
+                "timeSeriesQuery": {
+                  "timeSeriesFilter": {
+                    "aggregation": {
+                      "alignmentPeriod": "300s",
+                      "crossSeriesReducer": "REDUCE_SUM",
+                      "perSeriesAligner": "ALIGN_RATE"
+                    },
+                    "filter": "metric.type=\"run.googleapis.com/request_count\" AND resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"workout-parser-v2\" AND resource.labels.location=\"asia-southeast1\""
+                  }
+                }
+              }
+            ],
+            "yAxis": {
+              "label": "Requests/sec by Region",
+              "scale": "LINEAR"
+            }
+          }
+        },
+        "width": 24,
+        "xPos": 24,
+        "yPos": 12
+      },
+      {
+        "height": 16,
+        "widget": {
+          "title": "📈 Global API Performance Over Time",
+          "xyChart": {
+            "chartOptions": {
+              "mode": "COLOR"
+            },
+            "dataSets": [
+              {
+                "legendTemplate": "🚀 Global Requests/sec",
+                "plotType": "LINE",
+                "targetAxis": "Y1",
+                "timeSeriesQuery": {
+                  "timeSeriesFilter": {
+                    "aggregation": {
+                      "alignmentPeriod": "300s",
+                      "crossSeriesReducer": "REDUCE_SUM",
+                      "perSeriesAligner": "ALIGN_RATE"
+                    },
+                    "filter": "metric.type=\"run.googleapis.com/request_count\" AND resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"workout-parser-v2\""
+                  }
+                }
+              },
+              {
+                "legendTemplate": "⚡ Global P95 Latency",
+                "plotType": "LINE",
+                "targetAxis": "Y2",
+                "timeSeriesQuery": {
+                  "timeSeriesFilter": {
+                    "aggregation": {
+                      "alignmentPeriod": "300s",
+                      "crossSeriesReducer": "REDUCE_PERCENTILE_95",
+                      "perSeriesAligner": "ALIGN_DELTA"
+                    },
+                    "filter": "metric.type=\"run.googleapis.com/request_latencies\" AND resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"workout-parser-v2\""
+                  }
+                }
+              }
+            ],
+            "y2Axis": {
+              "label": "Latency (ms)",
+              "scale": "LINEAR"
+            },
+            "yAxis": {
+              "label": "Requests/sec",
+              "scale": "LINEAR"
+            }
+          }
+        },
+        "width": 48,
+        "yPos": 28
+      },
+      {
+        "height": 16,
+        "widget": {
+          "title": "🔥 Global Error Rates",
+          "xyChart": {
+            "chartOptions": {
+              "mode": "COLOR"
+            },
+            "dataSets": [
+              {
+                "legendTemplate": "🚫 4xx Errors",
+                "plotType": "LINE",
+                "targetAxis": "Y1",
+                "timeSeriesQuery": {
+                  "timeSeriesFilter": {
+                    "aggregation": {
+                      "alignmentPeriod": "300s",
+                      "crossSeriesReducer": "REDUCE_SUM",
+                      "perSeriesAligner": "ALIGN_RATE"
+                    },
+                    "filter": "metric.type=\"run.googleapis.com/request_count\" AND resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"workout-parser-v2\" AND metric.labels.response_code_class=\"4xx\""
+                  }
+                }
+              },
+              {
+                "legendTemplate": "💥 5xx Errors",
+                "plotType": "LINE",
+                "targetAxis": "Y1",
+                "timeSeriesQuery": {
+                  "timeSeriesFilter": {
+                    "aggregation": {
+                      "alignmentPeriod": "300s",
+                      "crossSeriesReducer": "REDUCE_SUM",
+                      "perSeriesAligner": "ALIGN_RATE"
+                    },
+                    "filter": "metric.type=\"run.googleapis.com/request_count\" AND resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"workout-parser-v2\" AND metric.labels.response_code_class=\"5xx\""
+                  }
+                }
+              }
+            ],
+            "yAxis": {
+              "label": "Errors/sec",
+              "scale": "LINEAR"
+            }
+          }
+        },
+        "width": 16,
+        "yPos": 44
+      },
+      {
+        "height": 16,
+        "widget": {
+          "title": "💾 Global Instance Metrics",
+          "xyChart": {
+            "chartOptions": {
+              "mode": "COLOR"
+            },
+            "dataSets": [
+              {
+                "legendTemplate": "🖥️ Active Instances",
+                "plotType": "LINE",
+                "targetAxis": "Y1",
+                "timeSeriesQuery": {
+                  "timeSeriesFilter": {
+                    "aggregation": {
+                      "alignmentPeriod": "300s",
+                      "crossSeriesReducer": "REDUCE_SUM",
+                      "perSeriesAligner": "ALIGN_MEAN"
+                    },
+                    "filter": "metric.type=\"run.googleapis.com/container/instance_count\" AND resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"workout-parser-v2\""
+                  }
+                }
+              },
+              {
+                "legendTemplate": "📊 Requests/sec",
+                "plotType": "LINE",
+                "targetAxis": "Y2",
+                "timeSeriesQuery": {
+                  "timeSeriesFilter": {
+                    "aggregation": {
+                      "alignmentPeriod": "300s",
+                      "crossSeriesReducer": "REDUCE_SUM",
+                      "perSeriesAligner": "ALIGN_RATE"
+                    },
+                    "filter": "metric.type=\"run.googleapis.com/request_count\" AND resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"workout-parser-v2\""
+                  }
+                }
+              }
+            ],
+            "y2Axis": {
+              "label": "Requests/sec",
+              "scale": "LINEAR"
+            },
+            "yAxis": {
+              "label": "Instance Count",
+              "scale": "LINEAR"
+            }
+          }
+        },
+        "width": 16,
+        "xPos": 16,
+        "yPos": 44
+      },
+      {
+        "height": 16,
+        "widget": {
+          "title": "🌍 Multi-Region Instance Count",
+          "xyChart": {
+            "chartOptions": {
+              "mode": "COLOR"
+            },
+            "dataSets": [
+              {
+                "legendTemplate": "${resource.labels.location}",
+                "plotType": "STACKED_AREA",
+                "targetAxis": "Y1",
+                "timeSeriesQuery": {
+                  "timeSeriesFilter": {
+                    "aggregation": {
+                      "alignmentPeriod": "300s",
+                      "crossSeriesReducer": "REDUCE_SUM",
+                      "groupByFields": [
+                        "resource.labels.location"
+                      ],
+                      "perSeriesAligner": "ALIGN_MEAN"
+                    },
+                    "filter": "metric.type=\"run.googleapis.com/container/instance_count\" AND resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"workout-parser-v2\""
+                  }
+                }
+              }
+            ],
+            "yAxis": {
+              "label": "Active Instances",
+              "scale": "LINEAR"
+            }
+          }
+        },
+        "width": 16,
+        "xPos": 32,
+        "yPos": 44
+      },
+      {
+        "height": 16,
+        "widget": {
+          "title": "📊 Regional Latency Comparison",
+          "xyChart": {
+            "chartOptions": {
+              "mode": "COLOR"
+            },
+            "dataSets": [
+              {
+                "legendTemplate": "🇺🇸 US-Central P95",
+                "plotType": "LINE",
+                "targetAxis": "Y1",
+                "timeSeriesQuery": {
+                  "timeSeriesFilter": {
+                    "aggregation": {
+                      "alignmentPeriod": "300s",
+                      "crossSeriesReducer": "REDUCE_PERCENTILE_95",
+                      "perSeriesAligner": "ALIGN_DELTA"
+                    },
+                    "filter": "metric.type=\"run.googleapis.com/request_latencies\" AND resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"workout-parser-v2\" AND resource.labels.location=\"us-central1\""
+                  }
+                }
+              },
+              {
+                "legendTemplate": "🗽 US-East P95",
+                "plotType": "LINE",
+                "targetAxis": "Y1",
+                "timeSeriesQuery": {
+                  "timeSeriesFilter": {
+                    "aggregation": {
+                      "alignmentPeriod": "300s",
+                      "crossSeriesReducer": "REDUCE_PERCENTILE_95",
+                      "perSeriesAligner": "ALIGN_DELTA"
+                    },
+                    "filter": "metric.type=\"run.googleapis.com/request_latencies\" AND resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"workout-parser-v2\" AND resource.labels.location=\"us-east1\""
+                  }
+                }
+              },
+              {
+                "legendTemplate": "🇪🇺 Europe P95",
+                "plotType": "LINE",
+                "targetAxis": "Y1",
+                "timeSeriesQuery": {
+                  "timeSeriesFilter": {
+                    "aggregation": {
+                      "alignmentPeriod": "300s",
+                      "crossSeriesReducer": "REDUCE_PERCENTILE_95",
+                      "perSeriesAligner": "ALIGN_DELTA"
+                    },
+                    "filter": "metric.type=\"run.googleapis.com/request_latencies\" AND resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"workout-parser-v2\" AND resource.labels.location=\"europe-west1\""
+                  }
+                }
+              },
+              {
+                "legendTemplate": "🌏 Asia-Pacific P95",
+                "plotType": "LINE",
+                "targetAxis": "Y1",
+                "timeSeriesQuery": {
+                  "timeSeriesFilter": {
+                    "aggregation": {
+                      "alignmentPeriod": "300s",
+                      "crossSeriesReducer": "REDUCE_PERCENTILE_95",
+                      "perSeriesAligner": "ALIGN_DELTA"
+                    },
+                    "filter": "metric.type=\"run.googleapis.com/request_latencies\" AND resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"workout-parser-v2\" AND resource.labels.location=\"asia-southeast1\""
+                  }
+                }
               }
             ],
             "yAxis": {
@@ -203,214 +487,23 @@
               "scale": "LINEAR"
             }
           }
-        }
+        },
+        "width": 24,
+        "yPos": 60
       },
       {
-        "xPos": 6,
-        "yPos": 7,
-        "width": 6,
-        "height": 4,
+        "height": 16,
         "widget": {
-          "title": "📈 Request Volume & Error Rates",
-          "xyChart": {
-            "dataSets": [
-              {
-                "timeSeriesQuery": {
-                  "timeSeriesFilter": {
-                    "filter": "metric.type=\"run.googleapis.com/request_count\" AND resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"workout-parser\"",
-                    "aggregation": {
-                      "alignmentPeriod": "60s",
-                      "perSeriesAligner": "ALIGN_RATE",
-                      "crossSeriesReducer": "REDUCE_SUM"
-                    }
-                  }
-                },
-                "plotType": "LINE",
-                "targetAxis": "Y1",
-                "legendTemplate": "Total Requests/min"
-              },
-              {
-                "timeSeriesQuery": {
-                  "timeSeriesFilter": {
-                    "filter": "metric.type=\"run.googleapis.com/request_count\" AND resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"workout-parser\" AND metric.labels.response_code_class=\"4xx\"",
-                    "aggregation": {
-                      "alignmentPeriod": "60s",
-                      "perSeriesAligner": "ALIGN_RATE",
-                      "crossSeriesReducer": "REDUCE_SUM"
-                    }
-                  }
-                },
-                "plotType": "LINE",
-                "targetAxis": "Y2",
-                "legendTemplate": "4xx Errors/min"
-              },
-              {
-                "timeSeriesQuery": {
-                  "timeSeriesFilter": {
-                    "filter": "metric.type=\"run.googleapis.com/request_count\" AND resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"workout-parser\" AND metric.labels.response_code_class=\"5xx\"",
-                    "aggregation": {
-                      "alignmentPeriod": "60s",
-                      "perSeriesAligner": "ALIGN_RATE",
-                      "crossSeriesReducer": "REDUCE_SUM"
-                    }
-                  }
-                },
-                "plotType": "LINE",
-                "targetAxis": "Y2",
-                "legendTemplate": "5xx Errors/min"
-              }
-            ],
-            "yAxis": {
-              "label": "Requests/min",
-              "scale": "LINEAR"
-            },
-            "y2Axis": {
-              "label": "Errors/min",
-              "scale": "LINEAR"
-            }
-          }
-        }
-      },
-      {
-        "yPos": 11,
-        "width": 4,
-        "height": 4,
-        "widget": {
-          "title": "🖥️ Cloud Run Instances",
-          "xyChart": {
-            "dataSets": [
-              {
-                "timeSeriesQuery": {
-                  "timeSeriesFilter": {
-                    "filter": "metric.type=\"run.googleapis.com/container/instance_count\" AND resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"workout-parser\"",
-                    "aggregation": {
-                      "alignmentPeriod": "60s",
-                      "perSeriesAligner": "ALIGN_MEAN",
-                      "crossSeriesReducer": "REDUCE_SUM"
-                    }
-                  }
-                },
-                "plotType": "STACKED_AREA",
-                "targetAxis": "Y1",
-                "legendTemplate": "Active Instances"
-              }
-            ],
-            "yAxis": {
-              "label": "Instance Count",
-              "scale": "LINEAR"
-            }
-          }
-        }
-      },
-      {
-        "xPos": 4,
-        "yPos": 11,
-        "width": 4,
-        "height": 4,
-        "widget": {
-          "title": "💾 Memory & CPU Usage",
-          "xyChart": {
-            "dataSets": [
-              {
-                "timeSeriesQuery": {
-                  "timeSeriesFilter": {
-                    "filter": "metric.type=\"run.googleapis.com/container/memory/utilizations\" AND resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"workout-parser\"",
-                    "aggregation": {
-                      "alignmentPeriod": "60s",
-                      "perSeriesAligner": "ALIGN_MEAN",
-                      "crossSeriesReducer": "REDUCE_MEAN"
-                    }
-                  }
-                },
-                "plotType": "LINE",
-                "targetAxis": "Y1",
-                "legendTemplate": "Memory Utilization %"
-              },
-              {
-                "timeSeriesQuery": {
-                  "timeSeriesFilter": {
-                    "filter": "metric.type=\"run.googleapis.com/container/cpu/utilizations\" AND resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"workout-parser\"",
-                    "aggregation": {
-                      "alignmentPeriod": "60s",
-                      "perSeriesAligner": "ALIGN_MEAN",
-                      "crossSeriesReducer": "REDUCE_MEAN"
-                    }
-                  }
-                },
-                "plotType": "LINE",
-                "targetAxis": "Y1",
-                "legendTemplate": "CPU Utilization %"
-              }
-            ],
-            "yAxis": {
-              "label": "Utilization %",
-              "scale": "LINEAR"
-            }
-          }
-        }
-      },
-      {
-        "xPos": 8,
-        "yPos": 11,
-        "width": 4,
-        "height": 4,
-        "widget": {
-          "title": "📊 Hourly App Check Summary",
-          "xyChart": {
-            "dataSets": [
-              {
-                "timeSeriesQuery": {
-                  "timeSeriesFilter": {
-                    "filter": "metric.type=\"logging.googleapis.com/user/appcheck_verified_requests\"",
-                    "aggregation": {
-                      "alignmentPeriod": "3600s",
-                      "perSeriesAligner": "ALIGN_SUM",
-                      "crossSeriesReducer": "REDUCE_SUM"
-                    }
-                  }
-                },
-                "plotType": "STACKED_BAR",
-                "targetAxis": "Y1",
-                "legendTemplate": "✅ Verified"
-              },
-              {
-                "timeSeriesQuery": {
-                  "timeSeriesFilter": {
-                    "filter": "metric.type=\"logging.googleapis.com/user/appcheck_unverified_requests\"",
-                    "aggregation": {
-                      "alignmentPeriod": "3600s",
-                      "perSeriesAligner": "ALIGN_SUM",
-                      "crossSeriesReducer": "REDUCE_SUM"
-                    }
-                  }
-                },
-                "plotType": "STACKED_BAR",
-                "targetAxis": "Y1",
-                "legendTemplate": "❌ Unverified"
-              },
-              {
-                "timeSeriesQuery": {
-                  "timeSeriesFilter": {
-                    "filter": "metric.type=\"logging.googleapis.com/user/appcheck_invalid_tokens\"",
-                    "aggregation": {
-                      "alignmentPeriod": "3600s",
-                      "perSeriesAligner": "ALIGN_SUM",
-                      "crossSeriesReducer": "REDUCE_SUM"
-                    }
-                  }
-                },
-                "plotType": "STACKED_BAR",
-                "targetAxis": "Y1",
-                "legendTemplate": "🚫 Invalid"
-              }
-            ],
-            "yAxis": {
-              "label": "Requests per Hour",
-              "scale": "LINEAR"
-            }
-          }
-        }
+          "logsPanel": {
+            "filter": "resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"workout-parser-v2\" AND (jsonPayload.security_event!=\"\" OR jsonPayload.event_type=\"appcheck_metric\" OR severity>=WARNING)"
+          },
+          "title": "📋 Global Security Events & App Check Logs"
+        },
+        "width": 24,
+        "xPos": 24,
+        "yPos": 60
       }
     ]
-  }
+  },
+  "name": "projects/341666880405/dashboards/4fc2c0fa-8141-4031-a04d-09f512e2f6ae"
 }
