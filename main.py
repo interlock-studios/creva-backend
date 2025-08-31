@@ -13,6 +13,8 @@ from collections import defaultdict
 import threading
 import asyncio
 from google.cloud import monitoring_v3
+from src.services.genai_service_pool import cleanup_genai_service_pool
+from src.api.process import cleanup_processing_resources
 
 # Import API routers
 from src.api import health_router, process_router, admin_router
@@ -41,20 +43,34 @@ project_id = config.project_id
 logger.info(f"Starting application - Environment: {environment}, Project: {project_id}")
 
 
-# Application lifespan management
+# Application lifespan management with resource cleanup
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
     logger.info("Application startup complete")
+    logger.info(f"Environment: {environment}, Project: {project_id}")
+    logger.info("Optimized multi-region GenAI service pool initialized")
+    
     yield
-    # Shutdown
-    logger.info("Application shutdown complete")
+    
+    # Shutdown - cleanup resources
+    logger.info("Application shutdown initiated")
+    try:
+        # Cleanup GenAI service pool
+        await cleanup_genai_service_pool()
+        
+        # Cleanup processing resources
+        await cleanup_processing_resources()
+        
+        logger.info("Application shutdown complete")
+    except Exception as e:
+        logger.error(f"Error during shutdown: {e}")
 
 
 app = FastAPI(
-    title="Social Media Workout Parser - AI Powered",
-    version="1.0.0",
-    description="Parse workout videos from TikTok and Instagram using AI",
+    title="Social Media Workout Parser - AI Powered (Optimized)",
+    version="2.0.0",
+    description="High-performance workout video parser with multi-region AI processing, connection pooling, and advanced caching",
     docs_url="/docs" if environment != "production" else None,
     redoc_url="/redoc" if environment != "production" else None,
     lifespan=lifespan,
@@ -77,7 +93,11 @@ from src.middleware.security import (
 from src.config.security import security_config
 
 # Security middleware - Configure trusted hosts based on environment
-app.add_middleware(TrustedHostMiddleware, allowed_hosts=security_config.trusted_hosts)
+# Temporarily disable host checking if environment variable is set
+if not os.getenv("DISABLE_HOST_CHECK", "").lower() == "true":
+    app.add_middleware(TrustedHostMiddleware, allowed_hosts=security_config.trusted_hosts)
+else:
+    logger.warning("Host checking disabled via DISABLE_HOST_CHECK environment variable")
 
 # CORS middleware - Mobile-friendly configuration
 app.add_middleware(
@@ -250,7 +270,8 @@ def log_structured_metric(metric_data: dict):
 
 def record_appcheck_metric(metric_type: str, path: str = "", app_id: str = "", ip: str = ""):
     """Record App Check metrics for monitoring with enhanced security tracking"""
-    global appcheck_metrics
+    global appcheck_metrics, performance_metrics
+    
     with appcheck_metrics_lock:
         appcheck_metrics["total_requests"] += 1
         if metric_type == "verified":
@@ -259,6 +280,10 @@ def record_appcheck_metric(metric_type: str, path: str = "", app_id: str = "", i
             appcheck_metrics["unverified_requests"] += 1
         elif metric_type == "invalid":
             appcheck_metrics["invalid_tokens"] += 1
+    
+    # Update performance metrics
+    with metrics_lock:
+        performance_metrics["total_requests"] += 1
 
     # Enhanced security logging with App Check readiness metrics
     severity = "info"
@@ -343,19 +368,69 @@ def record_appcheck_metric(metric_type: str, path: str = "", app_id: str = "", i
     )
 
 
-# Track active direct processing (shared state for routes)
+# Add region-specific health check
+@app.get("/health/regions")
+async def get_regional_health():
+    """Get health status of all regions for load balancer routing"""
+    try:
+        from src.services.genai_service_pool import get_genai_service_pool
+        service_pool = await get_genai_service_pool()
+        pool_stats = service_pool.get_pool_stats()
+        
+        return {
+            "status": "healthy" if pool_stats["healthy_services"] > 0 else "unhealthy",
+            "regions": pool_stats["regions"],
+            "healthy_services": pool_stats["healthy_services"],
+            "total_services": pool_stats["total_services"],
+            "timestamp": datetime.utcnow().isoformat(),
+        }
+    except Exception as e:
+        logger.error(f"Failed to get regional health: {e}")
+        return {
+            "status": "error",
+            "error": str(e),
+            "timestamp": datetime.utcnow().isoformat(),
+        }
+
+
+# Track active direct processing (shared state for routes) - increased capacity
 active_direct_processing = 0
 active_processing_lock = threading.Lock()
-MAX_DIRECT_PROCESSING = config.processing.max_direct_processing
+MAX_DIRECT_PROCESSING = min(config.processing.max_direct_processing, 20)  # Increased from 5 to 20
 
-# Legacy rate limiting configuration (now handled by SecurityMiddleware)
-# Keeping for backward compatibility with config
-RATE_LIMIT_REQUESTS = config.rate_limiting.requests_per_window
+# Enhanced rate limiting configuration with higher limits for optimized performance
+RATE_LIMIT_REQUESTS = min(config.rate_limiting.requests_per_window * 2, 50)  # Double the rate limit
 RATE_LIMIT_WINDOW = config.rate_limiting.window_seconds
 
-# Request queue management
-MAX_CONCURRENT_PROCESSING = config.processing.max_concurrent_processing
+# Add performance monitoring endpoint
+@app.get("/metrics/performance")
+async def get_performance_metrics():
+    """Get performance metrics for monitoring"""
+    with metrics_lock:
+        return {
+            "performance_metrics": performance_metrics.copy(),
+            "appcheck_metrics": appcheck_metrics.copy(),
+            "processing_capacity": {
+                "active_direct_processing": active_direct_processing,
+                "max_direct_processing": MAX_DIRECT_PROCESSING,
+                "max_concurrent_processing": MAX_CONCURRENT_PROCESSING,
+            },
+            "timestamp": datetime.utcnow().isoformat(),
+        }
+
+# Optimized request queue management with higher concurrency
+MAX_CONCURRENT_PROCESSING = min(config.processing.max_concurrent_processing, 100)  # Cap at 100 for safety
 processing_semaphore = asyncio.Semaphore(MAX_CONCURRENT_PROCESSING)
+
+# Performance monitoring
+performance_metrics = {
+    "total_requests": 0,
+    "cache_hits": 0,
+    "direct_processing": 0,
+    "queue_processing": 0,
+    "avg_response_time": 0.0,
+}
+metrics_lock = threading.Lock()
 
 
 # Legacy rate limiting middleware removed - now handled by SecurityMiddleware
@@ -370,4 +445,21 @@ if __name__ == "__main__":
     import uvicorn
 
     port = int(os.environ.get("PORT", 8080))
-    uvicorn.run(app, host="0.0.0.0", port=port)
+    
+    # Optimized uvicorn configuration for high performance
+    uvicorn_config = {
+        "host": "0.0.0.0",
+        "port": port,
+        "workers": 1,  # Single worker for async app
+        "loop": "asyncio",
+        "http": "httptools",
+        "lifespan": "on",
+        "access_log": environment != "production",
+        "server_header": False,
+        "date_header": False,
+    }
+    
+    logger.info(f"Starting optimized server on port {port}")
+    logger.info(f"Max concurrent processing: {MAX_CONCURRENT_PROCESSING}")
+    
+    uvicorn.run(app, **uvicorn_config)

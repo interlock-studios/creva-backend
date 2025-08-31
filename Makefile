@@ -4,7 +4,8 @@
 # Variables
 PROJECT_ID := sets-ai
 SERVICE_NAME := workout-parser-v2
-REGION := us-central1
+PRIMARY_REGION := us-central1
+SECONDARY_REGIONS := us-east1 europe-west1 asia-southeast1
 PYTHON := python3.11
 VENV := .venv
 PORT := 8080
@@ -145,24 +146,41 @@ docker-test: docker-build ## Build and test Docker image
 	@docker run --rm $(SERVICE_NAME):local python -c "import requests; requests.get('http://localhost:8080/health')"
 
 .PHONY: deploy
-deploy: ## Deploy to production
-	@echo "$(GREEN)Deploying to production...$(NC)"
-	@ENVIRONMENT=production ./deploy.sh
+deploy: ## Deploy to production (multi-region)
+	@echo "$(GREEN)Deploying to production (multi-region)...$(NC)"
+	@echo "$(YELLOW)Primary region: $(PRIMARY_REGION)$(NC)"
+	@echo "$(YELLOW)Secondary regions: $(SECONDARY_REGIONS)$(NC)"
+	@ENVIRONMENT=production PRIMARY_REGION=$(PRIMARY_REGION) SECONDARY_REGIONS=$(SECONDARY_REGIONS) ./deploy.sh
 
 .PHONY: deploy-staging
 deploy-staging: ## Deploy to staging
 	@echo "$(GREEN)Deploying to staging...$(NC)"
-	@ENVIRONMENT=staging ./deploy.sh
+	@ENVIRONMENT=staging PRIMARY_REGION=$(PRIMARY_REGION) ./deploy.sh
+
+.PHONY: deploy-single-region
+deploy-single-region: ## Deploy to single region only
+	@echo "$(GREEN)Deploying to single region: $(PRIMARY_REGION)...$(NC)"
+	@ENVIRONMENT=production SINGLE_REGION=true ./deploy.sh
 
 .PHONY: logs
-logs: ## View Cloud Run logs
-	@echo "$(GREEN)Fetching logs...$(NC)"
-	@gcloud logging read "resource.type=cloud_run_revision AND resource.labels.service_name=$(SERVICE_NAME)" --limit=50 --format=json | jq -r '.[] | "\(.timestamp) [\(.severity)] \(.jsonPayload.message // .textPayload)"'
+logs: ## View Cloud Run logs from primary region
+	@echo "$(GREEN)Fetching logs from primary region...$(NC)"
+	@gcloud logging read "resource.type=cloud_run_revision AND resource.labels.service_name=$(SERVICE_NAME) AND resource.labels.location=$(PRIMARY_REGION)" --limit=50 --format=json | jq -r '.[] | "\(.timestamp) [\(.severity)] \(.jsonPayload.message // .textPayload)"'
+
+.PHONY: logs-all-regions
+logs-all-regions: ## View Cloud Run logs from all regions
+	@echo "$(GREEN)Fetching logs from all regions...$(NC)"
+	@gcloud logging read "resource.type=cloud_run_revision AND resource.labels.service_name=$(SERVICE_NAME)" --limit=100 --format=json | jq -r '.[] | "\(.timestamp) [\(.severity)] [\(.resource.labels.location)] \(.jsonPayload.message // .textPayload)"'
 
 .PHONY: logs-tail
-logs-tail: ## Tail Cloud Run logs in real-time
-	@echo "$(GREEN)Tailing logs...$(NC)"
-	@gcloud logging tail "resource.type=cloud_run_revision AND resource.labels.service_name=$(SERVICE_NAME)" --format=json | jq -r '"\(.timestamp) [\(.severity)] \(.jsonPayload.message // .textPayload)"'
+logs-tail: ## Tail Cloud Run logs in real-time from primary region
+	@echo "$(GREEN)Tailing logs from primary region...$(NC)"
+	@gcloud logging tail "resource.type=cloud_run_revision AND resource.labels.service_name=$(SERVICE_NAME) AND resource.labels.location=$(PRIMARY_REGION)" --format=json | jq -r '"\(.timestamp) [\(.severity)] \(.jsonPayload.message // .textPayload)"'
+
+.PHONY: logs-tail-all
+logs-tail-all: ## Tail Cloud Run logs in real-time from all regions
+	@echo "$(GREEN)Tailing logs from all regions...$(NC)"
+	@gcloud logging tail "resource.type=cloud_run_revision AND resource.labels.service_name=$(SERVICE_NAME)" --format=json | jq -r '"\(.timestamp) [\(.severity)] [\(.resource.labels.location)] \(.jsonPayload.message // .textPayload)"'
 
 .PHONY: create-secrets
 create-secrets: ## Create required secrets in Secret Manager
@@ -178,16 +196,58 @@ update-secrets: ## Update secrets in Secret Manager
 		echo -n "$$api_key" | gcloud secrets versions add scrapecreators-api-key --data-file=-
 
 .PHONY: service-info
-service-info: ## Display Cloud Run service information
-	@echo "$(GREEN)Service Information:$(NC)"
-	@gcloud run services describe $(SERVICE_NAME) --region=$(REGION) --format=yaml
+service-info: ## Display Cloud Run service information from primary region
+	@echo "$(GREEN)Service Information (Primary Region):$(NC)"
+	@gcloud run services describe $(SERVICE_NAME) --region=$(PRIMARY_REGION) --format=yaml
+
+.PHONY: service-info-all
+service-info-all: ## Display Cloud Run service information from all regions
+	@echo "$(GREEN)Service Information (All Regions):$(NC)"
+	@echo "$(YELLOW)Primary Region: $(PRIMARY_REGION)$(NC)"
+	@gcloud run services describe $(SERVICE_NAME) --region=$(PRIMARY_REGION) --format="table(metadata.name,status.url,status.conditions[0].type,status.conditions[0].status)" || echo "Not deployed in $(PRIMARY_REGION)"
+	@echo "$(YELLOW)Secondary Regions:$(NC)"
+	@IFS=',' read -ra REGIONS <<< "$(SECONDARY_REGIONS)"; \
+	for region in "$${REGIONS[@]}"; do \
+		region=$$(echo $$region | xargs); \
+		echo "Region: $$region"; \
+		gcloud run services describe $(SERVICE_NAME) --region=$$region --format="table(metadata.name,status.url,status.conditions[0].type,status.conditions[0].status)" 2>/dev/null || echo "Not deployed in $$region"; \
+	done
 
 .PHONY: test-api
-test-api: ## Test the deployed API
-	@echo "$(GREEN)Testing deployed API...$(NC)"
-	@SERVICE_URL=$$(gcloud run services describe $(SERVICE_NAME) --region=$(REGION) --format='value(status.url)'); \
+test-api: ## Test the deployed API in primary region
+	@echo "$(GREEN)Testing deployed API in primary region...$(NC)"
+	@SERVICE_URL=$$(gcloud run services describe $(SERVICE_NAME) --region=$(PRIMARY_REGION) --format='value(status.url)'); \
 		echo "Testing $$SERVICE_URL/health"; \
-		curl -s "$$SERVICE_URL/health" | jq .
+		curl -s "$$SERVICE_URL/health" | jq .; \
+		echo "Testing $$SERVICE_URL/health/regions"; \
+		curl -s "$$SERVICE_URL/health/regions" | jq .; \
+		echo "Testing $$SERVICE_URL/metrics/performance"; \
+		curl -s "$$SERVICE_URL/metrics/performance" | jq .
+
+.PHONY: test-api-all
+test-api-all: ## Test the deployed API in all regions
+	@echo "$(GREEN)Testing deployed API in all regions...$(NC)"
+	@echo "$(YELLOW)Testing Primary Region: $(PRIMARY_REGION)$(NC)"
+	@SERVICE_URL=$$(gcloud run services describe $(SERVICE_NAME) --region=$(PRIMARY_REGION) --format='value(status.url)' 2>/dev/null); \
+	if [ ! -z "$$SERVICE_URL" ]; then \
+		echo "Testing $$SERVICE_URL/health"; \
+		curl -s "$$SERVICE_URL/health" | jq . || echo "Health check failed"; \
+	else \
+		echo "Service not found in $(PRIMARY_REGION)"; \
+	fi
+	@echo "$(YELLOW)Testing Secondary Regions:$(NC)"
+	@IFS=',' read -ra REGIONS <<< "$(SECONDARY_REGIONS)"; \
+	for region in "$${REGIONS[@]}"; do \
+		region=$$(echo $$region | xargs); \
+		echo "Testing region: $$region"; \
+		SERVICE_URL=$$(gcloud run services describe $(SERVICE_NAME) --region=$$region --format='value(status.url)' 2>/dev/null); \
+		if [ ! -z "$$SERVICE_URL" ]; then \
+			echo "Testing $$SERVICE_URL/health"; \
+			curl -s "$$SERVICE_URL/health" | jq . || echo "Health check failed for $$region"; \
+		else \
+			echo "Service not found in $$region"; \
+		fi; \
+	done
 
 .PHONY: dashboard
 dashboard: ## Deploy V2 monitoring dashboard with V1 comparison
@@ -207,8 +267,8 @@ clean: ## Clean up temporary files
 	@echo "$(GREEN)Cleanup complete$(NC)"
 
 .PHONY: setup-gcp
-setup-gcp: ## Setup Google Cloud project and services
-	@echo "$(GREEN)Setting up Google Cloud project...$(NC)"
+setup-gcp: ## Setup Google Cloud project and services for multi-region deployment
+	@echo "$(GREEN)Setting up Google Cloud project for multi-region deployment...$(NC)"
 	@gcloud config set project $(PROJECT_ID)
 	@echo "$(GREEN)Enabling required APIs...$(NC)"
 	@gcloud services enable aiplatform.googleapis.com
@@ -218,18 +278,30 @@ setup-gcp: ## Setup Google Cloud project and services
 	@gcloud services enable secretmanager.googleapis.com
 	@gcloud services enable cloudapis.googleapis.com
 	@gcloud services enable firestore.googleapis.com
-	@echo "$(GREEN)Creating Artifact Registry repository...$(NC)"
+	@gcloud services enable compute.googleapis.com
+	@echo "$(GREEN)Creating Artifact Registry repositories in all regions...$(NC)"
+	@echo "Creating repository in primary region: $(PRIMARY_REGION)"
 	@gcloud artifacts repositories create $(SERVICE_NAME) \
 		--repository-format=docker \
-		--location=$(REGION) \
-		--description="Docker repository for $(SERVICE_NAME)" || echo "$(YELLOW)Repository already exists$(NC)"
-	@echo "$(GREEN)Google Cloud setup complete$(NC)"
+		--location=$(PRIMARY_REGION) \
+		--description="Docker repository for $(SERVICE_NAME)" || echo "$(YELLOW)Repository already exists in $(PRIMARY_REGION)$(NC)"
+	@echo "Creating repositories in secondary regions..."
+	@IFS=',' read -ra REGIONS <<< "$(SECONDARY_REGIONS)"; \
+	for region in "$${REGIONS[@]}"; do \
+		region=$$(echo $$region | xargs); \
+		echo "Creating repository in $$region"; \
+		gcloud artifacts repositories create $(SERVICE_NAME) \
+			--repository-format=docker \
+			--location=$$region \
+			--description="Docker repository for $(SERVICE_NAME)" || echo "$(YELLOW)Repository already exists in $$region$(NC)"; \
+	done
+	@echo "$(GREEN)Google Cloud multi-region setup complete$(NC)"
 	@echo "$(YELLOW)Note: You may need to create Firestore indexes for the queue. Run 'make setup-firestore' if you get index errors.$(NC)"
 
 .PHONY: setup-firestore
 setup-firestore: ## Setup Firestore database and indexes
 	@echo "$(GREEN)Setting up Firestore database...$(NC)"
-	@gcloud firestore databases create --location=$(REGION) --type=firestore-native || echo "$(YELLOW)Firestore database already exists$(NC)"
+	@gcloud firestore databases create --location=$(PRIMARY_REGION) --type=firestore-native || echo "$(YELLOW)Firestore database already exists$(NC)"
 	@echo "$(GREEN)Deploying Firestore indexes...$(NC)"
 	@chmod +x scripts/deploy_indexes.sh
 	@./scripts/deploy_indexes.sh
@@ -238,5 +310,48 @@ setup-firestore: ## Setup Firestore database and indexes
 .PHONY: validate
 validate: lint security test ## Run all validation checks
 
+.PHONY: benchmark
+benchmark: ## Run performance benchmarks against deployed API
+	@echo "$(GREEN)Running performance benchmarks...$(NC)"
+	@SERVICE_URL=$$(gcloud run services describe $(SERVICE_NAME) --region=$(PRIMARY_REGION) --format='value(status.url)' 2>/dev/null); \
+	if [ ! -z "$$SERVICE_URL" ]; then \
+		echo "Benchmarking $$SERVICE_URL"; \
+		echo "Testing health endpoint..."; \
+		time curl -s "$$SERVICE_URL/health" > /dev/null; \
+		echo "Testing metrics endpoint..."; \
+		time curl -s "$$SERVICE_URL/metrics/performance" > /dev/null; \
+		echo "Testing regional health..."; \
+		time curl -s "$$SERVICE_URL/health/regions" > /dev/null; \
+	else \
+		echo "$(RED)Service not deployed. Run 'make deploy' first.$(NC)"; \
+	fi
+
+.PHONY: status
+status: ## Show deployment status across all regions
+	@echo "$(GREEN)Deployment Status:$(NC)"
+	@echo "$(YELLOW)Primary Region: $(PRIMARY_REGION)$(NC)"
+	@gcloud run services list --filter="metadata.name=$(SERVICE_NAME)" --format="table(metadata.name,status.url,metadata.labels.cloud\.googleapis\.com/location,status.conditions[0].status)" --regions=$(PRIMARY_REGION) || echo "No services found in primary region"
+	@echo "$(YELLOW)Secondary Regions: $(SECONDARY_REGIONS)$(NC)"
+	@IFS=',' read -ra REGIONS <<< "$(SECONDARY_REGIONS)"; \
+	for region in "$${REGIONS[@]}"; do \
+		region=$$(echo $$region | xargs); \
+		gcloud run services list --filter="metadata.name=$(SERVICE_NAME)" --format="table(metadata.name,status.url,metadata.labels.cloud\.googleapis\.com/location,status.conditions[0].status)" --regions=$$region 2>/dev/null || echo "No services found in $$region"; \
+	done
+
 # Default target
 .DEFAULT_GOAL := help
+
+# Performance optimization targets
+.PHONY: optimize
+optimize: ## Run all optimization steps
+	@echo "$(GREEN)Running optimization steps...$(NC)"
+	@echo "1. Validating code quality..."
+	@$(MAKE) validate
+	@echo "2. Building optimized Docker image..."
+	@$(MAKE) docker-build
+	@echo "3. Deploying to production..."
+	@$(MAKE) deploy
+	@echo "4. Running benchmarks..."
+	@sleep 30  # Wait for deployment to stabilize
+	@$(MAKE) benchmark
+	@echo "$(GREEN)Optimization complete!$(NC)"

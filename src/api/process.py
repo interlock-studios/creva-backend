@@ -215,3 +215,20 @@ async def get_job_status(job_id: str):
         )
 
     return result
+
+
+# Cleanup function for graceful shutdown
+async def cleanup_processing_resources():
+    """Cleanup processing resources on shutdown"""
+    try:
+        global executor, geoip_db
+        
+        if 'executor' in globals() and executor:
+            executor.shutdown(wait=True)
+        
+        if 'geoip_db' in globals() and geoip_db:
+            geoip_db.close()
+            
+        logger.info("Processing resources cleaned up")
+    except Exception as e:
+        logger.error(f"Error during processing cleanup: {e}")

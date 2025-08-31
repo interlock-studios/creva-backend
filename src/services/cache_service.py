@@ -3,6 +3,7 @@ from google.cloud.firestore import Client
 import hashlib
 import logging
 import os
+import asyncio
 from typing import Optional, Dict, Any
 from datetime import datetime, timedelta
 from urllib.parse import urlparse, parse_qs, urlencode
@@ -352,3 +353,13 @@ class CacheService:
             return True
         except Exception:
             return False
+    
+    # Backward compatibility method
+    def get_cache_stats_sync(self) -> Dict[str, Any]:
+        """Synchronous version of get_cache_stats for backward compatibility"""
+        try:
+            loop = asyncio.get_event_loop()
+            return loop.run_until_complete(self.get_cache_stats())
+        except RuntimeError:
+            # If no event loop is running, create a new one
+            return asyncio.run(self.get_cache_stats())

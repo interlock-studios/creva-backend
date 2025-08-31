@@ -8,14 +8,18 @@ google-genai
 # Video Processing
 ffmpeg-python==0.2.0
 
-# HTTP Client for ScrapCreators API
+# HTTP Client for ScrapCreators API and Connection Pooling
 httpx==0.28.1
+aiohttp==3.10.11
 
 # Data Models
 pydantic==2.11.4
 
 # Environment
 python-dotenv==1.0.0
+
+# GeoIP for region detection (optional)
+geoip2==4.8.0
 
 # Caching & Firebase
 google-cloud-firestore==2.19.0

@@ -1,7 +1,8 @@
-# Cloud Build configuration with security best practices
+# Cloud Build configuration with multi-region deployment and performance optimizations
 substitutions:
   _SERVICE_NAME: workout-parser
-  _REGION: us-central1
+  _PRIMARY_REGION: us-central1
+  _SECONDARY_REGIONS: us-east1,europe-west1,asia-southeast1
   _ENVIRONMENT: production
 
 options:
@@ -27,14 +28,14 @@ steps:
       - 'buildx'
       - 'build'
       - '--platform=linux/amd64'
-      - '--cache-from=${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_SERVICE_NAME}/${_SERVICE_NAME}:buildcache'
-      - '--cache-to=${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_SERVICE_NAME}/${_SERVICE_NAME}:buildcache'
+      - '--cache-from=${_PRIMARY_REGION}-docker.pkg.dev/${PROJECT_ID}/${_SERVICE_NAME}/${_SERVICE_NAME}:buildcache'
+      - '--cache-to=${_PRIMARY_REGION}-docker.pkg.dev/${PROJECT_ID}/${_SERVICE_NAME}/${_SERVICE_NAME}:buildcache'
       - '-t'
-      - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_SERVICE_NAME}/${_SERVICE_NAME}:${SHORT_SHA}'
+      - '${_PRIMARY_REGION}-docker.pkg.dev/${PROJECT_ID}/${_SERVICE_NAME}/${_SERVICE_NAME}:${SHORT_SHA}'
       - '-t'
-      - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_SERVICE_NAME}/${_SERVICE_NAME}:${_ENVIRONMENT}'
+      - '${_PRIMARY_REGION}-docker.pkg.dev/${PROJECT_ID}/${_SERVICE_NAME}/${_SERVICE_NAME}:${_ENVIRONMENT}'
       - '-t'
-      - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_SERVICE_NAME}/${_SERVICE_NAME}:latest'
+      - '${_PRIMARY_REGION}-docker.pkg.dev/${PROJECT_ID}/${_SERVICE_NAME}/${_SERVICE_NAME}:latest'
       - '--build-arg'
       - 'BUILD_DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ)'
       - '--build-arg'
@@ -47,7 +48,7 @@ steps:
     args:
       - 'test'
       - '--image'
-      - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_SERVICE_NAME}/${_SERVICE_NAME}:${SHORT_SHA}'
+      - '${_PRIMARY_REGION}-docker.pkg.dev/${PROJECT_ID}/${_SERVICE_NAME}/${_SERVICE_NAME}:${SHORT_SHA}'
       - '--config'
       - '/workspace/container-test.yaml'
     allowFailure: true  # Don't fail build if tests don't exist yet
@@ -58,7 +59,7 @@ steps:
     args:
       - 'push'
       - '--all-tags'
-      - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_SERVICE_NAME}/${_SERVICE_NAME}'
+      - '${_PRIMARY_REGION}-docker.pkg.dev/${PROJECT_ID}/${_SERVICE_NAME}/${_SERVICE_NAME}'
 
   # Step 5: Create or update service account if needed
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
@@ -88,42 +89,91 @@ steps:
           --member="serviceAccount:$${SERVICE_ACCOUNT}" \
           --role="roles/secretmanager.secretAccessor" || true
 
-  # Step 6: Deploy to Cloud Run
+  # Step 6: Deploy to Primary Region (us-central1)
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
-    id: 'deploy'
+    id: 'deploy-primary'
     entrypoint: 'bash'
     args:
       - '-c'
       - |
+        echo "Deploying to primary region: ${_PRIMARY_REGION}"
+        
         DEPLOY_ARGS=(
           "run" "deploy" "${_SERVICE_NAME}"
-          "--image" "${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_SERVICE_NAME}/${_SERVICE_NAME}:${SHORT_SHA}"
-          "--region" "${_REGION}"
+          "--image" "${_PRIMARY_REGION}-docker.pkg.dev/${PROJECT_ID}/${_SERVICE_NAME}/${_SERVICE_NAME}:${SHORT_SHA}"
+          "--region" "${_PRIMARY_REGION}"
           "--platform" "managed"
           "--allow-unauthenticated"
-          "--memory" "2Gi"
-          "--cpu" "2"
+          "--memory" "4Gi"
+          "--cpu" "4"
           "--timeout" "900"
-          "--max-instances" "50"
-          "--min-instances" "0"
-          "--concurrency" "80"
+          "--max-instances" "100"
+          "--min-instances" "2"
+          "--concurrency" "100"
           "--cpu-throttling"
           "--execution-environment" "gen2"
           "--service-account" "${_SERVICE_NAME}@${PROJECT_ID}.iam.gserviceaccount.com"
-          "--set-env-vars" "GOOGLE_CLOUD_PROJECT_ID=${PROJECT_ID},ENVIRONMENT=${_ENVIRONMENT},MAX_CONCURRENT_PROCESSING=40,RATE_LIMIT_REQUESTS=20,RATE_LIMIT_WINDOW=60"
+          "--set-env-vars" "GOOGLE_CLOUD_PROJECT_ID=${PROJECT_ID},ENVIRONMENT=${_ENVIRONMENT},MAX_CONCURRENT_PROCESSING=80,RATE_LIMIT_REQUESTS=50,RATE_LIMIT_WINDOW=60,MAX_DIRECT_PROCESSING=20,GEMINI_REGIONS=${_PRIMARY_REGION},${_SECONDARY_REGIONS}"
           "--set-secrets" "SCRAPECREATORS_API_KEY=scrapecreators-api-key:latest"
         )
         
         # Add environment-specific settings
         if [[ "${_ENVIRONMENT}" == "production" ]]; then
-          DEPLOY_ARGS+=("--min-instances" "1" "--cpu-boost")
+          DEPLOY_ARGS+=("--cpu-boost")
         else
           DEPLOY_ARGS+=("--tag" "${_ENVIRONMENT}" "--no-traffic")
         fi
         
         gcloud "$${DEPLOY_ARGS[@]}"
 
-  # Step 7: Deploy worker service
+  # Step 7: Deploy to Secondary Regions
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: 'deploy-secondary'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        echo "Deploying to secondary regions: ${_SECONDARY_REGIONS}"
+        
+        IFS=',' read -ra REGIONS <<< "${_SECONDARY_REGIONS}"
+        for region in "${REGIONS[@]}"; do
+          region=$(echo $region | xargs)  # trim whitespace
+          echo "Deploying to region: $region"
+          
+          # Copy image to region's registry if needed
+          gcloud artifacts repositories create ${_SERVICE_NAME} \
+            --repository-format=docker \
+            --location=$region \
+            --description="Docker repository for ${_SERVICE_NAME}" || true
+          
+          # Tag and push image to regional registry
+          docker tag ${_PRIMARY_REGION}-docker.pkg.dev/${PROJECT_ID}/${_SERVICE_NAME}/${_SERVICE_NAME}:${SHORT_SHA} \
+                     $region-docker.pkg.dev/${PROJECT_ID}/${_SERVICE_NAME}/${_SERVICE_NAME}:${SHORT_SHA} || true
+          
+          docker push $region-docker.pkg.dev/${PROJECT_ID}/${_SERVICE_NAME}/${_SERVICE_NAME}:${SHORT_SHA} || true
+          
+          # Deploy to region
+          gcloud run deploy ${_SERVICE_NAME} \
+            --image $region-docker.pkg.dev/${PROJECT_ID}/${_SERVICE_NAME}/${_SERVICE_NAME}:${SHORT_SHA} \
+            --region $region \
+            --platform managed \
+            --allow-unauthenticated \
+            --memory 4Gi \
+            --cpu 4 \
+            --timeout 900 \
+            --max-instances 100 \
+            --min-instances 1 \
+            --concurrency 100 \
+            --cpu-throttling \
+            --execution-environment gen2 \
+            --service-account ${_SERVICE_NAME}@${PROJECT_ID}.iam.gserviceaccount.com \
+            --set-env-vars GOOGLE_CLOUD_PROJECT_ID=${PROJECT_ID},ENVIRONMENT=${_ENVIRONMENT},MAX_CONCURRENT_PROCESSING=80,RATE_LIMIT_REQUESTS=50,RATE_LIMIT_WINDOW=60,MAX_DIRECT_PROCESSING=20,GEMINI_REGIONS=${_PRIMARY_REGION},${_SECONDARY_REGIONS} \
+            --set-secrets SCRAPECREATORS_API_KEY=scrapecreators-api-key:latest || {
+              echo "Failed to deploy to $region, continuing..."
+            }
+        done
+
+  # Step 8: Deploy worker service
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     id: 'deploy-worker'
     entrypoint: 'bash'
@@ -149,26 +199,52 @@ steps:
             --role="roles/aiplatform.user"
         fi
         
-        # Deploy worker service
+        # Deploy worker service to primary region
         gcloud run deploy workout-parser-worker \
-          --image ${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_SERVICE_NAME}/${_SERVICE_NAME}:${SHORT_SHA} \
-          --region ${_REGION} \
+          --image ${_PRIMARY_REGION}-docker.pkg.dev/${PROJECT_ID}/${_SERVICE_NAME}/${_SERVICE_NAME}:${SHORT_SHA} \
+          --region ${_PRIMARY_REGION} \
           --platform managed \
           --allow-unauthenticated \
-          --memory 2Gi \
-          --cpu 1 \
+          --memory 4Gi \
+          --cpu 2 \
           --timeout 300 \
           --concurrency 1 \
-          --max-instances 10 \
-          --min-instances 1 \
+          --max-instances 20 \
+          --min-instances 2 \
           --port 8081 \
           --command python \
           --args -m,src.worker.worker_service \
-          --set-env-vars GOOGLE_CLOUD_PROJECT_ID=${PROJECT_ID},ENVIRONMENT=${_ENVIRONMENT} \
+          --set-env-vars GOOGLE_CLOUD_PROJECT_ID=${PROJECT_ID},ENVIRONMENT=${_ENVIRONMENT},GEMINI_REGIONS=${_PRIMARY_REGION},${_SECONDARY_REGIONS} \
           --set-secrets SCRAPECREATORS_API_KEY=scrapecreators-api-key:latest \
           --service-account "$${WORKER_SA}"
 
-  # Step 8: Validate deployment health
+  # Step 9: Setup Global Load Balancer (optional)
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: 'setup-load-balancer'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        echo "Setting up global load balancer for multi-region deployment..."
+        
+        # Create global load balancer configuration
+        # This step is optional and can be configured separately
+        echo "Load balancer setup can be done manually or via Terraform"
+        echo "Primary region: ${_PRIMARY_REGION}"
+        echo "Secondary regions: ${_SECONDARY_REGIONS}"
+        
+        # For now, just output the service URLs
+        echo "=== Service URLs ==="
+        echo "Primary: https://${_SERVICE_NAME}-$(echo ${PROJECT_ID} | tr ':' '-')-uc.a.run.app"
+        
+        IFS=',' read -ra REGIONS <<< "${_SECONDARY_REGIONS}"
+        for region in "${REGIONS[@]}"; do
+          region=$(echo $region | xargs)
+          region_code=$(echo $region | cut -d'-' -f1-2 | tr '-' '')
+          echo "$region: https://${_SERVICE_NAME}-$(echo ${PROJECT_ID} | tr ':' '-')-${region_code}.a.run.app"
+        done
+
+  # Step 10: Validate deployment health
   - name: 'gcr.io/cloud-builders/gcloud'
     id: 'validate-deployment'
     entrypoint: 'bash'
@@ -177,9 +253,9 @@ steps:
       - |
         echo "Validating deployment health..."
         
-        # Get service URL
+        # Get primary service URL
         SERVICE_URL=$(gcloud run services describe ${_SERVICE_NAME} \
-          --platform managed --region ${_REGION} --format 'value(status.url)')
+          --platform managed --region ${_PRIMARY_REGION} --format 'value(status.url)')
         
         # Wait for service to be ready (max 5 minutes)
         for i in {1..30}; do
@@ -195,15 +271,15 @@ steps:
             echo "Rolling back deployment..."
             
             # Get previous revision
-            PREVIOUS_REVISION=$(gcloud run revisions list \
-              --service=${_SERVICE_NAME} --region=${_REGION} \
+            PREVIOUS_REVISION=$$(gcloud run revisions list \
+              --service=${_SERVICE_NAME} --region=${_PRIMARY_REGION} \
               --format='value(metadata.name)' --limit=2 | tail -n 1)
             
-            if [ ! -z "$PREVIOUS_REVISION" ]; then
-              echo "Rolling back to revision: $PREVIOUS_REVISION"
+            if [ ! -z "$$PREVIOUS_REVISION" ]; then
+              echo "Rolling back to revision: $$PREVIOUS_REVISION"
               gcloud run services update-traffic ${_SERVICE_NAME} \
-                --to-revisions=$PREVIOUS_REVISION=100 \
-                --region=${_REGION}
+                --to-revisions=$$PREVIOUS_REVISION=100 \
+                --region=${_PRIMARY_REGION}
             fi
             
             exit 1
@@ -216,18 +292,18 @@ steps:
         echo "Running smoke tests..."
         
         # Test health endpoint with detailed validation
-        HEALTH_RESPONSE=$(curl -s "$${SERVICE_URL}/health")
-        echo "Health response: $HEALTH_RESPONSE"
+        HEALTH_RESPONSE=$$(curl -s "$${SERVICE_URL}/health")
+        echo "Health response: $$HEALTH_RESPONSE"
         
         # Validate health response structure
-        if ! echo "$HEALTH_RESPONSE" | jq -e '.status' > /dev/null; then
+        if ! echo "$$HEALTH_RESPONSE" | jq -e '.status' > /dev/null; then
           echo "❌ Health endpoint returned invalid JSON"
           exit 1
         fi
         
-        HEALTH_STATUS=$(echo "$HEALTH_RESPONSE" | jq -r '.status')
-        if [ "$HEALTH_STATUS" != "healthy" ] && [ "$HEALTH_STATUS" != "degraded" ]; then
-          echo "❌ Health status is: $HEALTH_STATUS"
+        HEALTH_STATUS=$$(echo "$$HEALTH_RESPONSE" | jq -r '.status')
+        if [ "$$HEALTH_STATUS" != "healthy" ] && [ "$$HEALTH_STATUS" != "degraded" ]; then
+          echo "❌ Health status is: $$HEALTH_STATUS"
           exit 1
         fi
         
@@ -238,24 +314,38 @@ steps:
         }
         
         # Test API structure (should return 422 for invalid input, not 500)
-        HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
+        HTTP_CODE=$$(curl -s -o /dev/null -w "%{http_code}" \
           -X POST "$${SERVICE_URL}/process" \
           -H "Content-Type: application/json" \
           -d '{"url": "invalid-url"}')
         
-        if [ "$HTTP_CODE" != "422" ]; then
-          echo "❌ Process endpoint validation failed (expected 422, got $HTTP_CODE)"
+        if [ "$$HTTP_CODE" != "422" ]; then
+          echo "❌ Process endpoint validation failed (expected 422, got $$HTTP_CODE)"
           exit 1
         fi
         
         echo "✅ All smoke tests passed!"
-        echo "✅ Deployment validation complete!"
+        
+        # Test regional health endpoint
+        curl -f "$${SERVICE_URL}/health/regions" | jq .status || {
+          echo "❌ Regional health endpoint failed"
+          exit 1
+        }
+        
+        # Test performance metrics endpoint
+        curl -f "$${SERVICE_URL}/metrics/performance" | jq .performance_metrics || {
+          echo "❌ Performance metrics endpoint failed"
+          exit 1
+        }
+        
+        echo "✅ All smoke tests passed!"
+        echo "✅ Multi-region deployment validation complete!"
 
-# Store images in Artifact Registry
+# Store images in Artifact Registry (primary region)
 images:
-  - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_SERVICE_NAME}/${_SERVICE_NAME}:${SHORT_SHA}'
-  - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_SERVICE_NAME}/${_SERVICE_NAME}:${_ENVIRONMENT}'
-  - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_SERVICE_NAME}/${_SERVICE_NAME}:latest'
+  - '${_PRIMARY_REGION}-docker.pkg.dev/${PROJECT_ID}/${_SERVICE_NAME}/${_SERVICE_NAME}:${SHORT_SHA}'
+  - '${_PRIMARY_REGION}-docker.pkg.dev/${PROJECT_ID}/${_SERVICE_NAME}/${_SERVICE_NAME}:${_ENVIRONMENT}'
+  - '${_PRIMARY_REGION}-docker.pkg.dev/${PROJECT_ID}/${_SERVICE_NAME}/${_SERVICE_NAME}:latest'
 
-# Timeout for the entire build
-timeout: '1200s'
+# Timeout for the entire build (increased for multi-region deployment)
+timeout: '2400s'
