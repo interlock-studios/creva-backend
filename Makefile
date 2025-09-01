@@ -5,7 +5,7 @@
 PROJECT_ID := sets-ai
 SERVICE_NAME := workout-parser-v2
 PRIMARY_REGION := us-central1
-SECONDARY_REGIONS := us-east1 europe-west1 asia-southeast1
+SECONDARY_REGIONS := us-east1,europe-west1,asia-southeast1
 PYTHON := python3.11
 VENV := .venv
 PORT := 8080

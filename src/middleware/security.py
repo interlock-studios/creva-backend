@@ -22,9 +22,9 @@ class ThreatDetector:
         self.suspicious_patterns = defaultdict(int)
         self.blocked_ips = set()
         self.attack_patterns = {
-            "rapid_failures": {"threshold": 10, "window": 300},  # 10 failures in 5 min
-            "path_traversal": {"threshold": 3, "window": 3600},   # 3 attempts in 1 hour
-            "bot_behavior": {"threshold": 20, "window": 3600},    # 20 bot-like requests in 1 hour
+            "rapid_failures": {"threshold": 50, "window": 300},  # 50 failures in 5 min (much more lax)
+            "path_traversal": {"threshold": 10, "window": 3600},   # 10 attempts in 1 hour (more lax)
+            "bot_behavior": {"threshold": 100, "window": 3600},    # 100 bot-like requests in 1 hour (much more lax)
         }
     
     def analyze_request(self, ip: str, path: str, user_agent: str, status: int, app_id: str = None):
@@ -70,14 +70,17 @@ class ThreatDetector:
             if self.suspicious_patterns[f"traversal_{ip}"] >= self.attack_patterns["path_traversal"]["threshold"]:
                 self.blocked_ips.add(ip)
         
-        # Detect unusual endpoints
-        if status == 404 and not any(allowed in path for allowed in ["/health", "/docs", "/redoc", "/process"]):
+        # Detect unusual endpoints (only block on very obvious probing)
+        if status == 404 and not any(allowed in path for allowed in ["/health", "/docs", "/redoc", "/process", "/status", "/admin"]):
             self.suspicious_patterns[f"404_{ip}"] += 1
-            if self.suspicious_patterns[f"404_{ip}"] > 5:
+            if self.suspicious_patterns[f"404_{ip}"] > 25:  # Much higher threshold
                 self._log_security_event("endpoint_probing", ip, {
                     "probed_path": path,
                     "probe_count": self.suspicious_patterns[f"404_{ip}"]
                 })
+                # Only block after excessive probing
+                if self.suspicious_patterns[f"404_{ip}"] > 50:
+                    self.blocked_ips.add(ip)
     
     def is_blocked(self, ip: str) -> bool:
         """Check if IP is blocked"""
@@ -116,14 +119,14 @@ class EnhancedRateLimiter:
         
         # Determine limits based on authentication status
         if user_id:
-            # Authenticated user - more generous limits
-            ip_max = endpoint_config.get("ip_limit_auth", 20)
-            user_max = endpoint_config.get("user_limit", 10)
+            # Authenticated user - very generous limits
+            ip_max = endpoint_config.get("ip_limit_auth", 100)
+            user_max = endpoint_config.get("user_limit", 50)
             window = endpoint_config.get("window", 300)
             rate_key = f"user_{user_id}"
         else:
-            # Unauthenticated - stricter limits
-            ip_max = endpoint_config.get("ip_limit_unauth", 5)
+            # Unauthenticated - still generous for testing
+            ip_max = endpoint_config.get("ip_limit_unauth", 50)
             user_max = ip_max  # Same as IP for unauth
             window = endpoint_config.get("window", 300)
             rate_key = f"ip_{ip}"

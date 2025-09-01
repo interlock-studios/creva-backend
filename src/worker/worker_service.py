@@ -131,14 +131,10 @@ class VideoWorker:
                 # Handle regular video content
                 logger.info(f"Job {job_id} - Processing regular video")
 
-                # 2. Process audio removal for video analysis
-                logger.info(f"Job {job_id} - Removing audio from video...")
-                silent_video = await self.video_processor.remove_audio(video_content)
-
-                # 3. Analyze with Gemini
+                # 2. Analyze with Gemini (no audio removal needed)
                 logger.info(f"Job {job_id} - Analyzing video with AI...")
                 workout_json = await self.genai_pool.analyze_video(
-                    silent_video, transcript, caption, localization
+                    video_content, transcript, caption, localization
                 )
 
             if not workout_json:
@@ -182,7 +178,6 @@ class VideoWorker:
         """Determine if an error is worth retrying"""
         # Import here to avoid circular imports
         from src.exceptions import VideoFormatError, UnsupportedPlatformError
-        from src.utils.circuit_breaker import CircuitBreakerOpenError
         
         # Non-retryable errors
         non_retryable_types = (
@@ -192,9 +187,8 @@ class VideoWorker:
             KeyError,    # Usually indicates malformed data
         )
         
-        # Circuit breaker errors are retryable (service might recover)
-        if isinstance(error, CircuitBreakerOpenError):
-            return True
+        # Circuit breaker errors would be retryable (service might recover)
+        # Note: CircuitBreakerOpenError not currently implemented
         
         # Check for non-retryable error types
         if isinstance(error, non_retryable_types):

@@ -13,13 +13,22 @@ NC='\033[0m' # No Color
 SERVICE_NAME="${SERVICE_NAME:-workout-parser-v2}"
 PROJECT_ID="${PROJECT_ID:-sets-ai}"
 PRIMARY_REGION="${PRIMARY_REGION:-us-central1}"
+SECONDARY_REGIONS="${SECONDARY_REGIONS:-us-east1,europe-west1,asia-southeast1}"
 ENVIRONMENT="${ENVIRONMENT:-production}"
+SINGLE_REGION="${SINGLE_REGION:-false}"
 
-echo -e "${BLUE}🚀 Starting Optimized Deployment${NC}"
+echo -e "${BLUE}🚀 Starting Multi-Region Deployment${NC}"
 echo "Project: ${PROJECT_ID}"
 echo "Service: ${SERVICE_NAME}"
 echo "Environment: ${ENVIRONMENT}"
-echo "Region: ${PRIMARY_REGION}"
+echo "Primary Region: ${PRIMARY_REGION}"
+
+if [ "$SINGLE_REGION" = "true" ]; then
+    echo "Mode: Single Region Only"
+else
+    echo "Secondary Regions: ${SECONDARY_REGIONS}"
+    echo "Mode: Multi-Region"
+fi
 
 # Set project
 echo -e "${YELLOW}📋 Setting up Google Cloud project...${NC}"
@@ -29,24 +38,129 @@ gcloud config set project ${PROJECT_ID}
 echo -e "${YELLOW}🔧 Enabling required APIs...${NC}"
 gcloud services enable cloudbuild.googleapis.com run.googleapis.com artifactregistry.googleapis.com --quiet 2>/dev/null || true
 
-# Build and deploy using Cloud Build
-echo -e "${YELLOW}🏗️ Building and deploying with Cloud Build...${NC}"
-gcloud builds submit --tag us-central1-docker.pkg.dev/${PROJECT_ID}/${SERVICE_NAME}/${SERVICE_NAME}:${ENVIRONMENT} .
+if [ "$SINGLE_REGION" = "true" ]; then
+    # Single region deployment (original logic)
+    echo -e "${YELLOW}🏗️ Building and deploying to single region...${NC}"
+    gcloud builds submit --tag ${PRIMARY_REGION}-docker.pkg.dev/${PROJECT_ID}/${SERVICE_NAME}/${SERVICE_NAME}:${ENVIRONMENT} .
 
-# Deploy to Cloud Run
-echo -e "${GREEN}🚀 Deploying to Cloud Run...${NC}"
-gcloud run deploy ${SERVICE_NAME} \
-    --image us-central1-docker.pkg.dev/${PROJECT_ID}/${SERVICE_NAME}/${SERVICE_NAME}:${ENVIRONMENT} \
-    --region ${PRIMARY_REGION} \
-    --platform managed \
-    --allow-unauthenticated \
-    --memory 2Gi \
-    --cpu 2 \
-    --max-instances 50 \
-    --min-instances 1 \
-    --concurrency 80 \
-    --set-env-vars "GOOGLE_CLOUD_PROJECT_ID=${PROJECT_ID},ENVIRONMENT=${ENVIRONMENT},MAX_CONCURRENT_PROCESSING=60,RATE_LIMIT_REQUESTS=40,MAX_DIRECT_PROCESSING=15,GEMINI_REGIONS=us-central1 us-east1 europe-west1 asia-southeast1" \
-    --quiet
+    # Deploy to Cloud Run
+    echo -e "${GREEN}🚀 Deploying to Cloud Run (${PRIMARY_REGION})...${NC}"
+    gcloud run deploy ${SERVICE_NAME} \
+        --image ${PRIMARY_REGION}-docker.pkg.dev/${PROJECT_ID}/${SERVICE_NAME}/${SERVICE_NAME}:${ENVIRONMENT} \
+        --region ${PRIMARY_REGION} \
+        --platform managed \
+        --allow-unauthenticated \
+        --memory 2Gi \
+        --cpu 2 \
+        --max-instances 50 \
+        --min-instances 1 \
+        --concurrency 80 \
+        --set-env-vars "GOOGLE_CLOUD_PROJECT_ID=${PROJECT_ID},ENVIRONMENT=${ENVIRONMENT},MAX_CONCURRENT_PROCESSING=60,RATE_LIMIT_REQUESTS=40,MAX_DIRECT_PROCESSING=15,GEMINI_REGIONS=${PRIMARY_REGION}" \
+        --quiet
+else
+    # Multi-region deployment - build once, deploy to all regions
+    echo -e "${YELLOW}🏗️ Building Docker image...${NC}"
+    gcloud builds submit --tag ${PRIMARY_REGION}-docker.pkg.dev/${PROJECT_ID}/${SERVICE_NAME}/${SERVICE_NAME}:${ENVIRONMENT} .
+
+    # Deploy to primary region
+    echo -e "${GREEN}🚀 Deploying to Primary Region (${PRIMARY_REGION})...${NC}"
+    GEMINI_REGIONS_FORMATTED="${PRIMARY_REGION} ${SECONDARY_REGIONS//,/ }"
+    
+    # Deploy API service
+    echo -e "${BLUE}Deploying API service to ${PRIMARY_REGION}...${NC}"
+    gcloud run deploy ${SERVICE_NAME} \
+        --image ${PRIMARY_REGION}-docker.pkg.dev/${PROJECT_ID}/${SERVICE_NAME}/${SERVICE_NAME}:${ENVIRONMENT} \
+        --region ${PRIMARY_REGION} \
+        --platform managed \
+        --allow-unauthenticated \
+        --memory 4Gi \
+        --cpu 4 \
+        --max-instances 50 \
+        --min-instances 1 \
+        --concurrency 80 \
+        --timeout 900 \
+        --cpu-throttling \
+        --execution-environment gen2 \
+        --set-env-vars "GOOGLE_CLOUD_PROJECT_ID=${PROJECT_ID},ENVIRONMENT=${ENVIRONMENT},MAX_CONCURRENT_PROCESSING=60,RATE_LIMIT_REQUESTS=40,MAX_DIRECT_PROCESSING=15,GEMINI_REGIONS=${GEMINI_REGIONS_FORMATTED},CLOUD_RUN_REGION=${PRIMARY_REGION}" \
+        --set-secrets "SCRAPECREATORS_API_KEY=scrapecreators-api-key:latest" \
+        --quiet
+
+    # Deploy Worker service
+    echo -e "${BLUE}Deploying Worker service to ${PRIMARY_REGION}...${NC}"
+    gcloud run deploy ${SERVICE_NAME}-worker \
+        --image ${PRIMARY_REGION}-docker.pkg.dev/${PROJECT_ID}/${SERVICE_NAME}/${SERVICE_NAME}:${ENVIRONMENT} \
+        --region ${PRIMARY_REGION} \
+        --platform managed \
+        --allow-unauthenticated \
+        --memory 2Gi \
+        --cpu 2 \
+        --max-instances 10 \
+        --min-instances 1 \
+        --concurrency 1 \
+        --timeout 3600 \
+        --cpu-throttling \
+        --execution-environment gen2 \
+        --set-env-vars "GOOGLE_CLOUD_PROJECT_ID=${PROJECT_ID},ENVIRONMENT=${ENVIRONMENT},CLOUD_RUN_REGION=${PRIMARY_REGION}" \
+        --set-secrets "SCRAPECREATORS_API_KEY=scrapecreators-api-key:latest" \
+        --quiet
+
+    # Deploy to secondary regions
+    echo -e "${GREEN}🌍 Deploying to Secondary Regions...${NC}"
+    IFS=',' read -ra REGIONS <<< "${SECONDARY_REGIONS}"
+    for region in "${REGIONS[@]}"; do
+        region=$(echo $region | xargs)  # trim whitespace
+        echo -e "${BLUE}Deploying to ${region}...${NC}"
+        
+        # Deploy API service
+        echo -e "${BLUE}Deploying API service to ${region}...${NC}"
+        gcloud run deploy ${SERVICE_NAME} \
+            --image ${PRIMARY_REGION}-docker.pkg.dev/${PROJECT_ID}/${SERVICE_NAME}/${SERVICE_NAME}:${ENVIRONMENT} \
+            --region $region \
+            --platform managed \
+            --allow-unauthenticated \
+            --memory 4Gi \
+            --cpu 4 \
+            --max-instances 50 \
+            --min-instances 0 \
+            --concurrency 80 \
+            --timeout 900 \
+            --cpu-throttling \
+            --execution-environment gen2 \
+            --set-env-vars "GOOGLE_CLOUD_PROJECT_ID=${PROJECT_ID},ENVIRONMENT=${ENVIRONMENT},MAX_CONCURRENT_PROCESSING=60,RATE_LIMIT_REQUESTS=40,MAX_DIRECT_PROCESSING=15,GEMINI_REGIONS=${GEMINI_REGIONS_FORMATTED},CLOUD_RUN_REGION=$region" \
+            --set-secrets "SCRAPECREATORS_API_KEY=scrapecreators-api-key:latest" \
+            --quiet || {
+                echo -e "${YELLOW}Warning: Failed to deploy API to ${region}, continuing...${NC}"
+            }
+
+        # Deploy Worker service
+        echo -e "${BLUE}Deploying Worker service to ${region}...${NC}"
+        gcloud run deploy ${SERVICE_NAME}-worker \
+            --image ${PRIMARY_REGION}-docker.pkg.dev/${PROJECT_ID}/${SERVICE_NAME}/${SERVICE_NAME}:${ENVIRONMENT} \
+            --region $region \
+            --platform managed \
+            --allow-unauthenticated \
+            --memory 2Gi \
+            --cpu 2 \
+            --max-instances 10 \
+            --min-instances 0 \
+            --concurrency 1 \
+            --timeout 3600 \
+            --cpu-throttling \
+            --execution-environment gen2 \
+            --set-env-vars "GOOGLE_CLOUD_PROJECT_ID=${PROJECT_ID},ENVIRONMENT=${ENVIRONMENT},CLOUD_RUN_REGION=$region" \
+            --set-secrets "SCRAPECREATORS_API_KEY=scrapecreators-api-key:latest" \
+            --quiet || {
+                echo -e "${YELLOW}Warning: Failed to deploy Worker to ${region}, continuing...${NC}"
+            }
+        
+        # Wait a bit between deployments to avoid rate limits
+        sleep 15
+    done
+
+    echo -e "${GREEN}🎯 Setting up Global Load Balancer...${NC}"
+    echo "Note: For a single global endpoint, you'll need to set up a Global Load Balancer"
+    echo "This requires additional configuration. For now, each region has its own endpoint."
+fi
 
 # Get service URL
 SERVICE_URL=$(gcloud run services describe ${SERVICE_NAME} --region=${PRIMARY_REGION} --format='value(status.url)')

@@ -16,16 +16,17 @@ class SecurityConfig:
     def cors_origins(self) -> List[str]:
         """Get CORS origins based on environment"""
         if self.environment == "production":
-            # Production: Mobile apps don't need CORS
-            # Add your web domains here if you have a web version
-            return []
+            # Allow all origins for frontend access
+            # TODO: Restrict to specific domains once frontend domains are known
+            return ["*"]
         else:
-            # Development: Allow localhost for testing
+            # Development: Allow localhost for testing + all origins
             return [
                 "http://localhost:3000",
                 "http://localhost:8080", 
                 "http://127.0.0.1:3000",
-                "http://127.0.0.1:8080"
+                "http://127.0.0.1:8080",
+                "*"  # Allow all origins for development
             ]
     
     @property
@@ -45,24 +46,24 @@ class SecurityConfig:
     @property
     def rate_limits(self) -> Dict[str, Dict[str, Any]]:
         """Rate limiting configuration per endpoint"""
-        # Standard rate limits - 15 requests per minute per user as requested
+        # Much more generous rate limits for normal usage
         base_limits = {
             "/process": {
-                "user_limit": 15,       # 15 requests per authenticated user per minute
-                "ip_limit_auth": 25,    # 25 requests per IP for authenticated users
-                "ip_limit_unauth": 8,   # 8 requests per IP for unauthenticated
+                "user_limit": 100,      # 100 requests per authenticated user per minute
+                "ip_limit_auth": 200,   # 200 requests per IP for authenticated users
+                "ip_limit_unauth": 50,  # 50 requests per IP for unauthenticated
                 "window": 60            # 1 minute window
             },
             "/admin": {
-                "user_limit": 30,      # 30 requests per user for admin endpoints
-                "ip_limit_auth": 50,
-                "ip_limit_unauth": 15,
+                "user_limit": 200,     # 200 requests per user for admin endpoints
+                "ip_limit_auth": 300,
+                "ip_limit_unauth": 100,
                 "window": 60
             },
             "default": {
-                "user_limit": 20,      # 20 requests per user for other endpoints
-                "ip_limit_auth": 35,
-                "ip_limit_unauth": 12,
+                "user_limit": 150,     # 150 requests per user for other endpoints
+                "ip_limit_auth": 250,
+                "ip_limit_unauth": 75,
                 "window": 60
             }
         }
@@ -78,12 +79,12 @@ class SecurityConfig:
     
     @property
     def threat_detection(self) -> Dict[str, Dict[str, int]]:
-        """Threat detection thresholds"""
+        """Threat detection thresholds - much more lax, only block real attacks"""
         return {
-            "rapid_failures": {"threshold": 10, "window": 300},  # 10 failures in 5 min
-            "path_traversal": {"threshold": 3, "window": 3600},   # 3 attempts in 1 hour
-            "bot_behavior": {"threshold": 20, "window": 3600},    # 20 bot requests in 1 hour
-            "endpoint_probing": {"threshold": 5, "window": 300},  # 5 404s in 5 min
+            "rapid_failures": {"threshold": 100, "window": 300},  # 100 failures in 5 min
+            "path_traversal": {"threshold": 20, "window": 3600},   # 20 attempts in 1 hour
+            "bot_behavior": {"threshold": 500, "window": 3600},    # 500 bot requests in 1 hour
+            "endpoint_probing": {"threshold": 50, "window": 300},  # 50 404s in 5 min
         }
     
     @property

@@ -36,7 +36,47 @@
         },
         {
           "fieldPath": "created_at",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "processing_queue",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "url",
           "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "localization",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "created_at",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "processing_queue",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "url",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "localization",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "created_at",
+          "order": "DESCENDING"
         }
       ]
     }

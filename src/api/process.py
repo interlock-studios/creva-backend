@@ -33,7 +33,7 @@ genai_service = GenAIService()
 video_processor = VideoProcessor()
 
 # Configuration
-MAX_DIRECT_PROCESSING = int(os.getenv("MAX_DIRECT_PROCESSING", "5"))
+MAX_DIRECT_PROCESSING = int(os.getenv("MAX_DIRECT_PROCESSING", "15"))
 active_direct_processing = 0
 
 
@@ -85,12 +85,9 @@ async def process_video_direct(url: str, request_id: str, localization: str = No
             # Handle regular video content
             logger.info(f"Processing regular video - Request ID: {request_id}")
 
-            # Remove audio
-            silent_video = await video_processor.remove_audio(video_content)
-
-            # Analyze with Gemini
+            # Analyze with Gemini (no audio removal needed)
             workout_json = await genai_service.analyze_video_with_transcript(
-                silent_video, transcript, caption, localization
+                video_content, transcript, caption, localization
             )
 
         if not workout_json:

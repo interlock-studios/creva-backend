@@ -1,6 +1,6 @@
 # Cloud Build configuration with multi-region deployment and performance optimizations
 substitutions:
-  _SERVICE_NAME: workout-parser
+  _SERVICE_NAME: workout-parser-v2
   _PRIMARY_REGION: us-central1
   _SECONDARY_REGIONS: us-east1,europe-west1,asia-southeast1
   _ENVIRONMENT: production

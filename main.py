@@ -13,7 +13,7 @@ from collections import defaultdict
 import threading
 import asyncio
 from google.cloud import monitoring_v3
-from src.services.genai_service_pool import cleanup_genai_service_pool
+# GenAI service pool cleanup not needed
 from src.api.process import cleanup_processing_resources
 
 # Import API routers
@@ -56,9 +56,6 @@ async def lifespan(app: FastAPI):
     # Shutdown - cleanup resources
     logger.info("Application shutdown initiated")
     try:
-        # Cleanup GenAI service pool
-        await cleanup_genai_service_pool()
-        
         # Cleanup processing resources
         await cleanup_processing_resources()
         
@@ -99,12 +96,12 @@ if not os.getenv("DISABLE_HOST_CHECK", "").lower() == "true":
 else:
     logger.warning("Host checking disabled via DISABLE_HOST_CHECK environment variable")
 
-# CORS middleware - Mobile-friendly configuration
+# CORS middleware - Allow frontend access
 app.add_middleware(
     CORSMiddleware,
     allow_origins=security_config.cors_origins,
-    allow_credentials=True,
-    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_credentials=False,  # Set to False when using wildcard origins
+    allow_methods=["GET", "POST", "OPTIONS", "PUT", "DELETE"],
     allow_headers=[
         "X-Firebase-AppCheck",
         "Content-Type", 
@@ -113,6 +110,9 @@ app.add_middleware(
         "Origin",
         "User-Agent",
         "X-Requested-With",
+        "Access-Control-Allow-Origin",
+        "Access-Control-Allow-Methods",
+        "Access-Control-Allow-Headers",
     ],
 )
 
