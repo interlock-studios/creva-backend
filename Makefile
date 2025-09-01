@@ -387,12 +387,12 @@ benchmark: ## Run performance benchmarks against deployed API
 status: ## Show deployment status across all regions
 	@echo "$(GREEN)Deployment Status:$(NC)"
 	@echo "$(YELLOW)Primary Region: $(PRIMARY_REGION)$(NC)"
-	@gcloud run services list --filter="metadata.name=$(SERVICE_NAME)" --format="table(metadata.name,status.url,metadata.labels.cloud\.googleapis\.com/location,status.conditions[0].status)" --regions=$(PRIMARY_REGION) || echo "No services found in primary region"
+	@gcloud run services list --filter="metadata.name=$(SERVICE_NAME)" --format="table(metadata.name,status.url,status.conditions[0].status)" --region=$(PRIMARY_REGION) || echo "No services found in primary region"
 	@echo "$(YELLOW)Secondary Regions: $(SECONDARY_REGIONS)$(NC)"
 	@IFS=',' read -ra REGIONS <<< "$(SECONDARY_REGIONS)"; \
 	for region in "$${REGIONS[@]}"; do \
 		region=$$(echo $$region | xargs); \
-		gcloud run services list --filter="metadata.name=$(SERVICE_NAME)" --format="table(metadata.name,status.url,metadata.labels.cloud\.googleapis\.com/location,status.conditions[0].status)" --regions=$$region 2>/dev/null || echo "No services found in $$region"; \
+		gcloud run services list --filter="metadata.name=$(SERVICE_NAME)" --format="table(metadata.name,status.url,status.conditions[0].status)" --region=$$region 2>/dev/null || echo "No services found in $$region"; \
 	done
 
 # Default target

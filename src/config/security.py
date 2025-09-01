@@ -33,11 +33,12 @@ class SecurityConfig:
     def trusted_hosts(self) -> List[str]:
         """Get trusted hosts based on environment"""
         if self.environment == "production":
-            # Cloud Run domains for production
+            # Cloud Run domains for production + custom domain
             return [
                 "*.run.app",
                 "*.a.run.app",
-                "workout-parser-v2-341666880405.us-central1.run.app"
+                "workout-parser-v2-341666880405.us-central1.run.app",
+                "api.setsai.app"
             ]
         else:
             # Development: Allow all for testing
