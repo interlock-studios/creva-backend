@@ -150,17 +150,17 @@ deploy: ## Deploy to production (multi-region)
 	@echo "$(GREEN)Deploying to production (multi-region)...$(NC)"
 	@echo "$(YELLOW)Primary region: $(PRIMARY_REGION)$(NC)"
 	@echo "$(YELLOW)Secondary regions: $(SECONDARY_REGIONS)$(NC)"
-	@ENVIRONMENT=production PRIMARY_REGION=$(PRIMARY_REGION) SECONDARY_REGIONS=$(SECONDARY_REGIONS) ./deploy.sh
+	@ENVIRONMENT=production PRIMARY_REGION=$(PRIMARY_REGION) SECONDARY_REGIONS=$(SECONDARY_REGIONS) ./scripts/deployment/deploy.sh
 
 .PHONY: deploy-staging
 deploy-staging: ## Deploy to staging
 	@echo "$(GREEN)Deploying to staging...$(NC)"
-	@ENVIRONMENT=staging PRIMARY_REGION=$(PRIMARY_REGION) ./deploy.sh
+	@ENVIRONMENT=staging PRIMARY_REGION=$(PRIMARY_REGION) ./scripts/deployment/deploy.sh
 
 .PHONY: deploy-single-region
 deploy-single-region: ## Deploy to single region only
 	@echo "$(GREEN)Deploying to single region: $(PRIMARY_REGION)...$(NC)"
-	@ENVIRONMENT=production SINGLE_REGION=true ./deploy.sh
+	@ENVIRONMENT=production SINGLE_REGION=true ./scripts/deployment/deploy.sh
 
 .PHONY: logs
 logs: ## View Cloud Run logs from primary region
@@ -315,6 +315,54 @@ setup-firestore: ## Setup Firestore database and indexes
 	@chmod +x scripts/deploy_indexes.sh
 	@./scripts/deploy_indexes.sh
 	@echo "$(GREEN)Firestore setup complete$(NC)"
+
+.PHONY: setup-load-balancer
+setup-load-balancer: ## Setup Global HTTPS Load Balancer with setsai.app domain
+	@echo "$(GREEN)Setting up Global HTTPS Load Balancer with setsai.app domain...$(NC)"
+	@chmod +x scripts/setup/setup-global-lb-custom-domain.sh
+	@./scripts/setup/setup-global-lb-custom-domain.sh
+	@echo "$(GREEN)Global Load Balancer setup complete$(NC)"
+
+.PHONY: add-custom-domain
+add-custom-domain: ## Add setsai.app domain to existing load balancer
+	@echo "$(GREEN)Adding setsai.app domain to load balancer...$(NC)"
+	@chmod +x scripts/setup/add-domain-later.sh
+	@./scripts/setup/add-domain-later.sh api.setsai.app
+
+.PHONY: deploy-full
+deploy-full: ## Deploy to all regions AND setup global load balancer with setsai.app
+	@echo "$(GREEN)Full deployment: Multi-region + Global Load Balancer + setsai.app...$(NC)"
+	@echo "$(YELLOW)Step 1: Deploying to all regions...$(NC)"
+	@$(MAKE) deploy
+	@echo "$(YELLOW)Step 2: Setting up Global Load Balancer with setsai.app...$(NC)"
+	@$(MAKE) setup-load-balancer
+	@echo "$(GREEN)✅ Full deployment complete!$(NC)"
+	@echo "$(BLUE)🌐 Your API is now available at: https://api.setsai.app$(NC)"
+	@echo "$(BLUE)🔒 HTTPS load balancing across all regions$(NC)"
+
+.PHONY: status-lb
+status-lb: ## Show Global Load Balancer status and setsai.app domain info
+	@echo "$(GREEN)Global Load Balancer Status:$(NC)"
+	@echo "$(YELLOW)Backend Service:$(NC)"
+	@gcloud compute backend-services describe workout-parser-backend --global --format="table(name,backends[].group:label=BACKENDS,protocol,loadBalancingScheme)" 2>/dev/null || echo "Backend service not found"
+	@echo "$(YELLOW)URL Map:$(NC)"
+	@gcloud compute url-maps describe workout-parser-url-map --global --format="table(name,defaultService)" 2>/dev/null || echo "URL map not found"
+	@echo "$(YELLOW)Global IP:$(NC)"
+	@gcloud compute forwarding-rules describe workout-parser-forwarding-rule --global --format="value(IPAddress)" 2>/dev/null || echo "Forwarding rule not found"
+	@echo "$(YELLOW)SSL Certificates (setsai.app):$(NC)"
+	@gcloud compute ssl-certificates list --filter="name~setsai" --format="table(name,domains,managed.status)" 2>/dev/null || echo "No SSL certificates found"
+	@echo "$(YELLOW)Domain Status:$(NC)"
+	@echo "Expected domain: api.setsai.app"
+	@GLOBAL_IP=$$(gcloud compute forwarding-rules describe workout-parser-forwarding-rule --global --format="value(IPAddress)" 2>/dev/null); \
+	if [ ! -z "$$GLOBAL_IP" ]; then \
+		echo "Load balancer IP: $$GLOBAL_IP"; \
+		RESOLVED_IP=$$(dig +short api.setsai.app | tail -n1); \
+		if [ "$$RESOLVED_IP" = "$$GLOBAL_IP" ]; then \
+			echo "✅ DNS correctly configured"; \
+		else \
+			echo "❌ DNS mismatch - Resolved: $$RESOLVED_IP, Expected: $$GLOBAL_IP"; \
+		fi; \
+	fi
 
 .PHONY: validate
 validate: lint security test ## Run all validation checks

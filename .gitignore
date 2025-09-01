@@ -24,3 +24,13 @@ Thumbs.db
 
 # Logs
 *.log
+deployment.log
+
+# Coverage reports
+coverage.xml
+htmlcov/
+.coverage
+
+# Test artifacts
+.pytest_cache/
+.tox/
