@@ -13,7 +13,7 @@ NC='\033[0m' # No Color
 SERVICE_NAME="${SERVICE_NAME:-workout-parser-v2}"
 PROJECT_ID="${PROJECT_ID:-sets-ai}"
 PRIMARY_REGION="${PRIMARY_REGION:-us-central1}"
-SECONDARY_REGIONS="${SECONDARY_REGIONS:-us-east1,europe-west1,asia-southeast1}"
+SECONDARY_REGIONS="${SECONDARY_REGIONS:-us-east1,us-west1,europe-west1,europe-west4,europe-north1,asia-southeast1,asia-northeast1,asia-south1,australia-southeast1,southamerica-east1}"
 ENVIRONMENT="${ENVIRONMENT:-production}"
 SINGLE_REGION="${SINGLE_REGION:-false}"
 

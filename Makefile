@@ -5,7 +5,7 @@
 PROJECT_ID := sets-ai
 SERVICE_NAME := workout-parser-v2
 PRIMARY_REGION := us-central1
-SECONDARY_REGIONS := us-east1,europe-west1,asia-southeast1
+SECONDARY_REGIONS := us-east1,us-west1,europe-west1,europe-west4,europe-north1,asia-southeast1,asia-northeast1,asia-south1,australia-southeast1,southamerica-east1
 PYTHON := python3.11
 VENV := .venv
 PORT := 8080
@@ -339,6 +339,17 @@ deploy-full: ## Deploy to all regions AND setup global load balancer with setsai
 	@echo "$(GREEN)✅ Full deployment complete!$(NC)"
 	@echo "$(BLUE)🌐 Your API is now available at: https://api.setsai.app$(NC)"
 	@echo "$(BLUE)🔒 HTTPS load balancing across all regions$(NC)"
+
+.PHONY: deploy-global
+deploy-global: ## Deploy to MAXIMUM global regions (11 regions total!)
+	@echo "$(GREEN)🌍 MASSIVE Global Deployment: 11 regions worldwide!$(NC)"
+	@echo "$(YELLOW)Primary region (warm): $(PRIMARY_REGION)$(NC)"
+	@echo "$(YELLOW)Secondary regions (scale-to-zero): $(SECONDARY_REGIONS)$(NC)"
+	@echo "$(BLUE)💰 Cost: ~$15/month (only primary region costs money)$(NC)"
+	@echo "$(BLUE)🚀 Coverage: North America, South America, Europe, Asia, Australia$(NC)"
+	@$(MAKE) deploy
+	@echo "$(GREEN)✅ Global deployment complete!$(NC)"
+	@echo "$(BLUE)🌐 Your API is now deployed in 11 regions worldwide!$(NC)"
 
 .PHONY: status-lb
 status-lb: ## Show Global Load Balancer status and setsai.app domain info

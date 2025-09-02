@@ -1,6 +1,6 @@
 {
   "displayName": "🛡️ Sets AI - Global Security & Performance Dashboard",
-  "etag": "7be816f85e390c0cc35b47eca4b01d40",
+  "etag": "f95bbf8b0e7dc79061c173df34c65aad",
   "mosaicLayout": {
     "columns": 48,
     "tiles": [
@@ -317,8 +317,8 @@
             }
           }
         },
-        "width": 16,
-        "yPos": 44
+        "width": 24,
+        "yPos": 60
       },
       {
         "height": 16,
@@ -488,8 +488,8 @@
             }
           }
         },
-        "width": 24,
-        "yPos": 60
+        "width": 16,
+        "yPos": 44
       },
       {
         "height": 16,
