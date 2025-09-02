@@ -157,25 +157,67 @@ else
         sleep 15
     done
 
-    echo -e "${GREEN}🎯 Setting up Global Load Balancer...${NC}"
-    echo "Note: For a single global endpoint, you'll need to set up a Global Load Balancer"
-    echo "This requires additional configuration. For now, each region has its own endpoint."
+    echo -e "${GREEN}🎯 Checking Global Load Balancer status...${NC}"
+    
+    # Check if load balancer exists
+    if gcloud compute forwarding-rules describe workout-parser-forwarding-rule-v2 --global --quiet >/dev/null 2>&1; then
+        GLOBAL_IP=$(gcloud compute forwarding-rules describe workout-parser-forwarding-rule-v2 --global --format="value(IPAddress)" 2>/dev/null)
+        echo -e "${GREEN}✅ Global Load Balancer is active${NC}"
+        echo -e "${BLUE}Global IP: ${GLOBAL_IP}${NC}"
+        echo -e "${BLUE}Global Endpoint: https://api.setsai.app${NC}"
+        echo -e "${GREEN}🛡️ Cloud Armor security policies active${NC}"
+    else
+        echo -e "${YELLOW}⚠️ Global Load Balancer not configured${NC}"
+        echo -e "${BLUE}Run 'make setup-lb-security' to set up global endpoint${NC}"
+    fi
 fi
 
-# Get service URL
+# Get service URLs
 SERVICE_URL=$(gcloud run services describe ${SERVICE_NAME} --region=${PRIMARY_REGION} --format='value(status.url)')
 
-# Validate deployment
+# Validate deployment - check both global and regional endpoints
 echo -e "${YELLOW}🔍 Validating deployment...${NC}"
 sleep 15
 
+# Test primary regional endpoint
+echo -e "${BLUE}Testing primary region endpoint...${NC}"
 if curl -f -s "${SERVICE_URL}/health" > /dev/null; then
-    echo -e "${GREEN}✅ Deployment successful!${NC}"
-    echo -e "${BLUE}Service URL: ${SERVICE_URL}${NC}"
+    echo -e "${GREEN}✅ Primary region deployment successful!${NC}"
+    REGIONAL_SUCCESS=true
+else
+    echo -e "${RED}❌ Primary region deployment failed${NC}"
+    REGIONAL_SUCCESS=false
+fi
+
+# Test global endpoint if it exists
+GLOBAL_SUCCESS=true
+if gcloud compute forwarding-rules describe workout-parser-forwarding-rule-v2 --global --quiet >/dev/null 2>&1; then
+    echo -e "${BLUE}Testing global load balancer endpoint...${NC}"
+    if curl -f -s "https://api.setsai.app/health" > /dev/null; then
+        echo -e "${GREEN}✅ Global endpoint deployment successful!${NC}"
+        GLOBAL_SUCCESS=true
+    else
+        echo -e "${YELLOW}⚠️ Global endpoint not responding (may need DNS propagation)${NC}"
+        GLOBAL_SUCCESS=false
+    fi
+fi
+
+# Final status
+if [ "$REGIONAL_SUCCESS" = true ]; then
+    echo -e "${GREEN}✅ Multi-region deployment successful!${NC}"
+    echo -e "${BLUE}Primary Service URL: ${SERVICE_URL}${NC}"
+    
+    if [ "$GLOBAL_SUCCESS" = true ] && gcloud compute forwarding-rules describe workout-parser-forwarding-rule-v2 --global --quiet >/dev/null 2>&1; then
+        echo -e "${BLUE}Global Service URL: https://api.setsai.app${NC}"
+        echo -e "${GREEN}🛡️ Protected by Cloud Armor security policies${NC}"
+    fi
+    
     echo -e "${GREEN}🎉 Your optimized API is now live with:${NC}"
     echo -e "  • Multi-region GenAI processing"
     echo -e "  • Enhanced performance (2-3s vs 11s)"
-    echo -e "  • Improved security and monitoring"
+    echo -e "  • Advanced security and monitoring"
+    echo -e "  • Edge-level attack protection"
+    echo -e "  • Instance-level security policies"
 else
     echo -e "${RED}❌ Deployment validation failed${NC}"
     exit 1

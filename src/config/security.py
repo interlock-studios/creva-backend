@@ -47,23 +47,23 @@ class SecurityConfig:
     @property
     def rate_limits(self) -> Dict[str, Dict[str, Any]]:
         """Rate limiting configuration per endpoint"""
-        # Much more generous rate limits for normal usage
+        # Enhanced rate limits to match Cloud Armor policies
         base_limits = {
             "/process": {
                 "user_limit": 100,      # 100 requests per authenticated user per minute
-                "ip_limit_auth": 200,   # 200 requests per IP for authenticated users
+                "ip_limit_auth": 300,   # 300 requests per IP for authenticated users (matches Cloud Armor)
                 "ip_limit_unauth": 50,  # 50 requests per IP for unauthenticated
                 "window": 60            # 1 minute window
             },
             "/admin": {
                 "user_limit": 200,     # 200 requests per user for admin endpoints
-                "ip_limit_auth": 300,
+                "ip_limit_auth": 400,   # Higher for admin endpoints
                 "ip_limit_unauth": 100,
                 "window": 60
             },
             "default": {
                 "user_limit": 150,     # 150 requests per user for other endpoints
-                "ip_limit_auth": 250,
+                "ip_limit_auth": 500,   # 500 requests per IP (matches Cloud Armor DDoS protection)
                 "ip_limit_unauth": 75,
                 "window": 60
             }

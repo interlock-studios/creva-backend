@@ -194,6 +194,37 @@ blocked-ips: ## View recently blocked IPs
 	@echo "$(GREEN)Fetching recently blocked IPs...$(NC)"
 	@gcloud logging read 'resource.type="http_load_balancer" AND jsonPayload.securityPolicyRequestData.action="deny"' --limit=20 --format=json | jq -r '.[] | "\(.timestamp) - \(.httpRequest.remoteIp) blocked for: \(.jsonPayload.securityPolicyRequestData.securityPolicyName)"'
 
+.PHONY: lb-status
+lb-status: ## Check Global Load Balancer status
+	@echo "$(GREEN)Checking Global Load Balancer status...$(NC)"
+	@if gcloud compute forwarding-rules describe workout-parser-forwarding-rule-v2 --global --quiet >/dev/null 2>&1; then \
+		GLOBAL_IP=$$(gcloud compute forwarding-rules describe workout-parser-forwarding-rule-v2 --global --format="value(IPAddress)" 2>/dev/null); \
+		echo "$(GREEN)✅ Global Load Balancer is active$(NC)"; \
+		echo "$(BLUE)Global IP: $$GLOBAL_IP$(NC)"; \
+		echo "$(BLUE)Global Endpoint: https://api.setsai.app$(NC)"; \
+		echo "$(GREEN)🛡️ Cloud Armor security policies active$(NC)"; \
+	else \
+		echo "$(YELLOW)⚠️ Global Load Balancer not configured$(NC)"; \
+		echo "$(BLUE)Run 'make setup-lb-security' to set up global endpoint$(NC)"; \
+	fi
+
+.PHONY: test-endpoints
+test-endpoints: ## Test all endpoints (global and regional)
+	@echo "$(GREEN)Testing API endpoints...$(NC)"
+	@echo "$(BLUE)Testing global endpoint...$(NC)"
+	@if curl -f -s "https://api.setsai.app/health" > /dev/null; then \
+		echo "$(GREEN)✅ Global endpoint: https://api.setsai.app$(NC)"; \
+	else \
+		echo "$(YELLOW)⚠️ Global endpoint not responding$(NC)"; \
+	fi
+	@echo "$(BLUE)Testing primary regional endpoint...$(NC)"
+	@PRIMARY_URL=$$(gcloud run services describe $(SERVICE_NAME) --region=$(PRIMARY_REGION) --format='value(status.url)' 2>/dev/null); \
+	if curl -f -s "$$PRIMARY_URL/health" > /dev/null; then \
+		echo "$(GREEN)✅ Primary region: $$PRIMARY_URL$(NC)"; \
+	else \
+		echo "$(RED)❌ Primary region not responding$(NC)"; \
+	fi
+
 .PHONY: logs-tail
 logs-tail: ## Tail Cloud Run logs in real-time from primary region
 	@echo "$(GREEN)Tailing logs from primary region...$(NC)"

@@ -58,8 +58,8 @@ class ThreatDetector:
                     "user_agent": user_agent
                 })
         
-        # Detect path traversal attempts
-        suspicious_paths = ["../", "..\\", "/etc/", "/proc/", "/sys/", "passwd", "shadow"]
+        # Detect path traversal attempts and common attack patterns
+        suspicious_paths = ["../", "..\\", "/etc/", "/proc/", "/sys/", "passwd", "shadow", "/.git", "/.env", "/admin", "/wp-admin", "/phpmyadmin", "/config", "/.well-known"]
         if any(pattern in path.lower() for pattern in suspicious_paths):
             self.suspicious_patterns[f"traversal_{ip}"] += 1
             self._log_security_event("path_traversal", ip, {
@@ -67,7 +67,22 @@ class ThreatDetector:
                 "attempt_count": self.suspicious_patterns[f"traversal_{ip}"]
             })
             
-            if self.suspicious_patterns[f"traversal_{ip}"] >= self.attack_patterns["path_traversal"]["threshold"]:
+            # Log obvious attack patterns but don't immediately block IP (allow legitimate access)
+            if any(obvious_attack in path.lower() for obvious_attack in ["/.git", "/.env", "/wp-admin", "/phpmyadmin"]):
+                self._log_security_event("attack_pattern_detected", ip, {
+                    "reason": "obvious_attack_pattern",
+                    "attempted_path": path,
+                    "note": "logged_but_not_blocked"
+                })
+                # Only block IP after multiple obvious attacks (5+ in 10 minutes)
+                self.suspicious_patterns[f"obvious_attacks_{ip}"] += 1
+                if self.suspicious_patterns[f"obvious_attacks_{ip}"] >= 5:
+                    self.blocked_ips.add(ip)
+                    self._log_security_event("ip_blocked_multiple_attacks", ip, {
+                        "attack_count": self.suspicious_patterns[f"obvious_attacks_{ip}"],
+                        "reason": "multiple_obvious_attacks"
+                    })
+            elif self.suspicious_patterns[f"traversal_{ip}"] >= self.attack_patterns["path_traversal"]["threshold"]:
                 self.blocked_ips.add(ip)
         
         # Detect unusual endpoints (only block on very obvious probing)
@@ -240,9 +255,13 @@ class SecurityMiddleware(BaseHTTPMiddleware):
         
         ip = self.rate_limiter._get_client_ip(request)
         
-        # Check if IP is blocked
-        if self.threat_detector.is_blocked(ip):
-            logger.warning(f"Blocked request from {ip}")
+        # Allow legitimate paths without blocking (but still log attacks)
+        legitimate_paths = ["/", "/health", "/docs", "/redoc", "/openapi.json", "/process", "/status", "/admin"]
+        is_legitimate_path = any(request.url.path.startswith(path) for path in legitimate_paths)
+        
+        # Check if IP is blocked (but allow legitimate paths even from blocked IPs for now)
+        if self.threat_detector.is_blocked(ip) and not is_legitimate_path:
+            logger.warning(f"Blocked request from {ip} to {request.url.path}")
             return JSONResponse(
                 status_code=403,
                 content={"error": "Access denied", "detail": "IP address blocked due to suspicious activity"}
