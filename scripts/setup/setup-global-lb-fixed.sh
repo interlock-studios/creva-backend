@@ -29,6 +29,50 @@ gcloud compute backend-services create $BACKEND_SERVICE_NAME \
     --protocol=HTTP \
     --project=$PROJECT_ID || echo "Backend service already exists"
 
+# 2.1. Setup SAFE Cloud Armor security policy
+echo -e "${YELLOW}🛡️ Setting up SAFE Cloud Armor security policy...${NC}"
+SECURITY_POLICY_NAME="workout-parser-security-policy-safe"
+
+# Create security policy if it doesn't exist
+gcloud compute security-policies create $SECURITY_POLICY_NAME \
+    --description "Security policy for workout parser API" \
+    --project=$PROJECT_ID 2>/dev/null || echo "Security policy already exists"
+
+# Add SAFE DDoS protection (higher than app limits)
+gcloud compute security-policies rules create 1000 \
+    --security-policy=$SECURITY_POLICY_NAME \
+    --expression "true" \
+    --action "rate-based-ban" \
+    --rate-limit-threshold-count=500 \
+    --rate-limit-threshold-interval-sec=60 \
+    --ban-duration-sec=300 \
+    --conform-action=allow \
+    --exceed-action=deny-429 \
+    --enforce-on-key=IP \
+    --project=$PROJECT_ID 2>/dev/null || echo "DDoS rule already exists"
+
+# Add SQL injection protection
+gcloud compute security-policies rules create 3000 \
+    --security-policy=$SECURITY_POLICY_NAME \
+    --expression "evaluatePreconfiguredExpr('sqli-stable')" \
+    --action=deny-403 \
+    --description="Block SQL injection attempts" \
+    --project=$PROJECT_ID 2>/dev/null || echo "SQL injection rule already exists"
+
+# Add default allow rule
+gcloud compute security-policies rules create 2147483647 \
+    --security-policy=$SECURITY_POLICY_NAME \
+    --expression "true" \
+    --action=allow \
+    --description="Default allow rule" \
+    --project=$PROJECT_ID 2>/dev/null || echo "Default rule already exists"
+
+# Attach security policy to backend service
+gcloud compute backend-services update $BACKEND_SERVICE_NAME \
+    --global \
+    --security-policy=$SECURITY_POLICY_NAME \
+    --project=$PROJECT_ID || echo "Security policy already attached"
+
 # 3. Add regional backends (NEGs already exist)
 echo -e "${YELLOW}🌎 Adding regional backends...${NC}"
 REGIONS=("us-central1" "us-east1" "europe-west1" "asia-southeast1")

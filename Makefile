@@ -162,6 +162,18 @@ deploy-single-region: ## Deploy to single region only
 	@echo "$(GREEN)Deploying to single region: $(PRIMARY_REGION)...$(NC)"
 	@ENVIRONMENT=production SINGLE_REGION=true ./scripts/deployment/deploy.sh
 
+.PHONY: setup-security
+setup-security: ## Setup SAFE Cloud Armor security policies (user-friendly)
+	@echo "$(GREEN)Setting up SAFE Cloud Armor security policies...$(NC)"
+	@chmod +x ./scripts/setup/setup-cloud-armor-safe.sh
+	@./scripts/setup/setup-cloud-armor-safe.sh
+
+.PHONY: setup-lb-security
+setup-lb-security: ## Setup load balancer with security policies
+	@echo "$(GREEN)Setting up secure load balancer...$(NC)"
+	@chmod +x ./scripts/setup/setup-global-lb-fixed.sh
+	@./scripts/setup/setup-global-lb-fixed.sh
+
 .PHONY: logs
 logs: ## View Cloud Run logs from primary region
 	@echo "$(GREEN)Fetching logs from primary region...$(NC)"
@@ -171,6 +183,16 @@ logs: ## View Cloud Run logs from primary region
 logs-all-regions: ## View Cloud Run logs from all regions
 	@echo "$(GREEN)Fetching logs from all regions...$(NC)"
 	@gcloud logging read "resource.type=cloud_run_revision AND resource.labels.service_name=$(SERVICE_NAME)" --limit=100 --format=json | jq -r '.[] | "\(.timestamp) [\(.severity)] [\(.resource.labels.location)] \(.jsonPayload.message // .textPayload)"'
+
+.PHONY: security-logs
+security-logs: ## View Cloud Armor security logs
+	@echo "$(GREEN)Fetching Cloud Armor security logs...$(NC)"
+	@gcloud logging read 'resource.type="http_load_balancer" AND jsonPayload.securityPolicyRequestData.securityPolicy="workout-parser-security-policy-safe"' --limit=50 --format=json | jq -r '.[] | "\(.timestamp) [\(.severity)] \(.jsonPayload.securityPolicyRequestData.action) - \(.httpRequest.remoteIp) \(.httpRequest.requestUrl)"'
+
+.PHONY: blocked-ips
+blocked-ips: ## View recently blocked IPs
+	@echo "$(GREEN)Fetching recently blocked IPs...$(NC)"
+	@gcloud logging read 'resource.type="http_load_balancer" AND jsonPayload.securityPolicyRequestData.action="deny"' --limit=20 --format=json | jq -r '.[] | "\(.timestamp) - \(.httpRequest.remoteIp) blocked for: \(.jsonPayload.securityPolicyRequestData.securityPolicyName)"'
 
 .PHONY: logs-tail
 logs-tail: ## Tail Cloud Run logs in real-time from primary region
