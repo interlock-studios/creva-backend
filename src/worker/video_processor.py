@@ -175,3 +175,102 @@ class VideoProcessor:
                 raise VideoProcessingError(message=f"Video processing failed: {str(e)}", cause=e)
 
         # Temp files automatically cleaned up by context managers
+
+    async def extract_first_frame(self, video_content: bytes) -> bytes:
+        """Extract first frame from video as JPEG
+
+        Args:
+            video_content: Raw video bytes
+
+        Returns:
+            JPEG bytes of the first frame
+
+        Raises:
+            VideoProcessingError: If frame extraction fails
+        """
+        with self.temp_file(suffix=".mp4") as input_path, self.temp_file(
+            suffix=".jpg"
+        ) as output_path:
+
+            # Write input video
+            try:
+                with open(input_path, "wb") as f:
+                    f.write(video_content)
+            except IOError as e:
+                logger.error(f"Failed to write input video file: {e}")
+                raise VideoProcessingError(message=f"Failed to write video content: {e}", cause=e)
+
+            # Extract first frame using ffmpeg
+            try:
+                (
+                    ffmpeg.input(input_path)
+                    .output(
+                        output_path,
+                        vframes=1,  # Extract only 1 frame
+                        f="image2",  # Force image output format
+                        vcodec="mjpeg",  # Use JPEG codec
+                    )
+                    .overwrite_output()
+                    .run(capture_stdout=True, capture_stderr=True)
+                )
+
+                # Read the extracted frame
+                try:
+                    with open(output_path, "rb") as f:
+                        frame_data = f.read()
+
+                    if not frame_data:
+                        raise VideoFormatError(
+                            message="FFmpeg produced empty frame file",
+                            format_info="Empty output after frame extraction",
+                        )
+
+                    logger.debug(f"Successfully extracted first frame: {len(frame_data)} bytes")
+                    return frame_data
+
+                except IOError as e:
+                    logger.error(f"Failed to read extracted frame file: {e}")
+                    raise VideoProcessingError(
+                        message=f"Failed to read extracted frame: {e}", cause=e
+                    )
+
+            except ffmpeg.Error as e:
+                stderr_output = e.stderr.decode() if e.stderr else "No error details"
+                logger.error(f"FFmpeg frame extraction failed: {stderr_output}")
+                raise VideoFormatError(
+                    message=f"Frame extraction failed: {stderr_output}",
+                    format_info="FFmpeg frame extraction error",
+                    cause=e,
+                )
+            except Exception as e:
+                logger.error(f"Unexpected error during frame extraction: {e}")
+                raise VideoProcessingError(message=f"Frame extraction failed: {str(e)}", cause=e)
+
+    async def extract_image_from_slideshow(self, images: list[bytes], index: int = 0) -> bytes:
+        """Extract a specific image from slideshow
+
+        Args:
+            images: List of image bytes from slideshow
+            index: Index of image to extract (default: 0 for first image)
+
+        Returns:
+            JPEG bytes of the requested image
+
+        Raises:
+            VideoProcessingError: If image extraction fails
+            IndexError: If index is out of bounds
+        """
+        if not images:
+            raise VideoProcessingError(message="No images provided in slideshow")
+
+        if index < 0 or index >= len(images):
+            raise IndexError(f"Image index {index} out of bounds (0-{len(images)-1})")
+
+        # Return the requested image directly (already in bytes format)
+        image_data = images[index]
+
+        if not image_data:
+            raise VideoProcessingError(message=f"Image at index {index} is empty")
+
+        logger.debug(f"Extracted image {index} from slideshow: {len(image_data)} bytes")
+        return image_data

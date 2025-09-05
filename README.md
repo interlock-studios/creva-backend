@@ -1,28 +1,28 @@
-# Social Media Workout Parser
+# Zest - Relationship Content Parser
 
-**Turn any TikTok or Instagram workout video into structured JSON data in seconds!**
+**Extract meaningful relationship and lifestyle content from TikTok and Instagram posts with AI-powered analysis!**
 
-Send a TikTok or Instagram URL → Get back structured workout data with exercises, sets, reps, and instructions.
+Send a TikTok or Instagram URL → Get back structured content data with title, description, image, and location.
 
 ## 🚀 Try It Now
 
-**Live API:** https://workout-parser-ty6tkvdynq-uc.a.run.app
+**Live API:** https://zest-parser-xxx.run.app (Update with your deployment URL)
 
 ```bash
 # TikTok Example
-curl -X POST "https://workout-parser-ty6tkvdynq-uc.a.run.app/process" \
+curl -X POST "https://zest-parser-xxx.run.app/process" \
   -H "Content-Type: application/json" \
-  -d '{"url": "https://www.tiktok.com/@lastairbender222/video/7518493301046119710"}'
+  -d '{"url": "https://www.tiktok.com/@relationshipcoach/video/1234567890"}'
 
 # Instagram Example  
-curl -X POST "https://workout-parser-ty6tkvdynq-uc.a.run.app/process" \
+curl -X POST "https://zest-parser-xxx.run.app/process" \
   -H "Content-Type: application/json" \
-  -d '{"url": "https://www.instagram.com/reel/CS7CshJjb15/"}'
+  -d '{"url": "https://www.instagram.com/reel/ABC123XYZ/"}'
 
-# With Localization (NEW!)
-curl -X POST "https://workout-parser-ty6tkvdynq-uc.a.run.app/process" \
+# With Localization
+curl -X POST "https://zest-parser-xxx.run.app/process" \
   -H "Content-Type: application/json" \
-  -d '{"url": "https://www.tiktok.com/@lastairbender222/video/7518493301046119710", "localization": "Spanish"}'
+  -d '{"url": "https://www.tiktok.com/@datenight/video/9876543210", "localization": "Spanish"}'
 ```
 
 ## 🎯 How It Works
@@ -30,25 +30,29 @@ curl -X POST "https://workout-parser-ty6tkvdynq-uc.a.run.app/process" \
 ### Simple Flow
 1. **Send TikTok/Instagram URL** → API receives your request
 2. **Detect Platform** → Automatically routes to appropriate scraper
-3. **Check Cache** → If we've seen this video before, instant result!
-4. **Process Video** → Download video, extract transcript/caption, analyze with AI
-5. **Return Data** → Get structured workout JSON
+3. **Check Cache** → If we've seen this content before, instant result!
+4. **Process Content** → Download video/post, extract captions, analyze with AI
+5. **Return Data** → Get structured relationship content JSON
 
 ### Three Response Types
 
-#### 1. Cached (Instant - 90% of popular videos)
+#### 1. Cached (Instant - 90% of popular content)
 ```json
 {
-  "title": "Full Body HIIT Workout",
-  "workout_type": "hiit",
-  "duration_minutes": 15,
-  "exercises": [
-    {
-      "name": "Burpees",
-      "sets": [{"reps": 15, "rest_seconds": 30}],
-      "instructions": "Start standing, drop to plank, jump back up"
-    }
-  ]
+  "title": "5 Perfect Date Night Ideas",
+  "description": "Creative and romantic date ideas for couples",
+  "image": "https://example.com/image.jpg",
+  "location": "New York, NY",
+  "content_type": "date_idea",
+  "mood": "romantic",
+  "occasion": "date_night",
+  "tips": [
+    "Plan a picnic in Central Park",
+    "Visit a rooftop restaurant at sunset",
+    "Take a couples cooking class"
+  ],
+  "tags": ["datenight", "romance", "couples"],
+  "creator": "@relationshipcoach"
 }
 ```
 
@@ -66,7 +70,7 @@ Same JSON as above, but takes 10-15 seconds to process.
 
 Then check status:
 ```bash
-curl "https://workout-parser-ty6tkvdynq-uc.a.run.app/status/req123_1234567890"
+curl "https://zest-parser-xxx.run.app/status/req123_1234567890"
 ```
 
 ## 🏗️ Technical Overview
@@ -75,11 +79,11 @@ curl "https://workout-parser-ty6tkvdynq-uc.a.run.app/status/req123_1234567890"
 - **FastAPI** - Main API service
 - **Cloud Run** - Serverless hosting (auto-scales)
 - **Firestore** - Queue system and caching
-- **Worker Service** - Background video processing
-- **Google Gemini AI** - Video analysis
+- **Worker Service** - Background content processing
+- **Google Gemini AI** - Content analysis
 
 ### Smart Processing
-- **Cache First** - Popular videos return instantly
+- **Cache First** - Popular content returns instantly
 - **Direct Mode** - Process immediately when not busy
 - **Queue Mode** - Background processing when at capacity
 - **Auto-Scale** - Handles 1 user or 10,000 users
@@ -95,7 +99,7 @@ curl "https://workout-parser-ty6tkvdynq-uc.a.run.app/status/req123_1234567890"
 ```bash
 # 1. Clone and setup
 git clone <repo-url>
-cd sets-ai-backend
+cd zest-backend
 make setup
 
 # 2. Add your API key to .env file
@@ -110,7 +114,7 @@ That's it! API runs on http://localhost:8080
 
 ### What `make dev` starts:
 - **API Service** (port 8080) - Handles requests, checks cache
-- **Worker Service** (port 8081) - Processes videos in background
+- **Worker Service** (port 8081) - Processes content in background
 
 ## 🛠️ Development Commands
 
@@ -128,27 +132,22 @@ make deploy       # Deploy to production
 ## 📡 API Endpoints
 
 ### `POST /process`
-Process a TikTok or Instagram video
+Process a TikTok or Instagram post/video
 
 **Parameters:**
-- `url` (required): TikTok or Instagram video URL
+- `url` (required): TikTok or Instagram URL
 - `localization` (optional): Language for response text (e.g., "Spanish", "French", "es", "fr")
 
 ```bash
 # Basic usage
 curl -X POST http://localhost:8080/process \
   -H "Content-Type: application/json" \
-  -d '{"url": "https://www.tiktok.com/@lastairbender222/video/7518493301046119710"}'
+  -d '{"url": "https://www.tiktok.com/@user/video/123"}'
 
 # With Spanish localization
 curl -X POST http://localhost:8080/process \
   -H "Content-Type: application/json" \
-  -d '{"url": "https://www.tiktok.com/@lastairbender222/video/7518493301046119710", "localization": "Spanish"}'
-
-# With language code
-curl -X POST http://localhost:8080/process \
-  -H "Content-Type: application/json" \
-  -d '{"url": "https://www.instagram.com/reel/ABC123/", "localization": "fr"}'
+  -d '{"url": "https://www.tiktok.com/@user/video/123", "localization": "Spanish"}'
 ```
 
 ### `GET /status/{job_id}`
@@ -165,7 +164,7 @@ curl http://localhost:8080/health
 
 ## 🌍 Localization Support
 
-The API now supports **optional localization** to get workout responses in different languages!
+The API supports **optional localization** to get content in different languages!
 
 ### How to Use Localization
 
@@ -186,25 +185,24 @@ Simply add the `localization` parameter to your request:
 ### What Gets Localized
 
 When you specify a localization, the following fields are translated:
-- ✅ **title** - Workout title
-- ✅ **description** - Workout description  
-- ✅ **exercise names** - Names of exercises
-- ✅ **instructions** - Exercise instructions
+- ✅ **title** - Content title
+- ✅ **description** - Content description  
+- ✅ **tips** - Extracted tips or advice
+- ✅ **location** - Location information
 - ❌ **JSON structure** - Stays the same
-- ❌ **workout_type** - Stays in English (for consistency)
-- ❌ **muscle_groups** - Stays in English (for consistency)
+- ❌ **content_type** - Stays in English (for consistency)
+- ❌ **mood/occasion** - Stays in English (for consistency)
 
 ### Example Responses
 
 **English (default):**
 ```json
 {
-  "title": "Full Body HIIT Workout",
-  "exercises": [
-    {
-      "name": "Burpees", 
-      "instructions": "Start standing, drop to plank, jump back up"
-    }
+  "title": "5 Perfect Date Night Ideas",
+  "description": "Creative date ideas for couples",
+  "tips": [
+    "Plan a romantic picnic",
+    "Try a cooking class together"
   ]
 }
 ```
@@ -212,12 +210,11 @@ When you specify a localization, the following fields are translated:
 **Spanish (`"localization": "Spanish"`):**
 ```json
 {
-  "title": "Entrenamiento HIIT de Cuerpo Completo",
-  "exercises": [
-    {
-      "name": "Burpees",
-      "instructions": "Comienza de pie, baja a plancha, salta hacia arriba"
-    }
+  "title": "5 Ideas Perfectas para una Noche de Cita",
+  "description": "Ideas creativas de citas para parejas",
+  "tips": [
+    "Planea un picnic romántico",
+    "Prueben una clase de cocina juntos"
   ]
 }
 ```
@@ -234,14 +231,13 @@ When you specify a localization, the following fields are translated:
 6. **If Low Traffic** → Process directly (10-15 seconds)
 7. **If High Traffic** → Add to queue, return job_id
 
-### Background Processing (for queued videos):
+### Background Processing (for queued content):
 1. **Worker picks up job** from Firestore queue
-2. **Download video** using platform-specific scraper (TikTok/Instagram)
-3. **Extract metadata** - transcript from TikTok, caption from Instagram
-4. **Remove audio** with ffmpeg (faster AI processing)
-5. **Analyze with Gemini AI** (video + transcript/caption)
-6. **Store result** in cache and results collection
-7. **Update job status** to completed
+2. **Download content** using platform-specific scraper
+3. **Extract metadata** - captions, descriptions, location tags
+4. **Analyze with Gemini AI** - Extract relationship/lifestyle content
+5. **Store result** in cache and results collection
+6. **Update job status** to completed
 
 ### Smart Features:
 - **Multi-region AI** - Uses multiple Google Cloud regions
@@ -260,14 +256,12 @@ make create-secrets
 make deploy
 ```
 
-Your API will be live at: `https://workout-parser-xxx.run.app`
+Your API will be live at: `https://zest-parser-xxx.run.app`
 
 ## 📊 Monitoring & Analytics
 
-### **🚀 Sets AI Analytics Dashboard**
-Monitor your production deployment with our comprehensive analytics dashboard:
-
-**[📈 Live Monitoring Dashboard](https://console.cloud.google.com/monitoring/dashboards/builder/30243d62-f048-4ab4-b684-35395428c310;duration=P1D?project=sets-ai&inv=1&invt=Ab51dQ&pageState=(%22eventTypes%22:(%22selected%22:%5B%22CLOUD_ALERTING_ALERT%22,%22CLOUD_RUN_DEPLOYMENT%22%5D))**
+### **🚀 Zest Analytics Dashboard**
+Monitor your production deployment with our comprehensive analytics dashboard.
 
 ### What You Can Monitor:
 - **🔥 Real-time API Performance** - Request rates, response times, error rates
@@ -278,23 +272,6 @@ Monitor your production deployment with our comprehensive analytics dashboard:
 - **🌍 Geographic Distribution** - Where your users are coming from
 - **📊 Business Metrics** - Daily/weekly/monthly usage trends
 - **🚨 Alerts & Incidents** - Get notified of any issues immediately
-
-### Key Metrics Tracked:
-- **API Health**: Uptime, response times, error rates
-- **Processing Pipeline**: Video download success rates, AI analysis performance
-- **Resource Usage**: CPU, memory, and storage utilization
-- **Cost Optimization**: Track spending and optimize resource allocation
-- **User Experience**: End-to-end request latency and success rates
-
-### Setting Up Alerts:
-The dashboard includes pre-configured alerts for:
-- High error rates (>5%)
-- Slow response times (>30s)
-- Queue backlog buildup
-- GenAI rate limit hits
-- Service downtime
-
-**💡 Pro Tip**: Bookmark the dashboard and check it regularly to understand your usage patterns and optimize performance!
 
 ## 🔍 Troubleshooting
 
@@ -320,7 +297,7 @@ make setup-firestore
 # Or click the link in the error message
 ```
 
-**Videos stuck in "pending" status**
+**Content stuck in "pending" status**
 ```bash
 # Check if worker is running
 curl http://localhost:8081/health
@@ -335,17 +312,17 @@ make dev-force
 - **After free tier** - ~$0.40 per million requests
 
 ### Typical Monthly Costs
-- **Personal use** (< 1,000 videos): $0-5
-- **Small business** (10,000 videos): $10-30
-- **High volume** (100,000 videos): $50-150
+- **Personal use** (< 1,000 posts): $0-5
+- **Small business** (10,000 posts): $10-30
+- **High volume** (100,000 posts): $50-150
 
 ## 🏆 What Makes This Special
 
-- **Smart Caching** - Popular videos are instant
+- **Smart Caching** - Popular content is instant
 - **Hybrid Processing** - Fast when quiet, scalable when busy
 - **Production Ready** - Handles failures, retries, monitoring
 - **Cost Efficient** - Only pay for what you use
-- **Proprietary Technology** - Advanced AI-powered video analysis
+- **AI-Powered** - Advanced content analysis with Gemini 2.0
 
 ## 👨‍💻 For Developers
 
@@ -389,10 +366,14 @@ make security
 curl http://localhost:8080/health    # API health
 curl http://localhost:8081/health    # Worker health
 
-# Test video processing (use real TikTok or Instagram URLs)
+# Test content processing (use real TikTok or Instagram URLs)
 curl -X POST http://localhost:8080/process \
   -H "Content-Type: application/json" \
   -d '{"url": "https://www.tiktok.com/@lastairbender222/video/7518493301046119710"}'
+
+curl -X POST http://localhost:8080/process \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://www.instagram.com/p/DN-69RUAD2F"}'
 
 # Test Instagram processing
 curl -X POST http://localhost:8080/process \
@@ -512,7 +493,7 @@ curl -X GET "https://api.scrapecreators.com/health"  # If available
 
 ### Project Structure
 ```
-sets-ai-backend/
+zest-backend/
 ├── main.py                     # Main FastAPI application
 ├── src/
 │   ├── services/              # Core business logic services
@@ -528,7 +509,8 @@ sets-ai-backend/
 │   │   ├── worker_service.py      # Main worker process (Cloud Run service)
 │   │   └── video_processor.py     # Video processing pipeline (both platforms)
 │   └── models/                # Data structures
-│       └── parser_result.py       # Workout JSON schema
+│       └── parser_result.py       # Result JSON schema
+│       └── responses.py           # Response schemas
 ├── requirements.txt           # Python dependencies
 ├── requirements-dev.txt       # Development dependencies
 ├── Dockerfile                # Container configuration
@@ -582,4 +564,4 @@ LOG_LEVEL=INFO          # DEBUG|INFO|WARNING|ERROR
 
 **⚠️ Proprietary Software Notice**
 
-This software is proprietary and confidential. All rights reserved. This codebase contains trade secrets and proprietary technology for AI-powered video analysis. Unauthorized copying, distribution, or reverse engineering is prohibited.
+This software is proprietary and confidential. All rights reserved. This codebase contains trade secrets and proprietary technology for AI-powered content analysis. Unauthorized copying, distribution, or reverse engineering is prohibited.

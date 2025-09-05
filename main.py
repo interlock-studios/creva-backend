@@ -13,6 +13,7 @@ from collections import defaultdict
 import threading
 import asyncio
 from google.cloud import monitoring_v3
+
 # GenAI service pool cleanup not needed
 from src.api.process import cleanup_processing_resources
 
@@ -65,9 +66,9 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="Social Media Workout Parser - AI Powered (Optimized)",
+    title="Zest - Relationship Content Parser",
     version="2.0.0",
-    description="High-performance workout video parser with multi-region AI processing, connection pooling, and advanced caching",
+    description="Extract relationship and lifestyle content from TikTok and Instagram posts with AI-powered analysis",
     docs_url="/docs" if environment != "production" else None,
     redoc_url="/redoc" if environment != "production" else None,
     lifespan=lifespan,

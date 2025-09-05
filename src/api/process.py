@@ -8,6 +8,7 @@ import asyncio
 import time
 import os
 import logging
+import base64
 from dotenv import load_dotenv
 
 # Load environment variables before importing services
@@ -15,7 +16,7 @@ load_dotenv()
 
 from src.utils.logging import StructuredLogger, set_request_context
 from src.models.requests import ProcessRequest
-from src.models.responses import WorkoutData, QueuedResponse
+from src.models.responses import RelationshipContent, QueuedResponse
 from src.services.cache_service import CacheService
 from src.services.queue_service import QueueService
 from src.services.genai_service import GenAIService
@@ -58,6 +59,7 @@ async def process_video_direct(url: str, request_id: str, localization: str = No
         is_slideshow = metadata.get("is_slideshow", False)
         caption = metadata.get("caption", "") or metadata.get("description", "")
         transcript = metadata.get("transcript_text")
+        extracted_image_base64 = None
 
         if is_slideshow:
             # Handle slideshow content
@@ -75,8 +77,27 @@ async def process_video_direct(url: str, request_id: str, localization: str = No
                 if slideshow_transcript:
                     transcript = slideshow_transcript
 
+                # Extract first image from slideshow
+                if slideshow_images:
+                    try:
+                        logger.info(
+                            f"Attempting to extract first slideshow image - Request ID: {request_id}, Image count: {len(slideshow_images)}"
+                        )
+                        first_image = await video_processor.extract_image_from_slideshow(
+                            slideshow_images
+                        )
+                        extracted_image_base64 = f"data:image/jpeg;base64,{base64.b64encode(first_image).decode('utf-8')}"
+                        logger.info(
+                            f"Successfully extracted first slideshow image - Request ID: {request_id}, Image size: {len(first_image)} bytes"
+                        )
+                    except Exception as e:
+                        logger.error(
+                            f"Failed to extract slideshow image - Request ID: {request_id}, Error: {e}",
+                            exc_info=True,
+                        )
+
                 # Analyze slideshow with Gemini
-                workout_json = await genai_service.analyze_slideshow_with_transcript(
+                content_json = await genai_service.analyze_slideshow_with_transcript(
                     slideshow_images, transcript, caption, localization
                 )
             else:
@@ -85,32 +106,69 @@ async def process_video_direct(url: str, request_id: str, localization: str = No
             # Handle regular video content
             logger.info(f"Processing regular video - Request ID: {request_id}")
 
+            # Extract first frame from video
+            try:
+                logger.info(
+                    f"Attempting to extract first frame - Request ID: {request_id}, Video size: {len(video_content)} bytes"
+                )
+                first_frame = await video_processor.extract_first_frame(video_content)
+                extracted_image_base64 = (
+                    f"data:image/jpeg;base64,{base64.b64encode(first_frame).decode('utf-8')}"
+                )
+                logger.info(
+                    f"Successfully extracted first frame - Request ID: {request_id}, Frame size: {len(first_frame)} bytes"
+                )
+            except Exception as e:
+                logger.error(
+                    f"Failed to extract video frame - Request ID: {request_id}, Error: {e}",
+                    exc_info=True,
+                )
+
             # Analyze with Gemini (no audio removal needed)
-            workout_json = await genai_service.analyze_video_with_transcript(
+            content_json = await genai_service.analyze_video_with_transcript(
                 video_content, transcript, caption, localization
             )
 
-        if not workout_json:
+        if not content_json:
             raise ProcessingError(
-                message="Could not extract workout information from video",
+                message="Could not extract content information from video",
                 operation="genai_analysis",
             )
 
+        # Log what Gemini returned for the image field
+        logger.info(
+            f"Gemini returned image field: {content_json.get('image', 'NOT_SET')} - Request ID: {request_id}"
+        )
+
+        # Override the image field with the extracted frame/image if available
+        if extracted_image_base64:
+            content_json["image"] = extracted_image_base64
+            logger.info(
+                f"Added extracted image to response - Request ID: {request_id}, Image data length: {len(extracted_image_base64)}"
+            )
+        else:
+            logger.warning(f"No extracted image available to add - Request ID: {request_id}")
+
+        # Log final image field value
+        logger.info(
+            f"Final image field value (first 100 chars): {str(content_json.get('image', 'NULL'))[:100]} - Request ID: {request_id}"
+        )
+
         # Cache the result
-        await cache_service.cache_workout(url, workout_json, localization=localization)
+        await cache_service.cache_workout(url, content_json, localization=localization)
 
         logger.info(f"Direct processing completed - Request ID: {request_id}")
-        return workout_json
+        return content_json
 
     finally:
         # Always decrement counter
         active_direct_processing -= 1
 
 
-@router.post("/process", response_model=Union[WorkoutData, QueuedResponse])
+@router.post("/process", response_model=Union[RelationshipContent, QueuedResponse])
 async def process_video(
     request: ProcessRequest, req: Request, appcheck_claims: dict = Depends(optional_appcheck_token)
-) -> Union[WorkoutData, QueuedResponse]:
+) -> Union[RelationshipContent, QueuedResponse]:
     """Hybrid processing: try direct first, fall back to queue if busy"""
 
     request_id = getattr(req.state, "request_id", "unknown")
@@ -130,7 +188,7 @@ async def process_video(
     cached_workout = await cache_service.get_cached_workout(request.url, request.localization)
     if cached_workout:
         logger.info(f"Returning cached result - Request ID: {request_id}, URL: {request.url}")
-        return WorkoutData(**cached_workout)
+        return RelationshipContent(**cached_workout)
 
     # Check if already in queue (with localization)
     existing_job = await queue_service.get_job_by_url(request.url, status="pending", localization=request.localization)
@@ -167,7 +225,7 @@ async def process_video(
                 process_video_direct(request.url, request_id, request.localization),
                 timeout=30.0,  # 30 second timeout for direct processing
             )
-            return WorkoutData(**result)
+            return RelationshipContent(**result)
         except asyncio.TimeoutError:
             logger.warning(
                 f"Direct processing timeout - Request ID: {request_id}, falling back to queue"

@@ -37,8 +37,7 @@ class SecurityConfig:
             return [
                 "*.run.app",
                 "*.a.run.app",
-                "workout-parser-v2-341666880405.us-central1.run.app",
-                "api.setsai.app"
+                "api.zestai.app",
             ]
         else:
             # Development: Allow all for testing

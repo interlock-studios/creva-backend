@@ -1,9 +1,9 @@
-# TikTok Workout Parser V2 - Makefile
+# Zest - Relationship Content Parser - Makefile
 # Standardized commands for development and deployment
 
 # Variables
-PROJECT_ID := sets-ai
-SERVICE_NAME := workout-parser-v2
+PROJECT_ID := zest-45e51
+SERVICE_NAME := zest-parser
 PRIMARY_REGION := us-central1
 SECONDARY_REGIONS := us-east1,europe-west1,asia-southeast1
 PYTHON := python3.11
@@ -19,7 +19,7 @@ NC := \033[0m # No Color
 
 .PHONY: help
 help: ## Display this help message
-	@echo "$(GREEN)TikTok Workout Parser V2 - Available Commands$(NC)"
+	@echo "$(GREEN)Zest - Relationship Content Parser - Available Commands$(NC)"
 	@echo ""
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "$(YELLOW)%-20s$(NC) %s\n", $$1, $$2}'
 

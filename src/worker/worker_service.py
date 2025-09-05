@@ -7,6 +7,7 @@ import os
 import asyncio
 import logging
 import time
+import base64
 from datetime import datetime
 from contextlib import asynccontextmanager
 from dotenv import load_dotenv
@@ -94,6 +95,7 @@ class VideoWorker:
             # Extract transcript from metadata
             transcript = metadata_dict.get("transcript_text")
             caption = metadata_dict.get("caption", "") or metadata_dict.get("description", "")
+            extracted_image_base64 = None
 
             if transcript:
                 logger.info(f"Job {job_id} - Got transcript/caption: {len(transcript)} characters")
@@ -118,6 +120,17 @@ class VideoWorker:
                     if slideshow_transcript:
                         transcript = slideshow_transcript
 
+                    # Extract first image from slideshow
+                    if slideshow_images:
+                        try:
+                            first_image = await self.video_processor.extract_image_from_slideshow(
+                                slideshow_images
+                            )
+                            extracted_image_base64 = f"data:image/jpeg;base64,{base64.b64encode(first_image).decode('utf-8')}"
+                            logger.info(f"Job {job_id} - Extracted first image from slideshow")
+                        except Exception as e:
+                            logger.warning(f"Job {job_id} - Failed to extract slideshow image: {e}")
+
                     # Analyze slideshow with GenAI
                     logger.info(f"Job {job_id} - Analyzing slideshow with AI...")
                     workout_json = await self.genai_pool.analyze_slideshow(
@@ -131,6 +144,16 @@ class VideoWorker:
                 # Handle regular video content
                 logger.info(f"Job {job_id} - Processing regular video")
 
+                # Extract first frame from video
+                try:
+                    first_frame = await self.video_processor.extract_first_frame(video_content)
+                    extracted_image_base64 = (
+                        f"data:image/jpeg;base64,{base64.b64encode(first_frame).decode('utf-8')}"
+                    )
+                    logger.info(f"Job {job_id} - Extracted first frame from video")
+                except Exception as e:
+                    logger.warning(f"Job {job_id} - Failed to extract video frame: {e}")
+
                 # 2. Analyze with Gemini (no audio removal needed)
                 logger.info(f"Job {job_id} - Analyzing video with AI...")
                 workout_json = await self.genai_pool.analyze_video(
@@ -139,6 +162,10 @@ class VideoWorker:
 
             if not workout_json:
                 raise Exception("Could not extract workout information from video")
+
+            # Override the image field with the extracted frame/image if available
+            if extracted_image_base64:
+                workout_json["image"] = extracted_image_base64
 
             # 5. Cache the result
             cache_metadata = {

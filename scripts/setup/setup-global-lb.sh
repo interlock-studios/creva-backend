@@ -6,7 +6,7 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m'
 
-PROJECT_ID="sets-ai"
+PROJECT_ID="zest-45e51"
 LB_NAME="workout-parser-global-lb"
 BACKEND_SERVICE_NAME="workout-parser-backend"
 URL_MAP_NAME="workout-parser-url-map"

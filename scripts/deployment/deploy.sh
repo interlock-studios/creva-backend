@@ -11,7 +11,7 @@ NC='\033[0m' # No Color
 
 # Configuration
 SERVICE_NAME="${SERVICE_NAME:-workout-parser-v2}"
-PROJECT_ID="${PROJECT_ID:-sets-ai}"
+PROJECT_ID="${PROJECT_ID:-zest-45e51}"
 PRIMARY_REGION="${PRIMARY_REGION:-us-central1}"
 SECONDARY_REGIONS="${SECONDARY_REGIONS:-us-east1,europe-west1,asia-southeast1}"
 ENVIRONMENT="${ENVIRONMENT:-production}"

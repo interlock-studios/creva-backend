@@ -4,7 +4,7 @@
 # Usage: ./add-domain-later.sh your-domain.com
 
 DOMAIN=$1
-PROJECT_ID="sets-ai"
+PROJECT_ID="zest-45e51"
 
 if [ -z "$DOMAIN" ]; then
     echo "Usage: ./add-domain-later.sh your-domain.com"

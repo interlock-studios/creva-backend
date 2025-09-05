@@ -227,3 +227,218 @@ async def test_remove_audio_file_write_error():
         
         with pytest.raises(Exception, match="Failed to write video content"):
             await processor.remove_audio(test_video_content)
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_extract_first_frame_success():
+    """Test successful frame extraction from video"""
+    processor = VideoProcessor()
+    test_video_content = b"fake video content"
+    extracted_frame = b"fake jpeg frame data"
+    
+    # Mock the temp_file context manager properly
+    with patch.object(processor, 'temp_file') as mock_temp_file:
+        # Create proper context manager mocks
+        mock_input_cm = Mock()
+        mock_input_cm.__enter__ = Mock(return_value='/tmp/input.mp4')
+        mock_input_cm.__exit__ = Mock(return_value=None)
+        
+        mock_output_cm = Mock()
+        mock_output_cm.__enter__ = Mock(return_value='/tmp/output.jpg')
+        mock_output_cm.__exit__ = Mock(return_value=None)
+        
+        # Configure temp_file to return different context managers for each call
+        mock_temp_file.side_effect = [mock_input_cm, mock_output_cm]
+        
+        # Mock file operations and ffmpeg
+        with patch('builtins.open', create=True) as mock_open, \
+             patch('ffmpeg.input') as mock_input, \
+             patch('ffmpeg.output') as mock_output:
+            
+            # Mock file read/write operations
+            mock_file = Mock()
+            mock_open.return_value.__enter__.return_value = mock_file
+            mock_file.read.return_value = extracted_frame
+            mock_file.write = Mock()  # Mock write operation
+            
+            # Mock ffmpeg pipeline
+            mock_stream = Mock()
+            mock_input.return_value = mock_stream
+            mock_stream.output = Mock(return_value=mock_stream)
+            mock_stream.overwrite_output = Mock(return_value=mock_stream)
+            mock_stream.run = Mock()
+            
+            result = await processor.extract_first_frame(test_video_content)
+            
+            assert result == extracted_frame
+            
+            # Verify temp files were used
+            assert mock_temp_file.call_count == 2
+            # Verify ffmpeg was configured correctly
+            mock_stream.output.assert_called_once()
+            # Check that vframes=1 was passed
+            call_kwargs = mock_stream.output.call_args[1]
+            assert call_kwargs['vframes'] == 1
+            assert call_kwargs['f'] == 'image2'
+            assert call_kwargs['vcodec'] == 'mjpeg'
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_extract_first_frame_ffmpeg_error():
+    """Test frame extraction with FFmpeg error"""
+    processor = VideoProcessor()
+    test_video_content = b"fake video content"
+    
+    # Mock the temp_file context manager
+    with patch.object(processor, 'temp_file') as mock_temp_file:
+        mock_input_cm = Mock()
+        mock_input_cm.__enter__ = Mock(return_value='/tmp/input.mp4')
+        mock_input_cm.__exit__ = Mock(return_value=None)
+        
+        mock_output_cm = Mock()
+        mock_output_cm.__enter__ = Mock(return_value='/tmp/output.jpg')
+        mock_output_cm.__exit__ = Mock(return_value=None)
+        
+        mock_temp_file.side_effect = [mock_input_cm, mock_output_cm]
+        
+        with patch('builtins.open', create=True) as mock_open, \
+             patch('ffmpeg.input') as mock_input:
+            
+            # Mock file write
+            mock_file = Mock()
+            mock_open.return_value.__enter__.return_value = mock_file
+            mock_file.write = Mock()
+            
+            # Mock FFmpeg error
+            import ffmpeg
+            mock_stream = Mock()
+            mock_input.return_value = mock_stream
+            mock_stream.output.return_value = mock_stream
+            mock_stream.overwrite_output.return_value = mock_stream
+            error = ffmpeg.Error("ffmpeg", "stdout", b"stderr error message")
+            mock_stream.run.side_effect = error
+            
+            from src.exceptions import VideoFormatError
+            with pytest.raises(VideoFormatError, match="Frame extraction failed"):
+                await processor.extract_first_frame(test_video_content)
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_extract_first_frame_empty_output():
+    """Test frame extraction with empty output file"""
+    processor = VideoProcessor()
+    test_video_content = b"fake video content"
+    
+    with patch.object(processor, 'temp_file') as mock_temp_file:
+        mock_input_cm = Mock()
+        mock_input_cm.__enter__ = Mock(return_value='/tmp/input.mp4')
+        mock_input_cm.__exit__ = Mock(return_value=None)
+        
+        mock_output_cm = Mock()
+        mock_output_cm.__enter__ = Mock(return_value='/tmp/output.jpg')
+        mock_output_cm.__exit__ = Mock(return_value=None)
+        
+        mock_temp_file.side_effect = [mock_input_cm, mock_output_cm]
+        
+        with patch('builtins.open', create=True) as mock_open, \
+             patch('ffmpeg.input') as mock_input:
+            
+            # Set up different behavior for write and read
+            mock_write_file = Mock()
+            mock_write_file.write = Mock()
+            
+            mock_read_file = Mock()
+            mock_read_file.read.return_value = b""  # Empty output
+            
+            # Configure mock_open to return different mocks based on mode
+            def open_side_effect(path, mode='r'):
+                if 'w' in mode:
+                    return mock_write_file
+                else:
+                    return mock_read_file
+            
+            mock_open.side_effect = open_side_effect
+            mock_write_file.__enter__ = Mock(return_value=mock_write_file)
+            mock_write_file.__exit__ = Mock(return_value=None)
+            mock_read_file.__enter__ = Mock(return_value=mock_read_file)
+            mock_read_file.__exit__ = Mock(return_value=None)
+            
+            # Mock ffmpeg to run successfully
+            mock_stream = Mock()
+            mock_input.return_value = mock_stream
+            mock_stream.output.return_value = mock_stream
+            mock_stream.overwrite_output.return_value = mock_stream
+            mock_stream.run = Mock()
+            
+            from src.exceptions import VideoProcessingError
+            with pytest.raises(VideoProcessingError, match="Frame extraction failed"):
+                await processor.extract_first_frame(test_video_content)
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_extract_image_from_slideshow_success():
+    """Test successful image extraction from slideshow"""
+    processor = VideoProcessor()
+    
+    mock_images = [
+        b"image1_data",
+        b"image2_data",
+        b"image3_data",
+    ]
+    
+    # Test extracting first image (default)
+    result = await processor.extract_image_from_slideshow(mock_images)
+    assert result == b"image1_data"
+    
+    # Test extracting specific image
+    result = await processor.extract_image_from_slideshow(mock_images, index=1)
+    assert result == b"image2_data"
+    
+    # Test extracting last image
+    result = await processor.extract_image_from_slideshow(mock_images, index=2)
+    assert result == b"image3_data"
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_extract_image_from_slideshow_empty_list():
+    """Test image extraction from empty slideshow"""
+    processor = VideoProcessor()
+    
+    from src.exceptions import VideoProcessingError
+    with pytest.raises(VideoProcessingError, match="No images provided in slideshow"):
+        await processor.extract_image_from_slideshow([])
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_extract_image_from_slideshow_out_of_bounds():
+    """Test image extraction with out of bounds index"""
+    processor = VideoProcessor()
+    
+    mock_images = [b"image1", b"image2"]
+    
+    # Test negative index
+    with pytest.raises(IndexError, match="Image index -1 out of bounds"):
+        await processor.extract_image_from_slideshow(mock_images, index=-1)
+    
+    # Test index too large
+    with pytest.raises(IndexError, match="Image index 5 out of bounds"):
+        await processor.extract_image_from_slideshow(mock_images, index=5)
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_extract_image_from_slideshow_empty_image():
+    """Test image extraction when image data is empty"""
+    processor = VideoProcessor()
+    
+    mock_images = [b"", b"image2"]
+    
+    from src.exceptions import VideoProcessingError
+    with pytest.raises(VideoProcessingError, match="Image at index 0 is empty"):
+        await processor.extract_image_from_slideshow(mock_images, index=0)

@@ -7,7 +7,7 @@ BLUE='\033[0;34m'
 RED='\033[0;31m'
 NC='\033[0m'
 
-PROJECT_ID="sets-ai"
+PROJECT_ID="zest-45e51"
 DOMAIN="api.setsai.app"
 BACKEND_SERVICE_NAME="workout-parser-backend-v2"
 URL_MAP_NAME="workout-parser-url-map-v2"

@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Simple global endpoint using Cloud Run domain mapping
-PROJECT_ID="sets-ai"
+PROJECT_ID="zest-45e51"
 SERVICE_NAME="workout-parser-v2"
 
 echo "🌍 Setting up simple global endpoint..."
