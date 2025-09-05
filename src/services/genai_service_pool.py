@@ -223,13 +223,13 @@ class GenAIService:
         caption: Optional[str] = None,
         localization: Optional[str] = None,
     ) -> Optional[Dict[str, Any]]:
-        """Analyze video with Gemini 2.0 Flash"""
+        """Analyze video/post with Gemini 2.0 Flash for relationship content"""
 
         # Apply rate limiting for this specific service
         await self._rate_limit()
 
         # Build prompt
-        prompt = "You are an expert fitness instructor analyzing a TikTok workout video."
+        prompt = "You are an expert relationship coach and lifestyle content analyst analyzing social media content."
 
         if transcript:
             prompt += f"\n\nTRANSCRIPT:\n{transcript}"
@@ -240,51 +240,36 @@ class GenAIService:
         # Add localization instructions if specified
         localization_instruction = ""
         if localization:
-            localization_instruction = f"\n\nIMPORTANT: Provide ALL text content (title, description, exercise names, instructions, AND equipment names) in {localization} language ONLY. Translate ALL human-readable text fields including equipment names consistently in the specified language. Maintain the exact JSON structure but translate all text to {localization}."
+            localization_instruction = f"\n\nIMPORTANT: Provide ALL text content (title, description, tips, location) in {localization} language ONLY. Translate ALL human-readable text fields consistently in the specified language. Maintain the exact JSON structure but translate all text to {localization}."
 
-        prompt += "\n\nAnalyze this workout video and extract the following information. Return your response as a valid JSON object with NO additional text, explanations, or formatting."
+        prompt += "\n\nAnalyze this social media post/video and extract relationship, dating, or lifestyle content. Return your response as a valid JSON object with NO additional text, explanations, or formatting."
         prompt += localization_instruction
         prompt += """
 
 Required JSON structure:
 {
-  "title": "descriptive workout title",
-  "description": "brief description of the workout or null",
-  "workout_type": "MUST be one of: push, pull, legs, upper body, lower body, full body, strength, cardio, HIIT, hypertrophy, endurance, power, mobility, flexibility",
-  "duration_minutes": estimatedtotal workout duration in minutes (including rest periods) as integer or null,
-  "difficulty_level": integer from 1 to 10 (1=beginner, 10=expert),
-  "exercises": [
-    {
-      "name": "exercise name",
-      "muscle_groups": ["MUST use exact values from: abs, arms, back, biceps, calves, chest, core, forearms, glutes, hamstrings, lats, legs, lower back, obliques, quads, shoulders, traps, triceps"],
-      "equipment": "equipment needed - MUST be translated to the specified language if localization is provided (examples: Barbell, Dumbbells, Kettlebell, Machine, Cable, Bodyweight, Resistance Band, Medicine Ball, Pull-up Bar, Dip Station, None)",
-      "sets": [
-        {
-          "reps": integer or null,
-          "weight_lbs": number or null,
-          "duration_seconds": integer or null,
-          "distance_miles": number or null,
-          "rest_seconds": integer or null (defaults to 90 if not specified)
-        }
-      ],
-      "instructions": "detailed instructions or null"
-    }
-  ],
-  "tags": ["array of relevant tags"] or null,
-  "creator": "creator name or null"
+  "title": "descriptive title for the content",
+  "description": "brief description of the content or null",
+  "image": "main image URL from the post/video or null",
+  "location": "location mentioned or tagged in the content or null",
+  "content_type": "type of content (examples: date_idea, relationship_advice, couples_activity, lifestyle_tip, romantic_gesture, communication_tip, self_care) or null",
+  "mood": "mood or vibe (examples: romantic, fun, adventurous, cozy, intimate, playful, serious, inspiring) or null",
+  "occasion": "relevant occasion (examples: date_night, anniversary, valentine, weekend, vacation, everyday, special_occasion) or null",
+  "tips": ["array of extracted tips or advice points"] or null,
+  "tags": ["array of relevant hashtags or tags"] or null,
+  "creator": "creator username or null"
 }
 
-CRITICAL REQUIREMENTS:
-- Each exercise MUST have at least 1 set
-- Each set MUST include at least ONE measurement (reps, weight_lbs, duration_seconds, or distance_miles)
-- For strength exercises: use reps and optionally weight_lbs
-- For cardio exercises: use duration_seconds or distance_miles
-- For bodyweight exercises: use reps and optionally duration_seconds
-- muscle_groups must use EXACT values from the list above
-- equipment should be descriptive (use common names like those in examples above)
-- workout_type must use EXACT values from the list above
+EXTRACTION GUIDELINES:
+- Focus on relationship, dating, and lifestyle content
+- Extract the main image URL if visible in the video/post
+- Identify any location mentioned in captions, tags, or content
+- Categorize the content type based on the main theme
+- Extract actionable tips or advice if present
+- Identify the mood and occasion if relevant
+- Include relevant hashtags or tags
 
-CRITICAL CONSISTENCY RULE: If localization is specified, ALL text fields (title, description, exercise names, instructions, equipment names) MUST be in the SAME target language consistently throughout the entire response.
+CRITICAL CONSISTENCY RULE: If localization is specified, ALL text fields (title, description, tips, location) MUST be in the SAME target language consistently throughout the entire response.
 
 IMPORTANT: Your response must be ONLY the JSON object, with no markdown formatting, no code blocks, no explanations before or after."""
 
@@ -322,9 +307,15 @@ IMPORTANT: Your response must be ONLY the JSON object, with no markdown formatti
                 json_end = response_text.find("```", json_start)
                 response_text = response_text[json_start:json_end].strip()
 
-            return json.loads(response_text)
+            parsed_json = json.loads(response_text)
+            logger.debug(f"Service {self.service_id} - Gemini returned image field: {parsed_json.get('image', 'NOT_SET')}")
+            return parsed_json
         except Exception as e:
             logger.error(f"Service {self.service_id} - Failed to parse response: {e}")
+            try:
+                logger.error(f"Service {self.service_id} - Full response object: {response}")
+            except Exception:
+                logger.error(f"Service {self.service_id} - Could not access response object")
             return None
 
     async def analyze_slideshow_with_transcript(
@@ -340,7 +331,7 @@ IMPORTANT: Your response must be ONLY the JSON object, with no markdown formatti
         await self._rate_limit()
 
         # Build prompt for slideshow analysis
-        prompt = "You are an expert fitness instructor analyzing a TikTok workout slideshow containing multiple images."
+        prompt = "You are an expert relationship coach and lifestyle content analyst analyzing a social media slideshow."
 
         if transcript:
             prompt += f"\n\nTRANSCRIPT:\n{transcript}"
@@ -351,54 +342,38 @@ IMPORTANT: Your response must be ONLY the JSON object, with no markdown formatti
         # Add localization instructions if specified
         localization_instruction = ""
         if localization:
-            localization_instruction = f"\n\nIMPORTANT: Provide ALL text content (title, description, exercise names, instructions, AND equipment names) in {localization} language ONLY. Translate ALL human-readable text fields including equipment names consistently in the specified language. Maintain the exact JSON structure but translate all text to {localization}."
+            localization_instruction = f"\n\nIMPORTANT: Provide ALL text content (title, description, tips, location) in {localization} language ONLY. Translate ALL human-readable text fields consistently in the specified language. Maintain the exact JSON structure but translate all text to {localization}."
 
         image_count = len(slideshow_images)
-        prompt += f"\n\nThis is a slideshow with {image_count} images showing workout exercises, poses, or fitness content. Analyze ALL the images together to extract the following information. Return your response as a valid JSON object with NO additional text, explanations, or formatting."
+        prompt += f"\n\nThis is a slideshow with {image_count} images. Analyze ALL the images together to extract relationship, dating, or lifestyle content. Use 'slideshow_image_1' as placeholder for the main image URL. Return your response as a valid JSON object with NO additional text, explanations, or formatting."
         prompt += localization_instruction
 
         prompt += """
 
 Required JSON structure:
 {
-  "title": "descriptive workout title",
-  "description": "brief description of the workout or null",
-  "workout_type": "MUST be one of: push, pull, legs, upper body, lower body, full body, strength, cardio, HIIT, hypertrophy, endurance, power, mobility, flexibility",
-  "duration_minutes": estimated total workout duration in minutes (including rest periods) as integer or null,
-  "difficulty_level": integer from 1 to 10 (1=beginner, 10=expert),
-  "exercises": [
-    {
-      "name": "exercise name",
-      "muscle_groups": ["MUST use exact values from: abs, arms, back, biceps, calves, chest, core, forearms, glutes, hamstrings, lats, legs, lower back, obliques, quads, shoulders, traps, triceps"],
-      "equipment": "equipment needed - MUST be translated to the specified language if localization is provided (examples: Barbell, Dumbbells, Kettlebell, Machine, Cable, Bodyweight, Resistance Band, Medicine Ball, Pull-up Bar, Dip Station, None)",
-      "sets": [
-        {
-          "reps": integer or null,
-          "weight_lbs": number or null,
-          "duration_seconds": integer or null,
-          "distance_miles": number or null,
-          "rest_seconds": integer or null (defaults to 90 if not specified)
-        }
-      ],
-      "instructions": "detailed instructions or null"
-    }
-  ],
-  "tags": ["array of relevant tags"] or null,
-  "creator": "creator name or null"
+  "title": "descriptive title for the content",
+  "description": "brief description of the content or null",
+  "image": "use 'slideshow_image_1' as placeholder",
+  "location": "location mentioned or visible in the content or null",
+  "content_type": "type of content (examples: date_idea, relationship_advice, couples_activity, lifestyle_tip, romantic_gesture, communication_tip, self_care) or null",
+  "mood": "mood or vibe (examples: romantic, fun, adventurous, cozy, intimate, playful, serious, inspiring) or null",
+  "occasion": "relevant occasion (examples: date_night, anniversary, valentine, weekend, vacation, everyday, special_occasion) or null",
+  "tips": ["array of extracted tips or advice points from all images"] or null,
+  "tags": ["array of relevant hashtags or tags"] or null,
+  "creator": "creator username or null"
 }
 
-CRITICAL REQUIREMENTS:
-- Each exercise MUST have at least 1 set
-- Each set MUST include at least ONE measurement (reps, weight_lbs, duration_seconds, or distance_miles)
-- For strength exercises: use reps and optionally weight_lbs
-- For cardio exercises: use duration_seconds or distance_miles
-- For bodyweight exercises: use reps and optionally duration_seconds
-- muscle_groups must use EXACT values from the list above
-- equipment should be descriptive (use common names like those in examples above)
-- workout_type must use EXACT values from the list above
-- Analyze ALL images together to understand the complete workout sequence
+EXTRACTION GUIDELINES:
+- Focus on relationship, dating, and lifestyle content
+- Use 'slideshow_image_1' as placeholder for the main image field
+- Look for location information in images or captions
+- Analyze ALL images together to understand the complete story or advice
+- Extract actionable tips or advice if present across the images
+- Identify the overall mood and occasion
+- Include relevant hashtags or tags
 
-CRITICAL CONSISTENCY RULE: If localization is specified, ALL text fields (title, description, exercise names, instructions, equipment names) MUST be in the SAME target language consistently throughout the entire response.
+CRITICAL CONSISTENCY RULE: If localization is specified, ALL text fields (title, description, tips, location) MUST be in the SAME target language consistently throughout the entire response.
 
 IMPORTANT: Your response must be ONLY the JSON object, with no markdown formatting, no code blocks, no explanations before or after."""
 
@@ -454,7 +429,11 @@ IMPORTANT: Your response must be ONLY the JSON object, with no markdown formatti
                 json_end = response_text.find("```", json_start)
                 response_text = response_text[json_start:json_end].strip()
 
-            return json.loads(response_text)
+            parsed_json = json.loads(response_text)
+            logger.debug(
+                f"Service {self.service_id} - Gemini slideshow returned image field: {parsed_json.get('image', 'NOT_SET')}"
+            )
+            return parsed_json
         except Exception as e:
             logger.error(f"Service {self.service_id} - Failed to parse slideshow response: {e}")
             return None
