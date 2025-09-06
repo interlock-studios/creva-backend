@@ -1,6 +1,6 @@
 # Cloud Build configuration with multi-region deployment and performance optimizations
 substitutions:
-  _SERVICE_NAME: workout-parser-v2
+  _SERVICE_NAME: zest-parser
   _PRIMARY_REGION: us-central1
   _SECONDARY_REGIONS: us-east1,europe-west1,asia-southeast1
   _ENVIRONMENT: production
@@ -183,11 +183,11 @@ steps:
         echo "Deploying worker service..."
         
         # Create worker service account if needed
-        WORKER_SA="workout-parser-worker@${PROJECT_ID}.iam.gserviceaccount.com"
+        WORKER_SA="zest-parser-worker@${PROJECT_ID}.iam.gserviceaccount.com"
         if ! gcloud iam service-accounts describe "$${WORKER_SA}" 2>/dev/null; then
           echo "Creating worker service account..."
-          gcloud iam service-accounts create workout-parser-worker \
-            --display-name="TikTok Workout Worker Service Account"
+          gcloud iam service-accounts create zest-parser-worker \
+            --display-name="Zest Parser Worker Service Account"
           
           # Grant necessary permissions
           gcloud projects add-iam-policy-binding ${PROJECT_ID} \
@@ -200,7 +200,7 @@ steps:
         fi
         
         # Deploy worker service to primary region
-        gcloud run deploy workout-parser-worker \
+        gcloud run deploy zest-parser-worker \
           --image ${_PRIMARY_REGION}-docker.pkg.dev/${PROJECT_ID}/${_SERVICE_NAME}/${_SERVICE_NAME}:${SHORT_SHA} \
           --region ${_PRIMARY_REGION} \
           --platform managed \

@@ -70,7 +70,7 @@ Transform the backend from parsing workout videos to extracting relationship/lif
 - **API docs**: Update all endpoint descriptions
 
 ### 6. Branding Updates
-- Service name: workout-parser → relationship-parser
+- Service name: zest-parser (current deployment)
 - API title: "Social Media Workout Parser" → "Zest - Relationship Content Parser"
 - All references to "workout" → "content" or "relationship content"
 

@@ -2,8 +2,8 @@
 
 ## 🎯 Migration Overview
 
-**From:** `https://workout-parser-v2-341666880405.us-central1.run.app`  
-**To:** `https://api.setsai.app`
+**From:** `https://zest-parser-g4zcestszq-uc.a.run.app`  
+**To:** `https://api.zestai.app`
 
 ## �� Code Changes Required
 
@@ -12,13 +12,13 @@
 **Before:**
 ```javascript
 // .env or config file
-REACT_APP_API_URL=https://workout-parser-v2-341666880405.us-central1.run.app
+REACT_APP_API_URL=https://zest-parser-g4zcestszq-uc.a.run.app
 ```
 
 **After:**
 ```javascript
 // .env or config file  
-REACT_APP_API_URL=https://api.setsai.app
+REACT_APP_API_URL=https://api.zestai.app
 ```
 
 ### 2. API Client Configuration
@@ -26,7 +26,7 @@ REACT_APP_API_URL=https://api.setsai.app
 **Before:**
 ```javascript
 // api.js or similar
-const API_BASE_URL = 'https://workout-parser-v2-341666880405.us-central1.run.app';
+const API_BASE_URL = 'https://zest-parser-g4zcestszq-uc.a.run.app';
 
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
@@ -37,7 +37,7 @@ const apiClient = axios.create({
 **After:**
 ```javascript
 // api.js or similar
-const API_BASE_URL = 'https://api.setsai.app';
+const API_BASE_URL = 'https://api.zestai.app';
 
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
@@ -50,7 +50,7 @@ const apiClient = axios.create({
 **Before:**
 ```javascript
 // Direct fetch calls
-const response = await fetch('https://workout-parser-v2-341666880405.us-central1.run.app/process', {
+const response = await fetch('https://zest-parser-g4zcestszq-uc.a.run.app/process', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({ url: tiktokUrl })
@@ -60,7 +60,7 @@ const response = await fetch('https://workout-parser-v2-341666880405.us-central1
 **After:**
 ```javascript
 // Direct fetch calls
-const response = await fetch('https://api.setsai.app/process', {
+const response = await fetch('https://api.zestai.app/process', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({ url: tiktokUrl })
@@ -71,12 +71,12 @@ const response = await fetch('https://api.setsai.app/process', {
 
 **Before:**
 ```javascript
-const ws = new WebSocket('wss://workout-parser-v2-341666880405.us-central1.run.app/ws');
+const ws = new WebSocket('wss://zest-parser-g4zcestszq-uc.a.run.app/ws');
 ```
 
 **After:**
 ```javascript
-const ws = new WebSocket('wss://api.setsai.app/ws');
+const ws = new WebSocket('wss://api.zestai.app/ws');
 ```
 
 ## 🚀 Benefits After Migration
@@ -93,7 +93,7 @@ const ws = new WebSocket('wss://api.setsai.app/ws');
 - **SSL/HTTPS:** Automatic certificate management
 
 ### Professional Benefits:
-- **Custom Domain:** `api.setsai.app` instead of long Google URL
+- **Custom Domain:** `api.zestai.app` instead of long Google URL
 - **Branding:** Consistent with your domain
 - **Future-Proof:** Easy to add more regions or features
 
@@ -101,7 +101,7 @@ const ws = new WebSocket('wss://api.setsai.app/ws');
 
 ### Pre-Migration:
 - [ ] DNS record added and propagated
-- [ ] SSL certificate provisioned (check: `curl -I https://api.setsai.app`)
+- [ ] SSL certificate provisioned (check: `curl -I https://api.zestai.app`)
 - [ ] Load balancer health check passing
 
 ### During Migration:
@@ -121,10 +121,10 @@ const ws = new WebSocket('wss://api.setsai.app/ws');
 
 ```bash
 # Test health endpoint
-curl -s https://api.setsai.app/health | jq .
+curl -s https://api.zestai.app/health | jq .
 
 # Test process endpoint
-curl -X POST https://api.setsai.app/process \
+curl -X POST https://api.zestai.app/process \
   -H "Content-Type: application/json" \
   -d '{"url": "https://www.tiktok.com/@example/video/123"}' | jq .
 
@@ -138,7 +138,7 @@ If issues arise, you can quickly rollback:
 
 ```javascript
 // Emergency rollback - change back to:
-const API_BASE_URL = 'https://workout-parser-v2-341666880405.us-central1.run.app';
+const API_BASE_URL = 'https://zest-parser-g4zcestszq-uc.a.run.app';
 ```
 
 The regional endpoints remain active, so rollback is instant.

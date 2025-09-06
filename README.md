@@ -6,21 +6,21 @@ Send a TikTok or Instagram URL → Get back structured content data with title, 
 
 ## 🚀 Try It Now
 
-**Live API:** https://zest-parser-xxx.run.app (Update with your deployment URL)
+**Live API:** https://zest-parser-g4zcestszq-uc.a.run.app
 
 ```bash
 # TikTok Example
-curl -X POST "https://zest-parser-xxx.run.app/process" \
+curl -X POST "https://zest-parser-g4zcestszq-uc.a.run.app/process" \
   -H "Content-Type: application/json" \
   -d '{"url": "https://www.tiktok.com/@relationshipcoach/video/1234567890"}'
 
 # Instagram Example  
-curl -X POST "https://zest-parser-xxx.run.app/process" \
+curl -X POST "https://zest-parser-g4zcestszq-uc.a.run.app/process" \
   -H "Content-Type: application/json" \
   -d '{"url": "https://www.instagram.com/reel/ABC123XYZ/"}'
 
 # With Localization
-curl -X POST "https://zest-parser-xxx.run.app/process" \
+curl -X POST "https://zest-parser-g4zcestszq-uc.a.run.app/process" \
   -H "Content-Type: application/json" \
   -d '{"url": "https://www.tiktok.com/@datenight/video/9876543210", "localization": "Spanish"}'
 ```
@@ -70,7 +70,7 @@ Same JSON as above, but takes 10-15 seconds to process.
 
 Then check status:
 ```bash
-curl "https://zest-parser-xxx.run.app/status/req123_1234567890"
+curl "https://zest-parser-g4zcestszq-uc.a.run.app/status/req123_1234567890"
 ```
 
 ## 🏗️ Technical Overview
@@ -256,7 +256,7 @@ make create-secrets
 make deploy
 ```
 
-Your API will be live at: `https://zest-parser-xxx.run.app`
+Your API will be live at: `https://zest-parser-g4zcestszq-uc.a.run.app`
 
 ## 📊 Monitoring & Analytics
 

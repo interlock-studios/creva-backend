@@ -14,32 +14,32 @@ This document outlines the integration strategy for Sets AI Backend dual-service
 │  Legacy Service (Current App)    │    V2 Service (Future App)   │
 │  ─────────────────────────────    │    ─────────────────────    │
 │                                   │                             │
-│  workout-parser                   │    workout-parser-v2        │
+│  zest-parser (legacy)             │    zest-parser (current)    │
 │  ├─ API: concise responses        │    ├─ API: verbose responses│
 │  ├─ Branch: pre-localization      │    ├─ Branch: main          │
-│  ├─ URL: workout-parser.run.app   │    ├─ URL: workout-parser-v2│
-│  └─ Worker: workout-parser-worker │    └─ Worker: v2-worker     │
+│  ├─ URL: zest-parser.run.app      │    ├─ URL: zest-parser-g4z  │
+│  └─ Worker: zest-parser-worker    │    └─ Worker: current-worker│
 │                                   │                             │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
 ## Service Specifications
 
-### Legacy Service (workout-parser)
+### Legacy Service (zest-parser-legacy)
 **Purpose**: Maintain backward compatibility for current mobile app
 - **Branch**: `pre-localization`
-- **Service Name**: `workout-parser`
-- **API URL**: `https://workout-parser-ty6tkvdynq-uc.a.run.app`
-- **Worker URL**: `https://workout-parser-worker-ty6tkvdynq-uc.a.run.app`
+- **Service Name**: `zest-parser-legacy`
+- **API URL**: `https://zest-parser-g4zcestszq-uc.a.run.app`
+- **Worker URL**: `https://zest-parser-worker-g4zcestszq-uc.a.run.app`
 - **Response Format**: Concise (original format)
 - **Rate Limiting**: Original settings (10 req/min)
 
-### V2 Service (workout-parser-v2) ✅ DEPLOYED
+### Current Service (zest-parser) ✅ DEPLOYED
 **Purpose**: Support new features and enhanced functionality
 - **Branch**: `main`
-- **Service Name**: `workout-parser-v2`
-- **API URL**: `https://workout-parser-v2-ty6tkvdynq-uc.a.run.app`
-- **Worker URL**: `https://workout-parser-v2-worker-ty6tkvdynq-uc.a.run.app`
+- **Service Name**: `zest-parser`
+- **API URL**: `https://zest-parser-g4zcestszq-uc.a.run.app`
+- **Worker URL**: `https://zest-parser-worker-g4zcestszq-uc.a.run.app`
 - **Response Format**: Verbose (enhanced with metadata)
 - **Rate Limiting**: Disabled (999,999 req/min)
 - **Status**: 🟢 **LIVE AND TESTED**
@@ -47,15 +47,15 @@ This document outlines the integration strategy for Sets AI Backend dual-service
 #### V2 Service Test Endpoints
 ```bash
 # Health Check
-curl https://workout-parser-v2-ty6tkvdynq-uc.a.run.app/health
+curl https://zest-parser-g4zcestszq-uc.a.run.app/health
 
 # Process Video
-curl -X POST https://workout-parser-v2-ty6tkvdynq-uc.a.run.app/process \
+curl -X POST https://zest-parser-g4zcestszq-uc.a.run.app/process \
   -H "Content-Type: application/json" \
   -d '{"url": "https://www.tiktok.com/t/ZT6QvLBvy/"}'
 
 # Check Status  
-curl https://workout-parser-v2-ty6tkvdynq-uc.a.run.app/status/{job_id}
+curl https://zest-parser-g4zcestszq-uc.a.run.app/status/{job_id}
 ```
 
 ## API Endpoints
@@ -277,7 +277,7 @@ POST /cache/invalidate         # Cache management
 ## Integration Timeline
 
 ### Phase 1: Dual Service Deployment ✅ COMPLETE
-- [x] Deploy V2 service with new name (`workout-parser-v2`)
+- [x] Deploy V2 service with new name (`zest-parser`)
 - [x] Configure separate Artifact Registry repository
 - [x] Set up independent service accounts and permissions
 - [x] Disable rate limiting on V2 service
@@ -285,7 +285,7 @@ POST /cache/invalidate         # Cache management
 
 ### Phase 2: Legacy Service Deployment 🔄 PENDING
 - [ ] Deploy legacy service from `pre-localization` branch
-- [ ] Maintain original service name (`workout-parser`)
+- [ ] Maintain legacy service name (`zest-parser-legacy`)
 - [ ] Preserve original response format
 - [ ] Ensure zero downtime for current app users
 
@@ -381,25 +381,25 @@ WORKER_POLLING_INTERVAL=1
 ### Health Check Endpoints
 ```bash
 # Legacy Service
-curl https://workout-parser-ty6tkvdynq-uc.a.run.app/health
+curl https://zest-parser-g4zcestszq-uc.a.run.app/health
 
 # V2 Service  
-curl https://workout-parser-v2-ty6tkvdynq-uc.a.run.app/health
+curl https://zest-parser-g4zcestszq-uc.a.run.app/health
 ```
 
 ### Log Analysis
 ```bash
 # Legacy API Logs
-gcloud logging read "resource.labels.service_name=workout-parser"
+gcloud logging read "resource.labels.service_name=zest-parser"
 
 # V2 API Logs
-gcloud logging read "resource.labels.service_name=workout-parser-v2"
+gcloud logging read "resource.labels.service_name=zest-parser"
 
 # Legacy Worker Logs
-gcloud logging read "resource.labels.service_name=workout-parser-worker"
+gcloud logging read "resource.labels.service_name=zest-parser-worker"
 
 # V2 Worker Logs
-gcloud logging read "resource.labels.service_name=workout-parser-v2-worker"
+gcloud logging read "resource.labels.service_name=zest-parser-worker"
 ```
 
 ### Key Metrics to Monitor
@@ -432,7 +432,7 @@ make deploy
 
 #### Current App (Legacy)
 ```typescript
-const API_BASE_URL = 'https://workout-parser-ty6tkvdynq-uc.a.run.app';
+const API_BASE_URL = 'https://zest-parser-g4zcestszq-uc.a.run.app';
 
 // Existing integration remains unchanged
 const response = await fetch(`${API_BASE_URL}/process`, {
@@ -443,7 +443,7 @@ const response = await fetch(`${API_BASE_URL}/process`, {
 
 #### Future App Versions (V2)
 ```typescript
-const API_BASE_URL = 'https://workout-parser-v2-ty6tkvdynq-uc.a.run.app';
+const API_BASE_URL = 'https://zest-parser-g4zcestszq-uc.a.run.app';
 
 // Enhanced integration with verbose responses
 const response = await fetch(`${API_BASE_URL}/process`, {

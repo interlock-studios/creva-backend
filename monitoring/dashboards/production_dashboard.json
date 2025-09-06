@@ -18,7 +18,7 @@
                   "crossSeriesReducer": "REDUCE_SUM",
                   "perSeriesAligner": "ALIGN_SUM"
                 },
-                "filter": "metric.type=\"run.googleapis.com/request_count\" AND resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"workout-parser-v2\""
+                "filter": "metric.type=\"run.googleapis.com/request_count\" AND resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"zest-parser\""
               }
             }
           },
@@ -41,7 +41,7 @@
                   "crossSeriesReducer": "REDUCE_PERCENTILE_95",
                   "perSeriesAligner": "ALIGN_DELTA"
                 },
-                "filter": "metric.type=\"run.googleapis.com/request_latencies\" resource.type=\"cloud_run_revision\" resource.label.\"service_name\"=\"workout-parser-v2\""
+                "filter": "metric.type=\"run.googleapis.com/request_latencies\" resource.type=\"cloud_run_revision\" resource.label.\"service_name\"=\"zest-parser\""
               }
             }
           },
@@ -158,7 +158,7 @@
                       "crossSeriesReducer": "REDUCE_SUM",
                       "perSeriesAligner": "ALIGN_RATE"
                     },
-                    "filter": "metric.type=\"run.googleapis.com/request_count\" AND resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"workout-parser-v2\" AND resource.labels.location=\"us-central1\""
+                    "filter": "metric.type=\"run.googleapis.com/request_count\" AND resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"zest-parser\" AND resource.labels.location=\"us-central1\""
                   }
                 }
               },
@@ -173,7 +173,7 @@
                       "crossSeriesReducer": "REDUCE_SUM",
                       "perSeriesAligner": "ALIGN_RATE"
                     },
-                    "filter": "metric.type=\"run.googleapis.com/request_count\" AND resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"workout-parser-v2\" AND resource.labels.location=\"us-east1\""
+                    "filter": "metric.type=\"run.googleapis.com/request_count\" AND resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"zest-parser\" AND resource.labels.location=\"us-east1\""
                   }
                 }
               },
@@ -188,7 +188,7 @@
                       "crossSeriesReducer": "REDUCE_SUM",
                       "perSeriesAligner": "ALIGN_RATE"
                     },
-                    "filter": "metric.type=\"run.googleapis.com/request_count\" AND resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"workout-parser-v2\" AND resource.labels.location=\"europe-west1\""
+                    "filter": "metric.type=\"run.googleapis.com/request_count\" AND resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"zest-parser\" AND resource.labels.location=\"europe-west1\""
                   }
                 }
               },
@@ -203,7 +203,7 @@
                       "crossSeriesReducer": "REDUCE_SUM",
                       "perSeriesAligner": "ALIGN_RATE"
                     },
-                    "filter": "metric.type=\"run.googleapis.com/request_count\" AND resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"workout-parser-v2\" AND resource.labels.location=\"asia-southeast1\""
+                    "filter": "metric.type=\"run.googleapis.com/request_count\" AND resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"zest-parser\" AND resource.labels.location=\"asia-southeast1\""
                   }
                 }
               }
@@ -238,7 +238,7 @@
                       "crossSeriesReducer": "REDUCE_SUM",
                       "perSeriesAligner": "ALIGN_RATE"
                     },
-                    "filter": "metric.type=\"run.googleapis.com/request_count\" AND resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"workout-parser-v2\""
+                    "filter": "metric.type=\"run.googleapis.com/request_count\" AND resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"zest-parser\""
                   }
                 }
               },
@@ -253,7 +253,7 @@
                       "crossSeriesReducer": "REDUCE_PERCENTILE_95",
                       "perSeriesAligner": "ALIGN_DELTA"
                     },
-                    "filter": "metric.type=\"run.googleapis.com/request_latencies\" AND resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"workout-parser-v2\""
+                    "filter": "metric.type=\"run.googleapis.com/request_latencies\" AND resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"zest-parser\""
                   }
                 }
               }
@@ -291,7 +291,7 @@
                       "crossSeriesReducer": "REDUCE_SUM",
                       "perSeriesAligner": "ALIGN_RATE"
                     },
-                    "filter": "metric.type=\"run.googleapis.com/request_count\" AND resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"workout-parser-v2\" AND metric.labels.response_code_class=\"4xx\""
+                    "filter": "metric.type=\"run.googleapis.com/request_count\" AND resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"zest-parser\" AND metric.labels.response_code_class=\"4xx\""
                   }
                 }
               },
@@ -306,7 +306,7 @@
                       "crossSeriesReducer": "REDUCE_SUM",
                       "perSeriesAligner": "ALIGN_RATE"
                     },
-                    "filter": "metric.type=\"run.googleapis.com/request_count\" AND resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"workout-parser-v2\" AND metric.labels.response_code_class=\"5xx\""
+                    "filter": "metric.type=\"run.googleapis.com/request_count\" AND resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"zest-parser\" AND metric.labels.response_code_class=\"5xx\""
                   }
                 }
               }
@@ -340,7 +340,7 @@
                       "crossSeriesReducer": "REDUCE_SUM",
                       "perSeriesAligner": "ALIGN_MEAN"
                     },
-                    "filter": "metric.type=\"run.googleapis.com/container/instance_count\" AND resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"workout-parser-v2\""
+                    "filter": "metric.type=\"run.googleapis.com/container/instance_count\" AND resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"zest-parser\""
                   }
                 }
               },
@@ -355,7 +355,7 @@
                       "crossSeriesReducer": "REDUCE_SUM",
                       "perSeriesAligner": "ALIGN_RATE"
                     },
-                    "filter": "metric.type=\"run.googleapis.com/request_count\" AND resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"workout-parser-v2\""
+                    "filter": "metric.type=\"run.googleapis.com/request_count\" AND resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"zest-parser\""
                   }
                 }
               }
@@ -397,7 +397,7 @@
                       ],
                       "perSeriesAligner": "ALIGN_MEAN"
                     },
-                    "filter": "metric.type=\"run.googleapis.com/container/instance_count\" AND resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"workout-parser-v2\""
+                    "filter": "metric.type=\"run.googleapis.com/container/instance_count\" AND resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"zest-parser\""
                   }
                 }
               }
@@ -432,7 +432,7 @@
                       "crossSeriesReducer": "REDUCE_PERCENTILE_95",
                       "perSeriesAligner": "ALIGN_DELTA"
                     },
-                    "filter": "metric.type=\"run.googleapis.com/request_latencies\" AND resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"workout-parser-v2\" AND resource.labels.location=\"us-central1\""
+                    "filter": "metric.type=\"run.googleapis.com/request_latencies\" AND resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"zest-parser\" AND resource.labels.location=\"us-central1\""
                   }
                 }
               },
@@ -447,7 +447,7 @@
                       "crossSeriesReducer": "REDUCE_PERCENTILE_95",
                       "perSeriesAligner": "ALIGN_DELTA"
                     },
-                    "filter": "metric.type=\"run.googleapis.com/request_latencies\" AND resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"workout-parser-v2\" AND resource.labels.location=\"us-east1\""
+                    "filter": "metric.type=\"run.googleapis.com/request_latencies\" AND resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"zest-parser\" AND resource.labels.location=\"us-east1\""
                   }
                 }
               },
@@ -462,7 +462,7 @@
                       "crossSeriesReducer": "REDUCE_PERCENTILE_95",
                       "perSeriesAligner": "ALIGN_DELTA"
                     },
-                    "filter": "metric.type=\"run.googleapis.com/request_latencies\" AND resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"workout-parser-v2\" AND resource.labels.location=\"europe-west1\""
+                    "filter": "metric.type=\"run.googleapis.com/request_latencies\" AND resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"zest-parser\" AND resource.labels.location=\"europe-west1\""
                   }
                 }
               },
@@ -477,7 +477,7 @@
                       "crossSeriesReducer": "REDUCE_PERCENTILE_95",
                       "perSeriesAligner": "ALIGN_DELTA"
                     },
-                    "filter": "metric.type=\"run.googleapis.com/request_latencies\" AND resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"workout-parser-v2\" AND resource.labels.location=\"asia-southeast1\""
+                    "filter": "metric.type=\"run.googleapis.com/request_latencies\" AND resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"zest-parser\" AND resource.labels.location=\"asia-southeast1\""
                   }
                 }
               }
@@ -495,7 +495,7 @@
         "height": 16,
         "widget": {
           "logsPanel": {
-            "filter": "resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"workout-parser-v2\" AND (jsonPayload.security_event!=\"\" OR jsonPayload.event_type=\"appcheck_metric\" OR severity>=WARNING)"
+            "filter": "resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"zest-parser\" AND (jsonPayload.security_event!=\"\" OR jsonPayload.event_type=\"appcheck_metric\" OR severity>=WARNING)"
           },
           "title": "📋 Global Security Events & App Check Logs"
         },

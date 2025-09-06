@@ -8,12 +8,12 @@ RED='\033[0;31m'
 NC='\033[0m'
 
 PROJECT_ID="zest-45e51"
-DOMAIN="api.setsai.app"
-BACKEND_SERVICE_NAME="workout-parser-backend-v2"
-URL_MAP_NAME="workout-parser-url-map-v2"
-TARGET_PROXY_NAME="workout-parser-target-proxy-v2"
-FORWARDING_RULE_NAME="workout-parser-forwarding-rule-v2"
-SSL_CERT_NAME="setsai-ssl-cert"
+DOMAIN="api.zestai.app"
+BACKEND_SERVICE_NAME="zest-parser-backend"
+URL_MAP_NAME="zest-parser-url-map"
+TARGET_PROXY_NAME="zest-parser-target-proxy"
+FORWARDING_RULE_NAME="zest-parser-forwarding-rule"
+SSL_CERT_NAME="zestai-ssl-cert"
 
 echo -e "${BLUE}🌍 Setting up Global Load Balancer with Custom Domain${NC}"
 echo -e "${BLUE}Domain: ${DOMAIN}${NC}"
@@ -39,7 +39,7 @@ for region in "${REGIONS[@]}"; do
     # Add backend to backend service
     gcloud compute backend-services add-backend $BACKEND_SERVICE_NAME \
         --global \
-        --network-endpoint-group=workout-parser-neg-$region \
+        --network-endpoint-group=zest-parser-neg-$region \
         --network-endpoint-group-region=$region \
         --project=$PROJECT_ID || echo "Backend already added for $region"
 done

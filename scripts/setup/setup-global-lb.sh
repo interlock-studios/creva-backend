@@ -7,11 +7,11 @@ BLUE='\033[0;34m'
 NC='\033[0m'
 
 PROJECT_ID="zest-45e51"
-LB_NAME="workout-parser-global-lb"
-BACKEND_SERVICE_NAME="workout-parser-backend"
-URL_MAP_NAME="workout-parser-url-map"
-TARGET_PROXY_NAME="workout-parser-target-proxy"
-FORWARDING_RULE_NAME="workout-parser-forwarding-rule"
+LB_NAME="zest-parser-global-lb"
+BACKEND_SERVICE_NAME="zest-parser-backend"
+URL_MAP_NAME="zest-parser-url-map"
+TARGET_PROXY_NAME="zest-parser-target-proxy"
+FORWARDING_RULE_NAME="zest-parser-forwarding-rule"
 
 echo -e "${BLUE}🌍 Setting up Global Load Balancer for Multi-Region API${NC}"
 
@@ -32,16 +32,16 @@ for region in "${REGIONS[@]}"; do
     echo -e "${BLUE}Adding backend for $region...${NC}"
     
     # Create serverless NEG for Cloud Run service
-    gcloud compute network-endpoint-groups create workout-parser-neg-$region \
+    gcloud compute network-endpoint-groups create zest-parser-neg-$region \
         --region=$region \
         --network-endpoint-type=serverless \
-        --cloud-run-service=workout-parser-v2 \
+        --cloud-run-service=zest-parser \
         --project=$PROJECT_ID
     
     # Add backend to backend service
     gcloud compute backend-services add-backend $BACKEND_SERVICE_NAME \
         --global \
-        --network-endpoint-group=workout-parser-neg-$region \
+        --network-endpoint-group=zest-parser-neg-$region \
         --network-endpoint-group-region=$region \
         --project=$PROJECT_ID
 done
