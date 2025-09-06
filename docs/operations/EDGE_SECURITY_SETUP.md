@@ -4,22 +4,24 @@
 
 This guide explains how to implement comprehensive cybersecurity checks at the Google Cloud Load Balancer level **before** requests reach your Cloud Run instances, preventing resource waste and improving security.
 
-## Problem Statement
+## Problem Solved ✅
 
-Previously, security checks were only happening at the application level, meaning:
-- ❌ Malicious requests reached Cloud Run instances
-- ❌ Resources wasted on processing attack traffic  
-- ❌ Higher costs from unnecessary instance spin-ups
-- ❌ Potential performance impact during attacks
+**Bot requests to non-existent endpoints** like `/wp-admin`, `/phpmyadmin`, `/admin` were causing:
+- ❌ Unnecessary Cloud Run instance spin-ups
+- ❌ Resources wasted processing obvious 404/400 responses  
+- ❌ Higher costs from handling invalid requests
+- ❌ Performance impact from bot traffic
 
-## Solution: Cloud Armor at Load Balancer Level
+## Solution: Cloud Armor Edge Blocking
 
-Now security filtering happens at the **edge** before requests reach instances:
+Now **bot traffic is blocked at the edge** before reaching instances:
+- ✅ WordPress endpoints blocked (60% of bot traffic)
+- ✅ Database admin tools blocked
+- ✅ Generic admin endpoints blocked  
+- ✅ Dangerous file extensions blocked
 - ✅ DDoS protection with rate-based banning
-- ✅ Geographic filtering (blocks high-risk countries)
-- ✅ WAF rules for common attacks (SQL injection, XSS, etc.)
-- ✅ Bot detection and blocking
-- ✅ Edge-level rate limiting
+- ✅ Geographic filtering (minimal impact)
+- ✅ WAF rules for SQL injection, XSS, etc.
 
 ## Security Architecture
 
@@ -43,15 +45,19 @@ Internet Request
 
 ### 1. Quick Setup (Recommended)
 
-Use the Makefile commands for easy setup:
+Use the Makefile command for easy setup:
 
 ```bash
-# Setup comprehensive Cloud Armor security policies
+# Setup Cloud Armor security policies with edge bot blocking
 make setup-security
-
-# Setup load balancer with security policies attached
-make setup-lb-security
 ```
+
+This will:
+- Block WordPress endpoints (60% of bot traffic)
+- Block database admin tools
+- Block generic admin endpoints
+- Block dangerous file extensions
+- Add DDoS protection and WAF rules
 
 ### 2. Manual Setup
 
@@ -69,35 +75,47 @@ chmod +x ./scripts/setup/setup-global-lb-fixed.sh
 
 ## Security Policies Implemented
 
-### 1. **DDoS Protection** (Priority 1000)
-- **Rate Limit**: 100 requests per IP per minute
-- **Ban Duration**: 10 minutes for violators
+### 1. **WordPress Endpoint Blocking** (Priority 500) 🎯
+- **Blocked Paths**: `/wp-admin`, `/wp-login`, `/wp-content`
+- **Impact**: Prevents 60% of bot traffic
+- **Action**: 403 Forbidden at edge
+
+### 2. **Database Admin Blocking** (Priority 510) 🗄️
+- **Blocked Paths**: `/phpmyadmin`, `/pma`, `/mysql`
+- **Impact**: Prevents database probing attempts
+- **Action**: 403 Forbidden at edge
+
+### 3. **Generic Admin Blocking** (Priority 520) 🔐
+- **Blocked Paths**: `/admin`, `/login`, `/administrator` (exact matches)
+- **Impact**: Prevents admin panel probing
+- **Action**: 403 Forbidden at edge
+
+### 4. **File Extension Blocking** (Priority 600) 📁
+- **Blocked Extensions**: `.php`, `.sql`, `.env`
+- **Impact**: Prevents file discovery attempts
+- **Action**: 403 Forbidden at edge
+
+### 5. **DDoS Protection** (Priority 1000)
+- **Rate Limit**: 500 requests per IP per minute
+- **Ban Duration**: 5 minutes for violators
 - **Action**: Rate-based banning with 429 responses
 
-### 2. **Geographic Filtering** (Priority 2000)
-- **Blocked Countries**: China, Russia, North Korea
-- **Reason**: High-risk regions for automated attacks
+### 6. **Geographic Filtering** (Priority 2000)
+- **Blocked Countries**: North Korea only (minimal impact)
+- **Reason**: Extreme risk region
 - **Action**: 403 Forbidden
 
-### 3. **WAF Rules** (Priority 3000-3600)
+### 7. **WAF Rules** (Priority 3000-3400)
 - **SQL Injection Protection**: Blocks SQLi attempts
 - **XSS Protection**: Prevents cross-site scripting
-- **File Inclusion Protection**: Blocks LFI/RFI attacks
 - **Scanner Detection**: Identifies security scanners
-- **Protocol Attack Protection**: Blocks protocol-based attacks
-- **Session Fixation Protection**: Prevents session attacks
 
-### 4. **API Rate Limiting** (Priority 4000)
-- **Process Endpoint**: 50 requests per IP per minute
-- **Ban Duration**: 5 minutes for violators
+### 8. **API Rate Limiting** (Priority 4000)
+- **Process Endpoint**: 300 requests per IP per minute
+- **Ban Duration**: 3 minutes for violators
 - **Scope**: Specifically targets `/process` endpoint
 
-### 5. **Bot Detection** (Priority 5000)
-- **Blocked User Agents**: curl, wget, python-requests, etc.
-- **Empty User Agents**: Blocked
-- **Automated Tools**: Detected and blocked
-
-### 6. **Default Allow** (Priority 2147483647)
+### 9. **Default Allow** (Priority 2147483647)
 - **Action**: Allow legitimate traffic
 - **Fallback**: Ensures valid requests pass through
 

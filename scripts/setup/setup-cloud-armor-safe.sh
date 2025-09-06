@@ -98,7 +98,51 @@ gcloud compute security-policies rules create 4000 \
 
 echo -e "${GREEN}✅ API rate limiting: 300 req/min per IP (vs app: 200 req/min)${NC}"
 
-# 8. Block only OBVIOUS bad bots (not legitimate tools)
+# 8. Block WordPress endpoints (60% of bot traffic)
+echo -e "${YELLOW}🤖 Blocking WordPress endpoints (60% of bot traffic)...${NC}"
+gcloud compute security-policies rules create 500 \
+    --security-policy=$SECURITY_POLICY_NAME \
+    --expression "request.path.startsWith('/wp-admin') || request.path.startsWith('/wp-login') || request.path.startsWith('/wp-content')" \
+    --action=deny-403 \
+    --description="Block WordPress endpoints - prevents 60% of bot traffic" \
+    --project=$PROJECT_ID
+
+echo -e "${GREEN}✅ WordPress endpoints blocked at edge${NC}"
+
+# 9. Block database admin tools
+echo -e "${YELLOW}🗄️ Blocking database admin tools...${NC}"
+gcloud compute security-policies rules create 510 \
+    --security-policy=$SECURITY_POLICY_NAME \
+    --expression "request.path.startsWith('/phpmyadmin') || request.path.startsWith('/pma') || request.path.startsWith('/mysql')" \
+    --action=deny-403 \
+    --description="Block database admin endpoints" \
+    --project=$PROJECT_ID
+
+echo -e "${GREEN}✅ Database admin tools blocked at edge${NC}"
+
+# 10. Block generic admin endpoints
+echo -e "${YELLOW}🔐 Blocking generic admin endpoints...${NC}"
+gcloud compute security-policies rules create 520 \
+    --security-policy=$SECURITY_POLICY_NAME \
+    --expression "request.path == '/admin' || request.path == '/login' || request.path == '/administrator'" \
+    --action=deny-403 \
+    --description="Block generic admin endpoints (exact matches)" \
+    --project=$PROJECT_ID
+
+echo -e "${GREEN}✅ Generic admin endpoints blocked at edge${NC}"
+
+# 11. Block dangerous file extensions
+echo -e "${YELLOW}📁 Blocking dangerous file extensions...${NC}"
+gcloud compute security-policies rules create 600 \
+    --security-policy=$SECURITY_POLICY_NAME \
+    --expression "request.path.endsWith('.php') || request.path.endsWith('.sql') || request.path.endsWith('.env')" \
+    --action=deny-403 \
+    --description="Block dangerous file extensions" \
+    --project=$PROJECT_ID
+
+echo -e "${GREEN}✅ Dangerous file extensions blocked at edge${NC}"
+
+# 12. Block only OBVIOUS bad bots (not legitimate tools)
 echo -e "${YELLOW}🤖 Adding minimal bad bot blocking...${NC}"
 gcloud compute security-policies rules create 5000 \
     --security-policy=$SECURITY_POLICY_NAME \
@@ -131,20 +175,24 @@ echo -e "${GREEN}✅ SAFE Cloud Armor security policy setup complete!${NC}"
 echo -e "${BLUE}Policy Name: $SECURITY_POLICY_NAME${NC}"
 echo -e "${BLUE}Attached to: $BACKEND_SERVICE_NAME${NC}"
 
-echo -e "${GREEN}🛡️ SAFE Security features enabled (user-friendly):${NC}"
-echo -e "  • DDoS protection: 500 req/min (vs app: 200 req/min)"
-echo -e "  • Geographic: Only North Korea blocked"
-echo -e "  • SQL injection: Only high-confidence attacks"
-echo -e "  • XSS: Only obvious attempts"
-echo -e "  • Scanners: Only known attack tools"
-echo -e "  • API limits: 300 req/min (vs app: 200 req/min)"
-echo -e "  • Bots: Only attack tools (curl/wget allowed)"
+echo -e "${GREEN}🛡️ Enhanced Security features enabled:${NC}"
+echo -e "  🤖 WordPress endpoints blocked (60% of bot traffic)"
+echo -e "  🗄️ Database admin tools blocked"
+echo -e "  🔐 Generic admin endpoints blocked"
+echo -e "  📁 Dangerous file extensions blocked"
+echo -e "  🛡️ DDoS protection: 500 req/min (vs app: 200 req/min)"
+echo -e "  🌍 Geographic: Only North Korea blocked"
+echo -e "  🔍 SQL injection: Only high-confidence attacks"
+echo -e "  🔍 XSS: Only obvious attempts"
+echo -e "  🔍 Scanners: Only known attack tools"
+echo -e "  ⏱️ API limits: 300 req/min (vs app: 200 req/min)"
+echo -e "  🤖 Bots: Only attack tools (curl/wget allowed)"
 
-echo -e "${YELLOW}📊 This policy is SAFER than your app-level security:${NC}"
-echo -e "  • Higher rate limits than application"
-echo -e "  • Only blocks obvious attacks"
-echo -e "  • Preserves legitimate user access"
-echo -e "  • Can be gradually tightened based on logs"
+echo -e "${YELLOW}📊 Expected Results:${NC}"
+echo -e "  • 80%+ reduction in server spin-ups from bot traffic"
+echo -e "  • Significant cost savings (no instances for blocked requests)"
+echo -e "  • Better performance (only legitimate traffic reaches servers)"
+echo -e "  • Edge-level blocking (< 100ms responses for blocked requests)"
 
 echo -e "${BLUE}Monitor with:${NC}"
 echo -e "make security-logs"

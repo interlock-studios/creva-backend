@@ -163,8 +163,9 @@ deploy-single-region: ## Deploy to single region only
 	@ENVIRONMENT=production SINGLE_REGION=true ./scripts/deployment/deploy.sh
 
 .PHONY: setup-security
-setup-security: ## Setup SAFE Cloud Armor security policies (user-friendly)
-	@echo "$(GREEN)Setting up SAFE Cloud Armor security policies...$(NC)"
+setup-security: ## Setup Cloud Armor security policies with edge bot blocking
+	@echo "$(GREEN)Setting up Cloud Armor security policies with edge bot blocking...$(NC)"
+	@echo "$(YELLOW)⚡ Blocks bot traffic at edge, prevents server spin-ups$(NC)"
 	@chmod +x ./scripts/setup/setup-cloud-armor-safe.sh
 	@./scripts/setup/setup-cloud-armor-safe.sh
 
@@ -193,6 +194,18 @@ security-logs: ## View Cloud Armor security logs
 blocked-ips: ## View recently blocked IPs
 	@echo "$(GREEN)Fetching recently blocked IPs...$(NC)"
 	@gcloud logging read 'resource.type="http_load_balancer" AND jsonPayload.securityPolicyRequestData.action="deny"' --limit=20 --format=json | jq -r '.[] | "\(.timestamp) - \(.httpRequest.remoteIp) blocked for: \(.jsonPayload.securityPolicyRequestData.securityPolicyName)"'
+
+.PHONY: test-security
+test-security: ## Test edge security (quick verification)
+	@echo "$(GREEN)Testing edge security...$(NC)"
+	@echo "$(BLUE)Testing WordPress admin (should be 403):$(NC)"
+	@curl -s -w "wp-admin: %{http_code}\n" -o /dev/null https://api.setsai.app/wp-admin
+	@echo "$(BLUE)Testing phpMyAdmin (should be 403):$(NC)"
+	@curl -s -w "phpmyadmin: %{http_code}\n" -o /dev/null https://api.setsai.app/phpmyadmin
+	@echo "$(BLUE)Testing health endpoint (should be 200):$(NC)"
+	@curl -s -w "health: %{http_code}\n" -o /dev/null https://api.setsai.app/health
+	@echo "$(GREEN)✅ Edge security test complete!$(NC)"
+
 
 .PHONY: lb-status
 lb-status: ## Check Global Load Balancer status
