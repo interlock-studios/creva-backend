@@ -136,9 +136,11 @@ Required JSON structure:
 CRITICAL REQUIREMENTS:
 - Each exercise MUST have at least 1 set
 - Each set MUST include at least ONE measurement (reps, weight_lbs, duration_seconds, or distance_miles)
-- For strength exercises: use reps and optionally weight_lbs
-- For cardio exercises: use duration_seconds or distance_miles
-- For bodyweight exercises: use reps and optionally duration_seconds
+- For exercises described with TIME (e.g., "30 seconds of jumping jacks", "hold plank for 45 seconds"): use duration_seconds
+- For exercises described with REPETITIONS (e.g., "10 jumping jacks", "15 push-ups"): use reps
+- For strength exercises with weights: use reps and weight_lbs
+- For cardio exercises: use duration_seconds OR distance_miles (choose based on how the exercise is described)
+- The SAME exercise can use different measurement types in different sets (e.g., "10 jumping jacks" = reps, "jumping jacks for 30 seconds" = duration_seconds)
 - muscle_groups must use EXACT values from the list above
 - equipment should be descriptive (use common names like those in examples above)
 - workout_type must use EXACT values from the list above
@@ -256,9 +258,11 @@ Required JSON structure:
 CRITICAL REQUIREMENTS:
 - Each exercise MUST have at least 1 set
 - Each set MUST include at least ONE measurement (reps, weight_lbs, duration_seconds, or distance_miles)
-- For strength exercises: use reps and optionally weight_lbs
-- For cardio exercises: use duration_seconds or distance_miles
-- For bodyweight exercises: use reps and optionally duration_seconds
+- For exercises described with TIME (e.g., "30 seconds of jumping jacks", "hold plank for 45 seconds"): use duration_seconds
+- For exercises described with REPETITIONS (e.g., "10 jumping jacks", "15 push-ups"): use reps
+- For strength exercises with weights: use reps and weight_lbs
+- For cardio exercises: use duration_seconds OR distance_miles (choose based on how the exercise is described)
+- The SAME exercise can use different measurement types in different sets (e.g., "10 jumping jacks" = reps, "jumping jacks for 30 seconds" = duration_seconds)
 - muscle_groups must use EXACT values from the list above
 - equipment should be descriptive (use common names like those in examples above)
 - workout_type must use EXACT values from the list above
