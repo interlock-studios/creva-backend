@@ -146,16 +146,28 @@ docker-test: docker-build ## Build and test Docker image
 	@docker run --rm $(SERVICE_NAME):local python -c "import requests; requests.get('http://localhost:8080/health')"
 
 .PHONY: deploy
-deploy: ## Deploy to production (multi-region)
-	@echo "$(GREEN)Deploying to production (multi-region)...$(NC)"
+deploy: ## Deploy to production (multi-region) - PARALLEL deployment for speed!
+	@echo "$(GREEN)🚀 PARALLEL Deployment to production (multi-region)...$(NC)"
+	@echo "$(YELLOW)⚡ Using parallel deployment - much faster than sequential!$(NC)"
 	@echo "$(YELLOW)Primary region: $(PRIMARY_REGION)$(NC)"
 	@echo "$(YELLOW)Secondary regions: $(SECONDARY_REGIONS)$(NC)"
-	@ENVIRONMENT=production PRIMARY_REGION=$(PRIMARY_REGION) SECONDARY_REGIONS=$(SECONDARY_REGIONS) ./scripts/deployment/deploy.sh
+	@chmod +x scripts/deployment/deploy-parallel.sh
+	@ENVIRONMENT=production PRIMARY_REGION=$(PRIMARY_REGION) SECONDARY_REGIONS=$(SECONDARY_REGIONS) ./scripts/deployment/deploy-parallel.sh
 
 .PHONY: deploy-staging
 deploy-staging: ## Deploy to staging
 	@echo "$(GREEN)Deploying to staging...$(NC)"
+	@chmod +x scripts/deployment/deploy.sh
 	@ENVIRONMENT=staging PRIMARY_REGION=$(PRIMARY_REGION) ./scripts/deployment/deploy.sh
+
+.PHONY: deploy-sequential
+deploy-sequential: ## Deploy to production (multi-region) - OLD sequential method (slow but reliable)
+	@echo "$(GREEN)Deploying to production (multi-region) - SEQUENTIAL...$(NC)"
+	@echo "$(YELLOW)⚠️  Using sequential deployment (slower but more reliable)$(NC)"
+	@echo "$(YELLOW)Primary region: $(PRIMARY_REGION)$(NC)"
+	@echo "$(YELLOW)Secondary regions: $(SECONDARY_REGIONS)$(NC)"
+	@chmod +x scripts/deployment/deploy.sh
+	@ENVIRONMENT=production PRIMARY_REGION=$(PRIMARY_REGION) SECONDARY_REGIONS=$(SECONDARY_REGIONS) ./scripts/deployment/deploy.sh
 
 .PHONY: deploy-single-region
 deploy-single-region: ## Deploy to single region only

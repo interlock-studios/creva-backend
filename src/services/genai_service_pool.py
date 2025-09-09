@@ -260,6 +260,7 @@ Required JSON structure:
       "equipment": "equipment needed - MUST be translated to the specified language if localization is provided (examples: Barbell, Dumbbells, Kettlebell, Machine, Cable, Bodyweight, Resistance Band, Medicine Ball, Pull-up Bar, Dip Station, None)",
       "sets": [
         {
+          "set_type": "reps" or "duration" or "distance" (indicates the primary measurement type for this set),
           "reps": integer or null,
           "weight_lbs": number or null,
           "duration_seconds": integer or null,
@@ -277,11 +278,15 @@ Required JSON structure:
 CRITICAL REQUIREMENTS:
 - Each exercise MUST have at least 1 set
 - Each set MUST include at least ONE measurement (reps, weight_lbs, duration_seconds, or distance_miles)
-- For exercises described with TIME (e.g., "30 seconds of jumping jacks", "hold plank for 45 seconds"): use duration_seconds
-- For exercises described with REPETITIONS (e.g., "10 jumping jacks", "15 push-ups"): use reps
-- For strength exercises with weights: use reps and weight_lbs
-- For cardio exercises: use duration_seconds OR distance_miles (choose based on how the exercise is described)
-- The SAME exercise can use different measurement types in different sets (e.g., "10 jumping jacks" = reps, "jumping jacks for 30 seconds" = duration_seconds)
+- Each set MUST include a set_type field that indicates the primary measurement:
+  * "reps" when the primary measurement is repetitions (use with reps field)
+  * "duration" when the primary measurement is time (use with duration_seconds field)
+  * "distance" when the primary measurement is distance (use with distance_miles field)
+- For exercises described with TIME (e.g., "30 seconds of jumping jacks", "hold plank for 45 seconds"): use duration_seconds and set_type: "duration"
+- For exercises described with REPETITIONS (e.g., "10 jumping jacks", "15 push-ups"): use reps and set_type: "reps"
+- For strength exercises with weights: use reps, weight_lbs, and set_type: "reps"
+- For cardio exercises: use duration_seconds OR distance_miles with appropriate set_type ("duration" or "distance")
+- The SAME exercise can use different measurement types in different sets (e.g., "10 jumping jacks" = reps + set_type: "reps", "jumping jacks for 30 seconds" = duration_seconds + set_type: "duration")
 - muscle_groups must use EXACT values from the list above
 - equipment should be descriptive (use common names like those in examples above)
 - workout_type must use EXACT values from the list above
@@ -375,6 +380,7 @@ Required JSON structure:
       "equipment": "equipment needed - MUST be translated to the specified language if localization is provided (examples: Barbell, Dumbbells, Kettlebell, Machine, Cable, Bodyweight, Resistance Band, Medicine Ball, Pull-up Bar, Dip Station, None)",
       "sets": [
         {
+          "set_type": "reps" or "duration" or "distance" (indicates the primary measurement type for this set),
           "reps": integer or null,
           "weight_lbs": number or null,
           "duration_seconds": integer or null,
@@ -392,11 +398,15 @@ Required JSON structure:
 CRITICAL REQUIREMENTS:
 - Each exercise MUST have at least 1 set
 - Each set MUST include at least ONE measurement (reps, weight_lbs, duration_seconds, or distance_miles)
-- For exercises described with TIME (e.g., "30 seconds of jumping jacks", "hold plank for 45 seconds"): use duration_seconds
-- For exercises described with REPETITIONS (e.g., "10 jumping jacks", "15 push-ups"): use reps
-- For strength exercises with weights: use reps and weight_lbs
-- For cardio exercises: use duration_seconds OR distance_miles (choose based on how the exercise is described)
-- The SAME exercise can use different measurement types in different sets (e.g., "10 jumping jacks" = reps, "jumping jacks for 30 seconds" = duration_seconds)
+- Each set MUST include a set_type field that indicates the primary measurement:
+  * "reps" when the primary measurement is repetitions (use with reps field)
+  * "duration" when the primary measurement is time (use with duration_seconds field)
+  * "distance" when the primary measurement is distance (use with distance_miles field)
+- For exercises described with TIME (e.g., "30 seconds of jumping jacks", "hold plank for 45 seconds"): use duration_seconds and set_type: "duration"
+- For exercises described with REPETITIONS (e.g., "10 jumping jacks", "15 push-ups"): use reps and set_type: "reps"
+- For strength exercises with weights: use reps, weight_lbs, and set_type: "reps"
+- For cardio exercises: use duration_seconds OR distance_miles with appropriate set_type ("duration" or "distance")
+- The SAME exercise can use different measurement types in different sets (e.g., "10 jumping jacks" = reps + set_type: "reps", "jumping jacks for 30 seconds" = duration_seconds + set_type: "duration")
 - muscle_groups must use EXACT values from the list above
 - equipment should be descriptive (use common names like those in examples above)
 - workout_type must use EXACT values from the list above
