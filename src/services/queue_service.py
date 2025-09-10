@@ -214,12 +214,12 @@ class QueueService:
         return None
 
     async def mark_job_complete(self, job_id: str, result: Dict):
-        """Mark job as complete and store result"""
+        """Mark job as complete, store result, and remove from queue"""
         if not self.db:
             return
 
         try:
-            # Store result
+            # Store result in processing_results collection
             self.results_collection.document(job_id).set(
                 {
                     "job_id": job_id,
@@ -229,12 +229,10 @@ class QueueService:
                 }
             )
 
-            # Update queue status
-            self.queue_collection.document(job_id).update(
-                {"status": "completed", "completed_at": datetime.now(timezone.utc)}
-            )
+            # Remove job from queue (it's completed, no need to keep it)
+            self.queue_collection.document(job_id).delete()
 
-            logger.info(f"Job {job_id} marked as complete")
+            logger.info(f"Job {job_id} marked as complete and removed from queue")
 
         except Exception as e:
             logger.error(f"Error marking job complete: {e}")

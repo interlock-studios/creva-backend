@@ -59,6 +59,10 @@ class VideoWorker:
         self._max_backoff = 30.0  # Max 30 seconds between polls
         self._base_polling_interval = POLLING_INTERVAL
 
+        # Queue cleanup tracking
+        self._last_cleanup = datetime.now()
+        self._cleanup_interval = timedelta(hours=1)  # Run cleanup every hour
+
         # Initialize services
         self.genai_pool = GenAIServicePool()
         self.cache_service = CacheService()
@@ -213,6 +217,24 @@ class VideoWorker:
         # Default to retryable for network/API errors
         return True
 
+    async def periodic_queue_cleanup(self):
+        """Perform periodic queue cleanup to prevent backup"""
+        try:
+            logger.info("Starting periodic queue cleanup...")
+            
+            # Clean up old jobs (older than 24 hours)
+            deleted_count = await self.queue_service.cleanup_old_jobs(days=1, batch_size=50)
+            
+            if deleted_count > 0:
+                logger.info(f"Cleaned up {deleted_count} old jobs from queue")
+            else:
+                logger.debug("No old jobs to clean up")
+                
+            self._last_cleanup = datetime.now()
+            
+        except Exception as e:
+            logger.error(f"Error during periodic queue cleanup: {e}")
+
     async def worker_loop(self):
         """Main worker loop"""
         logger.info(f"Worker {WORKER_ID} starting main loop")
@@ -222,6 +244,10 @@ class VideoWorker:
 
         while self.running:
             try:
+                # Periodic queue cleanup
+                if datetime.now() - self._last_cleanup > self._cleanup_interval:
+                    asyncio.create_task(self.periodic_queue_cleanup())
+                
                 # Check if we can take more jobs
                 active_tasks = len(self.tasks)
                 if active_tasks < WORKER_BATCH_SIZE:
@@ -362,8 +388,45 @@ async def worker_stats():
         "running": worker.running,
         "active_tasks": len(worker.tasks),
         "genai_pool_size": worker.genai_pool.get_pool_size(),
+        "last_cleanup": worker._last_cleanup.isoformat(),
         "timestamp": datetime.now().isoformat(),
     }
+
+
+@app.get("/worker/queue-health")
+async def queue_health():
+    """Get queue health metrics"""
+    if not worker:
+        return JSONResponse(status_code=503, content={"error": "Worker not initialized"})
+    
+    try:
+        # Get queue status
+        queue_service = worker.queue_service
+        if not queue_service.db:
+            return {"error": "Queue service not available"}
+        
+        # Count jobs by status
+        pending = len(list(queue_service.queue_collection.where('status', '==', 'pending').stream()))
+        processing = len(list(queue_service.queue_collection.where('status', '==', 'processing').stream()))
+        
+        # Check for any old jobs that might be accumulating
+        from datetime import timedelta
+        old_cutoff = datetime.now(timezone.utc) - timedelta(hours=24)
+        old_jobs = len(list(queue_service.queue_collection.where('created_at', '<', old_cutoff).stream()))
+        
+        return {
+            "queue_status": {
+                "pending": pending,
+                "processing": processing,
+                "old_jobs_24h": old_jobs
+            },
+            "health": "healthy" if old_jobs < 10 else "warning" if old_jobs < 50 else "critical",
+            "last_cleanup": worker._last_cleanup.isoformat(),
+            "timestamp": datetime.now().isoformat()
+        }
+        
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"error": f"Failed to get queue health: {str(e)}"})
 
 
 # Main entry point for running directly
