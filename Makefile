@@ -181,6 +181,12 @@ setup-security: ## Setup Cloud Armor security policies with edge bot blocking
 	@chmod +x ./scripts/setup/setup-cloud-armor-safe.sh
 	@./scripts/setup/setup-cloud-armor-safe.sh
 
+.PHONY: setup-security-allowlist
+setup-security-allowlist: ## Apply STRICT allowlist Cloud Armor policy (deny-all except active endpoints)
+	@echo "$(GREEN)Applying STRICT allowlist Cloud Armor policy$(NC)"
+	@chmod +x ./scripts/setup/setup-cloud-armor-allowlist.sh
+	@./scripts/setup/setup-cloud-armor-allowlist.sh
+
 .PHONY: setup-lb-security
 setup-lb-security: ## Setup load balancer with security policies
 	@echo "$(GREEN)Setting up secure load balancer...$(NC)"
