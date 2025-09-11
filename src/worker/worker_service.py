@@ -7,7 +7,7 @@ import os
 import asyncio
 import logging
 import time
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from contextlib import asynccontextmanager
 from dotenv import load_dotenv
 import socket
@@ -446,7 +446,7 @@ if __name__ == "__main__":
     # For Cloud Run, use FastAPI with uvicorn
     import uvicorn
 
-    port = int(os.environ.get("PORT", 8081))
+    port = int(os.environ.get("PORT", 8080))
     uvicorn.run(app, host="0.0.0.0", port=port)
 
     # For direct execution (testing), use asyncio

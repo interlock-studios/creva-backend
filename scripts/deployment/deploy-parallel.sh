@@ -102,6 +102,8 @@ else
         --execution-environment gen2 \
         --set-env-vars "GOOGLE_CLOUD_PROJECT_ID=${PROJECT_ID},ENVIRONMENT=${ENVIRONMENT},CLOUD_RUN_REGION=${PRIMARY_REGION}" \
         --set-secrets "SCRAPECREATORS_API_KEY=scrapecreators-api-key:latest" \
+        --command "uvicorn" \
+        --args "src.worker.worker_service:app,--host,0.0.0.0,--port,8080,--workers,1" \
         --quiet
 
     # Function to deploy to a single region
@@ -151,6 +153,8 @@ else
             --execution-environment gen2 \
             --set-env-vars "GOOGLE_CLOUD_PROJECT_ID=${PROJECT_ID},ENVIRONMENT=${ENVIRONMENT},CLOUD_RUN_REGION=$region" \
             --set-secrets "SCRAPECREATORS_API_KEY=scrapecreators-api-key:latest" \
+            --command "uvicorn" \
+            --args "src.worker.worker_service:app,--host,0.0.0.0,--port,8080,--workers,1" \
             --quiet >> "$log_file" 2>&1; then
             echo -e "${GREEN}[${region}] ✅ Worker service deployed successfully${NC}"
         else
