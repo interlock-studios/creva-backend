@@ -9,16 +9,20 @@ sets-ai-backend/
 ├── main.py                    # 🚀 Main API server - start here
 ├── src/
 │   ├── services/              # 🔧 All the business logic
-│   │   ├── tiktok_scraper.py  #   Downloads TikTok videos
-│   │   ├── genai_service.py   #   Talks to Google AI
-│   │   ├── cache_service.py   #   Handles caching results
-│   │   └── queue_service.py   #   Manages job queue
+│   │   ├── tiktok_scraper.py        #   TikTok videos & PhotoMode slideshows
+│   │   ├── instagram_scraper.py     #   Instagram reels via ScrapeCreators
+│   │   ├── url_router.py            #   Platform detection and URL validation
+│   │   ├── genai_service.py         #   Google GenAI (single service)
+│   │   ├── genai_service_pool.py    #   GenAI pool for workers
+│   │   ├── cache_service.py         #   Firestore caching
+│   │   ├── queue_service.py         #   Firestore job queue
+│   │   └── config_validator.py      #   Env validation & rates
 │   ├── worker/                # 🏭 Background processing
 │   │   ├── worker_service.py  #   Main worker process
 │   │   └── video_processor.py #   Video manipulation
 │   └── models/                # 📋 Data structures
 │       └── parser_result.py   #   Workout JSON format
-├── Makefile                   # 🛠️ All your commands (make dev, make deploy)
+├── Makefile                   # 🛠️ Commands (dev, deploy, security, preview)
 ├── requirements.txt           # 📦 Python dependencies
 └── .env.example              # ⚙️ Environment variables template
 ```
@@ -138,12 +142,14 @@ make docker-run
 
 ### Deploy to Production
 ```bash
-# One command deploys both services
+# Multi-region deploy (parallel)
 make deploy
 
-# Or deploy individually
-./deploy.sh        # API service
-./deploy-worker.sh # Worker service
+# Sequential deploy
+make deploy-sequential
+
+# Preview (single region)
+make deploy-preview
 ```
 
 ## 🔍 Debugging Tips

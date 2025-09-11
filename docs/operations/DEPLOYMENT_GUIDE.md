@@ -4,15 +4,12 @@
 
 ### One-Command Deployment
 ```bash
-# Deploy to all regions + setup global HTTPS load balancer with setsai.app
-make deploy-full
+# Deploy to all regions (parallel)
+make deploy
 ```
 
-This single command will:
-1. **Deploy to all 4 regions** (us-central1, us-east1, europe-west1, asia-southeast1)
-2. **Setup Global HTTPS Load Balancer** with automatic SSL certificate
-3. **Configure setsai.app domain** with proper routing
-4. **Enable global traffic distribution** and failover
+This command deploys API and Worker services to:
+- us-central1 (primary) and secondary regions: us-east1, us-west1, europe-west1, europe-west4, europe-north1, asia-southeast1, asia-northeast1, asia-south1, australia-southeast1, southamerica-east1
 
 ### Step-by-Step Deployment
 
@@ -22,7 +19,7 @@ If you prefer to deploy in stages:
 # 1. Deploy to all regions first
 make deploy
 
-# 2. Setup global load balancer with setsai.app
+# 2. (Optional) Setup global load balancer with setsai.app
 make setup-load-balancer
 
 # 3. Check status
@@ -40,6 +37,9 @@ make deploy-staging
 
 # Add custom domain to existing load balancer
 make add-custom-domain
+
+# Deploy preview (single region, App Check disabled)
+make deploy-preview
 
 # Check load balancer and domain status
 make status-lb

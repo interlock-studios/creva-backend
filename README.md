@@ -6,21 +6,22 @@ Send a TikTok or Instagram URL → Get back structured workout data with exercis
 
 ## 🚀 Try It Now
 
-**Live API:** https://workout-parser-ty6tkvdynq-uc.a.run.app
+**Production API:** https://api.setsai.app
+**Preview API:** run `make deploy-preview` (prints the current preview URL)
 
 ```bash
 # TikTok Example
-curl -X POST "https://workout-parser-ty6tkvdynq-uc.a.run.app/process" \
+curl -X POST "https://api.setsai.app/process" \
   -H "Content-Type: application/json" \
   -d '{"url": "https://www.tiktok.com/@lastairbender222/video/7518493301046119710"}'
 
 # Instagram Example  
-curl -X POST "https://workout-parser-ty6tkvdynq-uc.a.run.app/process" \
+curl -X POST "https://api.setsai.app/process" \
   -H "Content-Type: application/json" \
   -d '{"url": "https://www.instagram.com/reel/CS7CshJjb15/"}'
 
 # With Localization (NEW!)
-curl -X POST "https://workout-parser-ty6tkvdynq-uc.a.run.app/process" \
+curl -X POST "https://api.setsai.app/process" \
   -H "Content-Type: application/json" \
   -d '{"url": "https://www.tiktok.com/@lastairbender222/video/7518493301046119710", "localization": "Spanish"}'
 ```
@@ -66,7 +67,7 @@ Same JSON as above, but takes 10-15 seconds to process.
 
 Then check status:
 ```bash
-curl "https://workout-parser-ty6tkvdynq-uc.a.run.app/status/req123_1234567890"
+curl "https://api.setsai.app/status/req123_1234567890"
 ```
 
 ## 🏗️ Technical Overview
@@ -83,6 +84,7 @@ curl "https://workout-parser-ty6tkvdynq-uc.a.run.app/status/req123_1234567890"
 - **Direct Mode** - Process immediately when not busy
 - **Queue Mode** - Background processing when at capacity
 - **Auto-Scale** - Handles 1 user or 10,000 users
+ - **Slideshow Aware** - TikTok PhotoMode slideshows supported (HEIC/WEBP auto-converted to JPEG)
 
 ## 🚀 Quick Setup (5 minutes)
 
@@ -111,6 +113,17 @@ That's it! API runs on http://localhost:8080
 ### What `make dev` starts:
 - **API Service** (port 8080) - Handles requests, checks cache
 - **Worker Service** (port 8081) - Processes videos in background
+
+### Other helpful commands
+```bash
+make deploy             # Multi-region prod deploy (parallel)
+make deploy-sequential  # Sequential deploy
+make deploy-preview     # Single-region preview deploy
+make setup-security     # Safe Cloud Armor policy
+make setup-security-allowlist  # Strict allowlist policy
+make test-endpoints     # Test global + primary endpoints
+make security-logs      # View Cloud Armor logs
+```
 
 ## 🛠️ Development Commands
 
@@ -238,7 +251,7 @@ When you specify a localization, the following fields are translated:
 1. **Worker picks up job** from Firestore queue
 2. **Download video** using platform-specific scraper (TikTok/Instagram)
 3. **Extract metadata** - transcript from TikTok, caption from Instagram
-4. **Remove audio** with ffmpeg (faster AI processing)
+4. **Slideshow images** - auto-convert HEIC/WEBP → JPEG for AI analysis
 5. **Analyze with Gemini AI** (video + transcript/caption)
 6. **Store result** in cache and results collection
 7. **Update job status** to completed

@@ -22,9 +22,9 @@ class ThreatDetector:
         self.suspicious_patterns = defaultdict(int)
         self.blocked_ips = set()
         self.attack_patterns = {
-            "rapid_failures": {"threshold": 50, "window": 300},  # 50 failures in 5 min (much more lax)
-            "path_traversal": {"threshold": 10, "window": 3600},   # 10 attempts in 1 hour (more lax)
-            "bot_behavior": {"threshold": 100, "window": 3600},    # 100 bot-like requests in 1 hour (much more lax)
+            "rapid_failures": {"threshold": 200, "window": 300},  # 200 failures in 5 min (very lax)
+            "path_traversal": {"threshold": 50, "window": 3600},   # 50 attempts in 1 hour (very lax)
+            "bot_behavior": {"threshold": 500, "window": 3600},    # 500 bot-like requests in 1 hour (very lax)
         }
     
     def analyze_request(self, ip: str, path: str, user_agent: str, status: int, app_id: str = None):
@@ -74,9 +74,9 @@ class ThreatDetector:
                     "attempted_path": path,
                     "note": "logged_but_not_blocked"
                 })
-                # Only block IP after multiple obvious attacks (5+ in 10 minutes)
+                # Only block IP after many obvious attacks (25+ in 10 minutes)
                 self.suspicious_patterns[f"obvious_attacks_{ip}"] += 1
-                if self.suspicious_patterns[f"obvious_attacks_{ip}"] >= 5:
+                if self.suspicious_patterns[f"obvious_attacks_{ip}"] >= 25:
                     self.blocked_ips.add(ip)
                     self._log_security_event("ip_blocked_multiple_attacks", ip, {
                         "attack_count": self.suspicious_patterns[f"obvious_attacks_{ip}"],
@@ -86,15 +86,15 @@ class ThreatDetector:
                 self.blocked_ips.add(ip)
         
         # Detect unusual endpoints (only block on very obvious probing)
-        if status == 404 and not any(allowed in path for allowed in ["/health", "/docs", "/redoc", "/process", "/status", "/admin"]):
+        if status == 404 and not any(allowed in path for allowed in ["/health", "/docs", "/redoc", "/process", "/status", "/admin", "/metrics"]):
             self.suspicious_patterns[f"404_{ip}"] += 1
-            if self.suspicious_patterns[f"404_{ip}"] > 25:  # Much higher threshold
+            if self.suspicious_patterns[f"404_{ip}"] > 100:  # Much higher threshold
                 self._log_security_event("endpoint_probing", ip, {
                     "probed_path": path,
                     "probe_count": self.suspicious_patterns[f"404_{ip}"]
                 })
                 # Only block after excessive probing
-                if self.suspicious_patterns[f"404_{ip}"] > 50:
+                if self.suspicious_patterns[f"404_{ip}"] > 200:
                     self.blocked_ips.add(ip)
     
     def is_blocked(self, ip: str) -> bool:
@@ -256,7 +256,7 @@ class SecurityMiddleware(BaseHTTPMiddleware):
         ip = self.rate_limiter._get_client_ip(request)
         
         # Allow legitimate paths without blocking (but still log attacks)
-        legitimate_paths = ["/", "/health", "/docs", "/redoc", "/openapi.json", "/process", "/status", "/admin"]
+        legitimate_paths = ["/", "/health", "/docs", "/redoc", "/openapi.json", "/process", "/status", "/admin", "/metrics"]
         is_legitimate_path = any(request.url.path.startswith(path) for path in legitimate_paths)
         
         # Check if IP is blocked (but allow legitimate paths even from blocked IPs for now)

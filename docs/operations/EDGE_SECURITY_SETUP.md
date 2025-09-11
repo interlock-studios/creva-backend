@@ -59,7 +59,24 @@ This will:
 - Block dangerous file extensions
 - Add DDoS protection and WAF rules
 
-### 2. Manual Setup
+### 2. Strict Allowlist Mode (deny-all except API endpoints)
+
+Use this to ensure only valid API paths reach Cloud Run. Everything else is denied at edge.
+
+```bash
+# Apply strict allowlist policy (idempotent)
+make setup-security-allowlist
+```
+
+Allowed by default:
+- `/health`, `/health/*`
+- `/status`, `/status/*`
+- `/process`
+- `/metrics/*`
+
+Default rule: deny (403). Update the script in `scripts/setup/setup-cloud-armor-allowlist.sh` if you add new public endpoints.
+
+### 3. Manual Setup
 
 If you prefer manual setup:
 
@@ -115,9 +132,9 @@ chmod +x ./scripts/setup/setup-global-lb-fixed.sh
 - **Ban Duration**: 3 minutes for violators
 - **Scope**: Specifically targets `/process` endpoint
 
-### 9. **Default Allow** (Priority 2147483647)
-- **Action**: Allow legitimate traffic
-- **Fallback**: Ensures valid requests pass through
+### 9. **Default Rule** (Priority 2147483647)
+- **Safe Policy**: Allow
+- **Allowlist Policy**: Deny (403)
 
 ## Monitoring & Alerts
 
@@ -190,6 +207,12 @@ gcloud compute security-policies rules update 1000 \
 
 ```bash
 gcloud compute security-policies describe workout-parser-security-policy \
+    --format="table(rules[].priority,rules[].action,rules[].description)"
+```
+
+For the allowlist policy:
+```bash
+gcloud compute security-policies describe workout-parser-security-policy-allowlist \
     --format="table(rules[].priority,rules[].action,rules[].description)"
 ```
 

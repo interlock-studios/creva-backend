@@ -419,17 +419,26 @@ IMPORTANT: Your response must be ONLY the JSON object, with no markdown formatti
         # Prepare content with multiple images
         contents = [prompt]
 
-        # Add all slideshow images to the analysis
+        # Add all slideshow images to the analysis (convert to JPEG if needed)
+        from src.utils.image_converter import convert_image_to_jpeg
+
         valid_images = 0
         for i, image_content in enumerate(slideshow_images):
-            if image_content:  # Skip empty image content
-                try:
-                    contents.append(Part.from_bytes(data=image_content, mime_type="image/jpeg"))
-                    valid_images += 1
-                except Exception as e:
-                    logger.warning(
-                        f"Service {self.service_id} - Failed to add image {i} to analysis: {e}"
-                    )
+            if not image_content:
+                continue
+            jpeg_bytes = convert_image_to_jpeg(image_content)
+            if not jpeg_bytes:
+                logger.warning(
+                    f"Service {self.service_id} - Failed to convert slideshow image {i} to JPEG; skipping"
+                )
+                continue
+            try:
+                contents.append(Part.from_bytes(data=jpeg_bytes, mime_type="image/jpeg"))
+                valid_images += 1
+            except Exception as e:
+                logger.warning(
+                    f"Service {self.service_id} - Failed to add image {i} to analysis: {e}"
+                )
 
         if valid_images == 0:
             logger.error(f"Service {self.service_id} - No valid images found in slideshow")

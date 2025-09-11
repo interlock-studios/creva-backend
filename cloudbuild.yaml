@@ -113,7 +113,7 @@ steps:
           "--cpu-throttling"
           "--execution-environment" "gen2"
           "--service-account" "${_SERVICE_NAME}@${PROJECT_ID}.iam.gserviceaccount.com"
-          "--set-env-vars" "GOOGLE_CLOUD_PROJECT_ID=${PROJECT_ID},ENVIRONMENT=${_ENVIRONMENT},MAX_CONCURRENT_PROCESSING=80,RATE_LIMIT_REQUESTS=50,RATE_LIMIT_WINDOW=60,MAX_DIRECT_PROCESSING=20,GEMINI_REGIONS=${_PRIMARY_REGION},${_SECONDARY_REGIONS},APPCHECK_REQUIRED=true"
+          "--set-env-vars" "GOOGLE_CLOUD_PROJECT_ID=${PROJECT_ID},ENVIRONMENT=${_ENVIRONMENT},MAX_CONCURRENT_PROCESSING=80,RATE_LIMIT_REQUESTS=50,RATE_LIMIT_WINDOW=60,MAX_DIRECT_PROCESSING=20,GEMINI_REGIONS=${_PRIMARY_REGION},${_SECONDARY_REGIONS},APPCHECK_REQUIRED=false"
           "--set-secrets" "SCRAPECREATORS_API_KEY=scrapecreators-api-key:latest"
         )
         
@@ -168,7 +168,7 @@ steps:
             --cpu-throttling \
             --execution-environment gen2 \
             --service-account ${_SERVICE_NAME}@${PROJECT_ID}.iam.gserviceaccount.com \
-            --set-env-vars GOOGLE_CLOUD_PROJECT_ID=${PROJECT_ID},ENVIRONMENT=${_ENVIRONMENT},MAX_CONCURRENT_PROCESSING=80,RATE_LIMIT_REQUESTS=50,RATE_LIMIT_WINDOW=60,MAX_DIRECT_PROCESSING=20,GEMINI_REGIONS=${_PRIMARY_REGION},${_SECONDARY_REGIONS},APPCHECK_REQUIRED=true \
+            --set-env-vars GOOGLE_CLOUD_PROJECT_ID=${PROJECT_ID},ENVIRONMENT=${_ENVIRONMENT},MAX_CONCURRENT_PROCESSING=80,RATE_LIMIT_REQUESTS=50,RATE_LIMIT_WINDOW=60,MAX_DIRECT_PROCESSING=20,GEMINI_REGIONS=${_PRIMARY_REGION},${_SECONDARY_REGIONS},APPCHECK_REQUIRED=false \
             --set-secrets SCRAPECREATORS_API_KEY=scrapecreators-api-key:latest || {
               echo "Failed to deploy to $region, continuing..."
             }

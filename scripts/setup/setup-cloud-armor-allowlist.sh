@@ -36,43 +36,7 @@ if [ -n "$EXISTING_RULE_PRIORITIES" ]; then
   done <<< "$EXISTING_RULE_PRIORITIES"
 fi
 
-echo -e "${BLUE}Adding WAF protections (SQLi/XSS/Scanner) before allow rules...${NC}"
-# High-confidence WAF blocks first
-gcloud compute security-policies rules create 300 \
-  --security-policy="$SECURITY_POLICY_NAME" \
-  --expression "evaluatePreconfiguredExpr('sqli-stable')" \
-  --action=deny-403 \
-  --description="Block SQL injection" \
-  --project="$PROJECT_ID" || gcloud compute security-policies rules update 300 \
-  --security-policy="$SECURITY_POLICY_NAME" \
-  --expression "evaluatePreconfiguredExpr('sqli-stable')" \
-  --action=deny-403 \
-  --description="Block SQL injection" \
-  --project="$PROJECT_ID"
-
-gcloud compute security-policies rules create 310 \
-  --security-policy="$SECURITY_POLICY_NAME" \
-  --expression "evaluatePreconfiguredExpr('xss-stable')" \
-  --action=deny-403 \
-  --description="Block XSS" \
-  --project="$PROJECT_ID" || gcloud compute security-policies rules update 310 \
-  --security-policy="$SECURITY_POLICY_NAME" \
-  --expression "evaluatePreconfiguredExpr('xss-stable')" \
-  --action=deny-403 \
-  --description="Block XSS" \
-  --project="$PROJECT_ID"
-
-gcloud compute security-policies rules create 320 \
-  --security-policy="$SECURITY_POLICY_NAME" \
-  --expression "evaluatePreconfiguredExpr('scannerdetection-stable')" \
-  --action=deny-403 \
-  --description="Block scanners" \
-  --project="$PROJECT_ID" || gcloud compute security-policies rules update 320 \
-  --security-policy="$SECURITY_POLICY_NAME" \
-  --expression "evaluatePreconfiguredExpr('scannerdetection-stable')" \
-  --action=deny-403 \
-  --description="Block scanners" \
-  --project="$PROJECT_ID"
+echo -e "${BLUE}Skipping WAF deny rules to avoid false positives; rely on pure path allowlist.${NC}"
 
 echo -e "${BLUE}Adding path ALLOW rules for active endpoints...${NC}"
 # Enumerated active endpoints (from FastAPI routers)
@@ -132,43 +96,7 @@ gcloud compute security-policies rules create 990 \
   --description="Rate limit /process" \
   --project="$PROJECT_ID"
 
-echo -e "${BLUE}Denying known noisy paths early (wordpress, phpmyadmin, etc.)...${NC}"
-# Split into multiple rules to respect expression limit (max 5 ORs)
-gcloud compute security-policies rules create 2000 \
-  --security-policy="$SECURITY_POLICY_NAME" \
-  --expression "request.path.startsWith('/wp-') || request.path.startsWith('/phpmyadmin') || request.path.startsWith('/pma') || request.path.startsWith('/mysql')" \
-  --action=deny-403 \
-  --description="Block common scanner paths (wp, phpmyadmin, pma, mysql)" \
-  --project="$PROJECT_ID" || gcloud compute security-policies rules update 2000 \
-  --security-policy="$SECURITY_POLICY_NAME" \
-  --expression "request.path.startsWith('/wp-') || request.path.startsWith('/phpmyadmin') || request.path.startsWith('/pma') || request.path.startsWith('/mysql')" \
-  --action=deny-403 \
-  --description="Block common scanner paths (wp, phpmyadmin, pma, mysql)" \
-  --project="$PROJECT_ID"
-
-gcloud compute security-policies rules create 2001 \
-  --security-policy="$SECURITY_POLICY_NAME" \
-  --expression "request.path == '/admin' || request.path == '/login' || request.path == '/administrator'" \
-  --action=deny-403 \
-  --description="Block admin probe paths" \
-  --project="$PROJECT_ID" || gcloud compute security-policies rules update 2001 \
-  --security-policy="$SECURITY_POLICY_NAME" \
-  --expression "request.path == '/admin' || request.path == '/login' || request.path == '/administrator'" \
-  --action=deny-403 \
-  --description="Block admin probe paths" \
-  --project="$PROJECT_ID"
-
-gcloud compute security-policies rules create 2002 \
-  --security-policy="$SECURITY_POLICY_NAME" \
-  --expression "request.path.endsWith('.php') || request.path.endsWith('.sql') || request.path.endsWith('.env')" \
-  --action=deny-403 \
-  --description="Block dangerous file extensions" \
-  --project="$PROJECT_ID" || gcloud compute security-policies rules update 2002 \
-  --security-policy="$SECURITY_POLICY_NAME" \
-  --expression "request.path.endsWith('.php') || request.path.endsWith('.sql') || request.path.endsWith('.env')" \
-  --action=deny-403 \
-  --description="Block dangerous file extensions" \
-  --project="$PROJECT_ID"
+echo -e "${BLUE}Skipping explicit deny lists; default deny will catch unknown paths.${NC}"
 
 echo -e "${BLUE}Setting DEFAULT DENY catch-all...${NC}"
 gcloud compute security-policies rules update 2147483647 \

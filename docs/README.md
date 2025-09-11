@@ -12,6 +12,8 @@ Technical architecture and design documents:
 Operational guides and optimizations:
 - `PERFORMANCE_OPTIMIZATIONS.md` - Performance tuning and optimization strategies
 - `SECURITY_ENHANCEMENTS.md` - Security improvements and best practices
+- `DEPLOYMENT_GUIDE.md` - Full production deployment guide
+- `EDGE_SECURITY_SETUP.md` - Cloud Armor safe vs allowlist policies
 
 ### `/frontend/`
 Frontend-related documentation and utilities:
@@ -22,6 +24,10 @@ Frontend-related documentation and utilities:
 - `CLAUDE.md` - Detailed technical architecture and API documentation
 - `../PROJECT_STRUCTURE.md` - Quick development guide (in project root)
 - `../README.md` - Main project README (in project root)
+
+### Quick Links
+- **API (prod)**: https://api.setsai.app
+- **Preview**: `make deploy-preview` (prints URL)
 
 ## 🔗 Quick Links
 

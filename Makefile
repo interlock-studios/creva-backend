@@ -490,6 +490,12 @@ status: ## Show deployment status across all regions
 		gcloud run services list --filter="metadata.name=$(SERVICE_NAME)" --format="table(metadata.name,status.url,status.conditions[0].status)" --region=$$region 2>/dev/null || echo "No services found in $$region"; \
 	done
 
+.PHONY: deploy-preview
+deploy-preview: ## Deploy single-region preview Cloud Run service (App Check disabled)
+	@echo "$(GREEN)Deploying preview service...$(NC)"
+	@chmod +x scripts/deployment/deploy-preview.sh
+	@PROJECT_ID=$(PROJECT_ID) REGION=$(PRIMARY_REGION) SERVICE_NAME=workout-parser-preview IMAGE_TAG=preview ./scripts/deployment/deploy-preview.sh
+
 # Default target
 .DEFAULT_GOAL := help
 
