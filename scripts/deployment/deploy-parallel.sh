@@ -81,7 +81,7 @@ else
         --timeout 900 \
         --cpu-throttling \
         --execution-environment gen2 \
-        --set-env-vars "GOOGLE_CLOUD_PROJECT_ID=${PROJECT_ID},ENVIRONMENT=${ENVIRONMENT},MAX_CONCURRENT_PROCESSING=60,RATE_LIMIT_REQUESTS=40,MAX_DIRECT_PROCESSING=15,GEMINI_REGIONS=${GEMINI_REGIONS_FORMATTED},CLOUD_RUN_REGION=${PRIMARY_REGION}" \
+        --set-env-vars "GOOGLE_CLOUD_PROJECT_ID=${PROJECT_ID},ENVIRONMENT=${ENVIRONMENT},MAX_CONCURRENT_PROCESSING=60,RATE_LIMIT_REQUESTS=40,MAX_DIRECT_PROCESSING=15,GEMINI_REGIONS=${GEMINI_REGIONS_FORMATTED},CLOUD_RUN_REGION=${PRIMARY_REGION},APPCHECK_REQUIRED=true" \
         --set-secrets "SCRAPECREATORS_API_KEY=scrapecreators-api-key:latest" \
         --quiet
 
@@ -126,7 +126,7 @@ else
             --timeout 900 \
             --cpu-throttling \
             --execution-environment gen2 \
-            --set-env-vars "GOOGLE_CLOUD_PROJECT_ID=${PROJECT_ID},ENVIRONMENT=${ENVIRONMENT},MAX_CONCURRENT_PROCESSING=60,RATE_LIMIT_REQUESTS=40,MAX_DIRECT_PROCESSING=15,GEMINI_REGIONS=${GEMINI_REGIONS_FORMATTED},CLOUD_RUN_REGION=$region" \
+            --set-env-vars "GOOGLE_CLOUD_PROJECT_ID=${PROJECT_ID},ENVIRONMENT=${ENVIRONMENT},MAX_CONCURRENT_PROCESSING=60,RATE_LIMIT_REQUESTS=40,MAX_DIRECT_PROCESSING=15,GEMINI_REGIONS=${GEMINI_REGIONS_FORMATTED},CLOUD_RUN_REGION=$region,APPCHECK_REQUIRED=true" \
             --set-secrets "SCRAPECREATORS_API_KEY=scrapecreators-api-key:latest" \
             --quiet >> "$log_file" 2>&1; then
             echo -e "${GREEN}[${region}] ✅ API service deployed successfully${NC}"
