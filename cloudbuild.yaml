@@ -104,8 +104,8 @@ steps:
           "--region" "${_PRIMARY_REGION}"
           "--platform" "managed"
           "--allow-unauthenticated"
-          "--memory" "4Gi"
-          "--cpu" "4"
+          "--memory" "2Gi"
+          "--cpu" "1"
           "--timeout" "900"
           "--max-instances" "100"
           "--min-instances" "2"
@@ -119,7 +119,8 @@ steps:
         
         # Add environment-specific settings
         if [[ "${_ENVIRONMENT}" == "production" ]]; then
-          DEPLOY_ARGS+=("--cpu-boost")
+          # CPU boost disabled to reduce costs; re-enable only if latency requires it
+          :
         else
           DEPLOY_ARGS+=("--tag" "${_ENVIRONMENT}" "--no-traffic")
         fi
@@ -158,8 +159,8 @@ steps:
             --region $region \
             --platform managed \
             --allow-unauthenticated \
-            --memory 4Gi \
-            --cpu 4 \
+            --memory 2Gi \
+            --cpu 1 \
             --timeout 900 \
             --max-instances 100 \
             --min-instances 1 \
@@ -205,8 +206,8 @@ steps:
           --region ${_PRIMARY_REGION} \
           --platform managed \
           --allow-unauthenticated \
-          --memory 4Gi \
-          --cpu 2 \
+          --memory 1.5Gi \
+          --cpu 1 \
           --timeout 300 \
           --concurrency 1 \
           --max-instances 20 \

@@ -73,8 +73,8 @@ else
         --region ${PRIMARY_REGION} \
         --platform managed \
         --allow-unauthenticated \
-        --memory 4Gi \
-        --cpu 4 \
+        --memory 2Gi \
+        --cpu 1 \
         --max-instances 50 \
         --min-instances 1 \
         --concurrency 80 \
@@ -92,8 +92,8 @@ else
         --region ${PRIMARY_REGION} \
         --platform managed \
         --allow-unauthenticated \
-        --memory 2Gi \
-        --cpu 2 \
+        --memory 1Gi \
+        --cpu 1 \
         --max-instances 10 \
         --min-instances 0 \
         --concurrency 1 \
@@ -120,8 +120,8 @@ else
             --region $region \
             --platform managed \
             --allow-unauthenticated \
-            --memory 4Gi \
-            --cpu 4 \
+            --memory 2Gi \
+            --cpu 1 \
             --max-instances 50 \
             --min-instances 0 \
             --concurrency 80 \
@@ -143,8 +143,8 @@ else
             --region $region \
             --platform managed \
             --allow-unauthenticated \
-            --memory 2Gi \
-            --cpu 2 \
+            --memory 1Gi \
+            --cpu 1 \
             --max-instances 10 \
             --min-instances 0 \
             --concurrency 1 \
