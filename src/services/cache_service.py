@@ -1,9 +1,12 @@
 from google.cloud import firestore
 from google.cloud.firestore import Client
+from google.api_core import retry
+from google.api_core import exceptions
 import hashlib
 import logging
 import os
 import asyncio
+import time
 from typing import Optional, Dict, Any
 from datetime import datetime, timedelta
 from urllib.parse import urlparse, parse_qs, urlencode
@@ -27,19 +30,61 @@ class CacheService:
 
         # Default TTL for cached workouts (1 week)
         self.default_ttl_hours = int(os.getenv("CACHE_TTL_HOURS", "168"))  # 24 * 7 = 168 hours
+        
+        # Connection configuration with more aggressive timeouts
+        self.operation_timeout = 30  # 30 seconds for operations
+        self.connection_timeout = 10  # 10 seconds for initial connection
+        
+        # Configure retry policy for better resilience
+        self.retry_policy = retry.Retry(
+            initial=1.0,  # Initial delay
+            maximum=10.0,  # Maximum delay
+            multiplier=2.0,  # Backoff multiplier
+            deadline=30.0,  # Total deadline
+            predicate=retry.if_exception_type(
+                exceptions.DeadlineExceeded,
+                exceptions.ServiceUnavailable,
+                exceptions.InternalServerError,
+            ),
+        )
 
-        try:
-            # Initialize Firestore client
-            self.db = firestore.Client(project=self.project_id)
-            self.collection_name = "workout_cache"
+        self.db = self._initialize_firestore_with_retry()
 
-            # Test connection by attempting to get collection reference
-            self.cache_collection = self.db.collection(self.collection_name)
-            logger.info(f"Connected to Firestore in project: {self.project_id}")
+    def _initialize_firestore_with_retry(self):
+        """Initialize Firestore client with retry logic"""
+        max_attempts = 3
+        for attempt in range(max_attempts):
+            try:
+                # Initialize Firestore client with timeout
+                self.db = firestore.Client(project=self.project_id)
+                self.collection_name = "workout_cache"
+                self.cache_collection = self.db.collection(self.collection_name)
+                
+                # Test connection with a very simple operation and short timeout
+                try:
+                    # Just test if we can access the collection (no actual read/write)
+                    test_doc_ref = self.cache_collection.document("__connection_test__")
+                    # This is a lightweight operation that just creates a reference
+                    logger.info(f"Firestore client initialized successfully for project: {self.project_id}")
+                    return self.db
+                except Exception as test_error:
+                    logger.warning(f"Firestore connection test failed (attempt {attempt + 1}): {test_error}")
+                    if attempt == max_attempts - 1:
+                        raise test_error
 
-        except Exception as e:
-            logger.warning(f"Firestore connection failed: {e}. Cache will be disabled.")
-            self.db = None
+            except Exception as e:
+                wait_time = min(2 ** attempt, 8)  # Exponential backoff, max 8 seconds
+                if attempt < max_attempts - 1:
+                    logger.warning(
+                        f"Firestore initialization attempt {attempt + 1}/{max_attempts} failed: {e}. "
+                        f"Retrying in {wait_time}s..."
+                    )
+                    time.sleep(wait_time)
+                else:
+                    logger.error(f"All Firestore initialization attempts failed: {e}. Cache will be disabled.")
+                    return None
+
+        return None
 
     def _normalize_tiktok_url(self, url: str) -> str:
         """
@@ -111,7 +156,9 @@ class CacheService:
         try:
             cache_key = self._generate_cache_key(tiktok_url, localization)
             doc_ref = self.cache_collection.document(cache_key)
-            doc = doc_ref.get()
+            
+            # Use shorter timeout and retry policy to prevent long hangs
+            doc = doc_ref.get(timeout=self.connection_timeout, retry=self.retry_policy)
 
             if doc.exists:
                 cached_data = doc.to_dict()
@@ -153,6 +200,12 @@ class CacheService:
                 logger.info(f"Cache MISS{localization_info} for URL: {tiktok_url[:50]}...")
                 return None
 
+        except exceptions.DeadlineExceeded as e:
+            logger.error(f"Cache retrieval timeout after {self.connection_timeout}s for URL: {tiktok_url[:50]}... - {e}")
+            return None
+        except exceptions.ServiceUnavailable as e:
+            logger.error(f"Firestore service unavailable for cache retrieval: {e}")
+            return None
         except Exception as e:
             logger.error(f"Error retrieving from cache: {e}")
             return None
@@ -195,9 +248,9 @@ class CacheService:
                 "ttl_hours": self.default_ttl_hours,
             }
 
-            # Store in Firestore
+            # Store in Firestore with timeout and retry
             doc_ref = self.cache_collection.document(cache_key)
-            doc_ref.set(cache_data)
+            doc_ref.set(cache_data, timeout=self.operation_timeout, retry=self.retry_policy)
 
             localization_info = f" [{localization}]" if localization else ""
             logger.info(
@@ -205,6 +258,12 @@ class CacheService:
             )
             return True
 
+        except exceptions.DeadlineExceeded as e:
+            logger.error(f"Cache storage timeout after {self.operation_timeout}s for URL: {tiktok_url[:50]}... - {e}")
+            return False
+        except exceptions.ServiceUnavailable as e:
+            logger.error(f"Firestore service unavailable for cache storage: {e}")
+            return False
         except Exception as e:
             logger.error(f"Error caching workout: {e}")
             return False
