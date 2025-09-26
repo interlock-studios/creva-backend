@@ -78,22 +78,50 @@ class VideoProcessor:
 
         logger.info(f"Processing {platform} video: {url}")
 
-        # Use appropriate scraper directly
-        try:
-            if platform == "tiktok":
+        # For Instagram, check if it's a slideshow first
+        if platform == "instagram":
+            try:
+                # Get metadata first to check if it's a slideshow
+                api_data = await self.instagram_scraper.fetch_instagram_data(url)
+                metadata_obj = self.instagram_scraper.extract_metadata(api_data)
+                
+                if metadata_obj.is_slideshow:
+                    # It's a slideshow, return empty video content and metadata
+                    logger.info(f"Detected Instagram slideshow with {metadata_obj.image_count} images")
+                    
+                    metadata = {
+                        "platform": platform,
+                        "title": metadata_obj.title or "Unknown",
+                        "duration": metadata_obj.duration_seconds or 0,
+                        "uploader": metadata_obj.author or "Unknown",
+                        "description": metadata_obj.description or "",
+                        "caption": metadata_obj.caption or metadata_obj.description or "",
+                        "tags": metadata_obj.hashtags or [],
+                        "transcript_text": None,  # Instagram slideshows don't have transcripts
+                        # Slideshow-specific metadata
+                        "is_slideshow": True,
+                        "image_count": metadata_obj.image_count,
+                        "slideshow_duration": metadata_obj.slideshow_duration,
+                    }
+                    
+                    # Return empty video content for slideshows
+                    return b"", metadata
+                else:
+                    # It's a regular video, proceed with normal video download
+                    video_content, metadata_obj, caption_text = await self.instagram_scraper.scrape_instagram_complete(url)
+                    transcript_text = caption_text
+                    
+            except Exception as e:
+                raise InstagramAPIError(
+                    message=f"Failed to download Instagram content: {str(e)}", url=url, cause=e
+                )
+        else:
+            # TikTok handling
+            try:
                 video_content, metadata_obj, transcript_text = await self.tiktok_scraper.scrape_tiktok_complete(url)
-            else:  # instagram
-                video_content, metadata_obj, caption_text = await self.instagram_scraper.scrape_instagram_complete(url)
-                # Instagram returns caption instead of transcript, but we'll treat it similarly
-                transcript_text = caption_text
-        except Exception as e:
-            if platform == "tiktok":
+            except Exception as e:
                 raise TikTokAPIError(
                     message=f"Failed to download TikTok video: {str(e)}", url=url, cause=e
-                )
-            else:
-                raise InstagramAPIError(
-                    message=f"Failed to download Instagram video: {str(e)}", url=url, cause=e
                 )
 
         # Convert metadata to dict format (same format for both platforms)

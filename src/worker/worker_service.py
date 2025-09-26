@@ -138,9 +138,32 @@ class VideoWorker:
                         slideshow_images, transcript, caption, description, localization
                     )
                 else:
-                    # Instagram slideshows (if supported in the future)
-                    logger.warning(f"Job {job_id} - Instagram slideshows not yet supported")
-                    raise Exception("Instagram slideshows not yet supported")
+                    # Handle Instagram slideshows - same pattern as TikTok
+                    logger.info(f"Job {job_id} - Processing Instagram slideshow")
+                    slideshow_images, slideshow_metadata, slideshow_transcript = (
+                        await self.video_processor.instagram_scraper.scrape_instagram_slideshow(url)
+                    )
+
+                    # Use the slideshow-specific transcript if available
+                    if slideshow_transcript:
+                        transcript = slideshow_transcript
+
+                    # Extract first image from slideshow
+                    if slideshow_images:
+                        try:
+                            first_image = await self.video_processor.extract_image_from_slideshow(
+                                slideshow_images
+                            )
+                            extracted_image_base64 = f"data:image/jpeg;base64,{base64.b64encode(first_image).decode('utf-8')}"
+                            logger.info(f"Job {job_id} - Extracted first image from Instagram slideshow")
+                        except Exception as e:
+                            logger.warning(f"Job {job_id} - Failed to extract Instagram slideshow image: {e}")
+
+                    # Analyze slideshow with GenAI
+                    logger.info(f"Job {job_id} - Analyzing Instagram slideshow with AI...")
+                    workout_json = await self.genai_pool.analyze_slideshow(
+                        slideshow_images, transcript, caption, description, localization
+                    )
             else:
                 # Handle regular video content
                 logger.info(f"Job {job_id} - Processing regular video")

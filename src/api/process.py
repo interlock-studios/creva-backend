@@ -102,7 +102,37 @@ async def process_video_direct(url: str, request_id: str, localization: str = No
                     slideshow_images, transcript, caption, description, localization
                 )
             else:
-                raise Exception("Instagram slideshows not yet supported")
+                # Handle Instagram slideshows - same pattern as TikTok
+                slideshow_images, slideshow_metadata, slideshow_transcript = (
+                    await video_processor.instagram_scraper.scrape_instagram_slideshow(url)
+                )
+
+                if slideshow_transcript:
+                    transcript = slideshow_transcript
+
+                # Extract first image from slideshow
+                if slideshow_images:
+                    try:
+                        logger.info(
+                            f"Attempting to extract first Instagram slideshow image - Request ID: {request_id}, Image count: {len(slideshow_images)}"
+                        )
+                        first_image = await video_processor.extract_image_from_slideshow(
+                            slideshow_images
+                        )
+                        extracted_image_base64 = f"data:image/jpeg;base64,{base64.b64encode(first_image).decode('utf-8')}"
+                        logger.info(
+                            f"Successfully extracted first Instagram slideshow image - Request ID: {request_id}, Image size: {len(first_image)} bytes"
+                        )
+                    except Exception as e:
+                        logger.error(
+                            f"Failed to extract Instagram slideshow image - Request ID: {request_id}, Error: {e}",
+                            exc_info=True,
+                        )
+
+                # Analyze slideshow with Gemini
+                content_json = await genai_service.analyze_slideshow_with_transcript(
+                    slideshow_images, transcript, caption, description, localization
+                )
         else:
             # Handle regular video content
             logger.info(f"Processing regular video - Request ID: {request_id}")
