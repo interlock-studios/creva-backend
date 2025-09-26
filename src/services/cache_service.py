@@ -28,7 +28,7 @@ class CacheService:
             self.db = None
             return
 
-        # Default TTL for cached workouts (1 week)
+        # Default TTL for cached bucket lists (1 week)
         self.default_ttl_hours = int(os.getenv("CACHE_TTL_HOURS", "168"))  # 24 * 7 = 168 hours
         
         # Connection configuration with more aggressive timeouts
@@ -57,7 +57,7 @@ class CacheService:
             try:
                 # Initialize Firestore client with timeout
                 self.db = firestore.Client(project=self.project_id)
-                self.collection_name = "workout_cache"
+                self.collection_name = "bucket_list_cache"
                 self.cache_collection = self.db.collection(self.collection_name)
                 
                 # Test connection with a very simple operation and short timeout
@@ -137,18 +137,18 @@ class CacheService:
         url_hash = hashlib.sha256(cache_input.encode()).hexdigest()[:16]
         return url_hash  # Just the hash, no prefix needed for Firestore
 
-    async def get_cached_workout(
+    async def get_cached_bucket_list(
         self, tiktok_url: str, localization: Optional[str] = None
     ) -> Optional[Dict[str, Any]]:
         """
-        Retrieve cached workout data for a TikTok URL and localization.
+        Retrieve cached bucket list data for a TikTok URL and localization.
 
         Args:
             tiktok_url: The TikTok video URL
             localization: Optional localization parameter (e.g., "Spanish", "es")
 
         Returns:
-            Cached workout JSON if found, None otherwise
+            Cached bucket list JSON if found, None otherwise
         """
         if not self.db:
             return None
@@ -194,7 +194,7 @@ class CacheService:
                     f"Cache HIT{localization_info} for URL: {tiktok_url[:50]}... (cached at: {created_at})"
                 )
 
-                return cached_data.get("workout_json")
+                return cached_data.get("bucket_list_json")
             else:
                 localization_info = f" [{localization}]" if localization else ""
                 logger.info(f"Cache MISS{localization_info} for URL: {tiktok_url[:50]}...")
@@ -210,19 +210,19 @@ class CacheService:
             logger.error(f"Error retrieving from cache: {e}")
             return None
 
-    async def cache_workout(
+    async def cache_bucket_list(
         self,
         tiktok_url: str,
-        workout_json: Dict[str, Any],
+        bucket_list_json: Dict[str, Any],
         metadata: Optional[Dict[str, Any]] = None,
         localization: Optional[str] = None,
     ) -> bool:
         """
-        Cache workout data for a TikTok URL and localization.
+        Cache bucket list data for a TikTok URL and localization.
 
         Args:
             tiktok_url: The TikTok video URL
-            workout_json: The processed workout JSON
+            bucket_list_json: The processed bucket list JSON
             metadata: Optional metadata about the video
             localization: Optional localization parameter (e.g., "Spanish", "es")
 
@@ -239,7 +239,7 @@ class CacheService:
             expires_at = now + timedelta(hours=self.default_ttl_hours)
 
             cache_data = {
-                "workout_json": workout_json,
+                "bucket_list_json": bucket_list_json,
                 "metadata": metadata or {},
                 "created_at": now,
                 "expires_at": expires_at,
@@ -265,12 +265,12 @@ class CacheService:
             logger.error(f"Firestore service unavailable for cache storage: {e}")
             return False
         except Exception as e:
-            logger.error(f"Error caching workout: {e}")
+            logger.error(f"Error caching bucket list: {e}")
             return False
 
     def invalidate_cache(self, tiktok_url: str, localization: Optional[str] = None) -> bool:
         """
-        Invalidate cached workout for a specific TikTok URL and localization.
+        Invalidate cached bucket list for a specific TikTok URL and localization.
 
         Args:
             tiktok_url: The TikTok video URL
@@ -348,8 +348,8 @@ class CacheService:
                     "project_id": self.project_id,
                     "collection": self.collection_name,
                 },
-                "workout_cache": {
-                    "total_cached_workouts": total_docs,
+                "bucket_list_cache": {
+                    "total_cached_bucket_lists": total_docs,
                     "recent_sample_size": recent_count,
                     "expired_in_sample": expired_count,
                     "default_ttl_hours": self.default_ttl_hours,
@@ -360,9 +360,9 @@ class CacheService:
             logger.error(f"Error getting cache stats: {e}")
             return {"status": "error", "error": str(e)}
 
-    def clear_all_workout_cache(self) -> int:
+    def clear_all_bucket_list_cache(self) -> int:
         """
-        Clear all cached workout data. Use with caution!
+        Clear all cached bucket list data. Use with caution!
 
         Returns:
             Number of documents deleted
@@ -394,11 +394,11 @@ class CacheService:
             if batch_size > 0:
                 batch.commit()
 
-            logger.warning(f"CLEARED {deleted_count} workout cache entries")
+            logger.warning(f"CLEARED {deleted_count} bucket list cache entries")
             return deleted_count
 
         except Exception as e:
-            logger.error(f"Error clearing workout cache: {e}")
+            logger.error(f"Error clearing bucket list cache: {e}")
             return 0
 
     def is_healthy(self) -> bool:
@@ -413,7 +413,19 @@ class CacheService:
         except Exception:
             return False
     
-    # Backward compatibility method
+    # Backward compatibility methods
+    async def get_cached_workout(self, tiktok_url: str, localization: Optional[str] = None) -> Optional[Dict[str, Any]]:
+        """Backward compatibility method - use get_cached_bucket_list instead"""
+        return await self.get_cached_bucket_list(tiktok_url, localization)
+    
+    async def cache_workout(self, tiktok_url: str, workout_json: Dict[str, Any], metadata: Optional[Dict[str, Any]] = None, localization: Optional[str] = None) -> bool:
+        """Backward compatibility method - use cache_bucket_list instead"""
+        return await self.cache_bucket_list(tiktok_url, workout_json, metadata, localization)
+    
+    def clear_all_workout_cache(self) -> int:
+        """Backward compatibility method - use clear_all_bucket_list_cache instead"""
+        return self.clear_all_bucket_list_cache()
+    
     def get_cache_stats_sync(self) -> Dict[str, Any]:
         """Synchronous version of get_cache_stats for backward compatibility"""
         try:

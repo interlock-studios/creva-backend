@@ -364,7 +364,7 @@ WORKER_POLLING_INTERVAL=1
 
 ### Cloud Firestore
 - **Collections**:
-  - `workout_cache` - Processed video cache
+  - `bucket_list_cache` - Processed video cache
   - `processing_queue` - Job queue management
   - `processing_results` - Completed job results
 - **Indexes**: Composite indexes for queue queries

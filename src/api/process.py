@@ -186,7 +186,7 @@ async def process_video_direct(url: str, request_id: str, localization: str = No
         )
 
         # Cache the result
-        await cache_service.cache_workout(url, content_json, localization=localization)
+        await cache_service.cache_bucket_list(url, content_json, localization=localization)
 
         logger.info(f"Direct processing completed - Request ID: {request_id}")
         return content_json
@@ -216,10 +216,10 @@ async def process_video(
         logger.debug(f"App Check not provided (optional) - Request ID: {request_id}")
 
     # Check cache first
-    cached_workout = await cache_service.get_cached_workout(request.url, request.localization)
-    if cached_workout:
+    cached_bucket_list = await cache_service.get_cached_bucket_list(request.url, request.localization)
+    if cached_bucket_list:
         logger.info(f"Returning cached result - Request ID: {request_id}, URL: {request.url}")
-        return RelationshipContent(**cached_workout)
+        return RelationshipContent(**cached_bucket_list)
 
     # Check if already in queue (with localization)
     existing_job = await queue_service.get_job_by_url(request.url, status="pending", localization=request.localization)
