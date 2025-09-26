@@ -88,6 +88,9 @@ class InstagramScraper:
                 "SCRAPECREATORS_API_KEY environment variable is required and must be set to a valid API key. "
                 "Please update your .env file with your actual ScrapeCreators API key."
             )
+        
+        # Clean the API key to prevent header issues (remove whitespace and newlines)
+        self.api_key = self.api_key.strip()
 
         self.base_url = "https://api.scrapecreators.com/v1/instagram/post"
         logger.info("Instagram scraper initialized with API key validation")
@@ -306,7 +309,7 @@ class InstagramScraper:
                 elif response.status_code == 401:
                     raise APIError("Unauthorized - check your API key", response.status_code)
                 elif response.status_code == 403:
-                    raise APIError("Forbidden - insufficient permissions", response.status_code)
+                    raise APIError(f"Forbidden - insufficient permissions (API key issue or rate limit). Response: {response.text[:200]}", response.status_code)
                 elif response.status_code == 404:
                     raise APIError("Post/Reel not found or unavailable", response.status_code)
                 elif response.status_code == 429:

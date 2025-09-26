@@ -7,6 +7,15 @@ import time
 import random
 import asyncio
 import os
+import io
+try:
+    from PIL import Image
+    import pillow_heif
+    # Register HEIF opener with PIL
+    pillow_heif.register_heif_opener()
+    PILLOW_AVAILABLE = True
+except ImportError:
+    PILLOW_AVAILABLE = False
 
 logger = logging.getLogger(__name__)
 
@@ -245,12 +254,34 @@ IMPORTANT: Your response must be ONLY the JSON object, with no markdown formatti
         # Add all slideshow images to the analysis
         valid_images = 0
         for i, image_content in enumerate(slideshow_images):
-            if image_content:  # Skip empty image content
-                try:
-                    contents.append(Part.from_bytes(data=image_content, mime_type="image/jpeg"))
-                    valid_images += 1
-                except Exception as e:
-                    logger.warning(f"Failed to add image {i} to analysis: {e}")
+            if image_content and len(image_content) > 0:  # Skip empty image content
+                # Additional validation for image content
+                if self._is_valid_image_content(image_content):
+                    try:
+                        # Determine mime type based on content
+                        mime_type = self._get_image_mime_type(image_content)
+                        
+                        # Convert HEIC/HEIF to JPEG as Gemini doesn't support them
+                        if mime_type == "image/heic":
+                            if PILLOW_AVAILABLE:
+                                try:
+                                    image_content = self._convert_heic_to_jpeg(image_content)
+                                    mime_type = "image/jpeg"
+                                    logger.debug(f"Converted HEIC image {i} to JPEG for Gemini compatibility")
+                                except Exception as conv_error:
+                                    logger.warning(f"Failed to convert HEIC image {i} to JPEG: {conv_error}, skipping")
+                                    continue
+                            else:
+                                logger.warning(f"Skipping image {i}: HEIC format not supported and conversion unavailable")
+                                continue
+                            
+                        contents.append(Part.from_bytes(data=image_content, mime_type=mime_type))
+                        valid_images += 1
+                        logger.debug(f"Added image {i} to analysis (size: {len(image_content)} bytes, type: {mime_type})")
+                    except Exception as e:
+                        logger.warning(f"Failed to add image {i} to analysis: {e}")
+                else:
+                    logger.warning(f"Skipping image {i}: Invalid image content (size: {len(image_content)} bytes)")
 
         if valid_images == 0:
             logger.error("No valid images found in slideshow")
@@ -295,3 +326,93 @@ IMPORTANT: Your response must be ONLY the JSON object, with no markdown formatti
         except Exception as e:
             logger.error(f"Failed to parse slideshow response: {e}")
             return None
+
+    def _is_valid_image_content(self, content: bytes) -> bool:
+        """Validate if the content is a valid image by checking headers"""
+        if not content or len(content) < 10:
+            return False
+            
+        # Check for common image format headers
+        # JPEG
+        if content.startswith(b'\xff\xd8\xff'):
+            return True
+        # PNG
+        if content.startswith(b'\x89PNG\r\n\x1a\n'):
+            return True
+        # WebP
+        if len(content) > 12 and content[8:12] == b'WEBP':
+            return True
+        # GIF
+        if content.startswith(b'GIF87a') or content.startswith(b'GIF89a'):
+            return True
+        # BMP
+        if content.startswith(b'BM'):
+            return True
+        # HEIC/HEIF (Apple's format used by TikTok)
+        if len(content) > 12:
+            # HEIC files have 'ftyp' at offset 4-8 and 'heic' or 'mif1' at offset 8-12
+            if content[4:8] == b'ftyp' and (content[8:12] == b'heic' or content[8:12] == b'mif1'):
+                return True
+            # Alternative HEIC signature
+            if content[4:8] == b'ftyp' and content[8:12] == b'heix':
+                return True
+            # Additional HEIC variants
+            if content[4:8] == b'ftyp' and content[8:12] == b'msf1':
+                return True
+            # Check for any MP4-based image format (which HEIC is based on)
+            if content[4:8] == b'ftyp':
+                return True
+        
+        # AVIF format (another modern image format)
+        if len(content) > 12 and content[4:8] == b'ftyp' and content[8:12] == b'avif':
+            return True
+            
+        return False
+
+    def _get_image_mime_type(self, content: bytes) -> str:
+        """Determine the MIME type of an image based on its content"""
+        if content.startswith(b'\xff\xd8\xff'):
+            return "image/jpeg"
+        elif content.startswith(b'\x89PNG\r\n\x1a\n'):
+            return "image/png"
+        elif len(content) > 12 and content[8:12] == b'WEBP':
+            return "image/webp"
+        elif content.startswith(b'GIF87a') or content.startswith(b'GIF89a'):
+            return "image/gif"
+        elif content.startswith(b'BM'):
+            return "image/bmp"
+        elif len(content) > 12 and content[4:8] == b'ftyp':
+            # Handle all MP4-based image formats (HEIC, AVIF, etc.)
+            if content[8:12] == b'avif':
+                return "image/avif"
+            else:
+                # Default to HEIC for other ftyp-based formats
+                return "image/heic"
+        else:
+            # Default to JPEG if we can't determine the type
+            return "image/jpeg"
+
+    def _convert_heic_to_jpeg(self, heic_content: bytes) -> bytes:
+        """Convert HEIC image content to JPEG format"""
+        if not PILLOW_AVAILABLE:
+            raise RuntimeError("Pillow and pillow-heif are required for HEIC conversion")
+        
+        try:
+            # Open HEIC image from bytes
+            heic_image = Image.open(io.BytesIO(heic_content))
+            
+            # Convert to RGB if necessary (HEIC can be in different color modes)
+            if heic_image.mode != 'RGB':
+                heic_image = heic_image.convert('RGB')
+            
+            # Save as JPEG to bytes buffer
+            jpeg_buffer = io.BytesIO()
+            heic_image.save(jpeg_buffer, format='JPEG', quality=85, optimize=True)
+            jpeg_content = jpeg_buffer.getvalue()
+            
+            logger.debug(f"Converted HEIC image ({len(heic_content)} bytes) to JPEG ({len(jpeg_content)} bytes)")
+            return jpeg_content
+            
+        except Exception as e:
+            logger.error(f"Failed to convert HEIC to JPEG: {e}")
+            raise

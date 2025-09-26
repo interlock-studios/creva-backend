@@ -601,6 +601,48 @@ class TikTokScraper:
         logger.info(f"Extracted {len(images)} slideshow images")
         return images
 
+    def _is_valid_image(self, content: bytes) -> bool:
+        """Validate if the content is a valid image by checking headers"""
+        if not content or len(content) < 10:
+            return False
+            
+        # Check for common image format headers
+        # JPEG
+        if content.startswith(b'\xff\xd8\xff'):
+            return True
+        # PNG
+        if content.startswith(b'\x89PNG\r\n\x1a\n'):
+            return True
+        # WebP
+        if len(content) > 12 and content[8:12] == b'WEBP':
+            return True
+        # GIF
+        if content.startswith(b'GIF87a') or content.startswith(b'GIF89a'):
+            return True
+        # BMP
+        if content.startswith(b'BM'):
+            return True
+        # HEIC/HEIF (Apple's format used by TikTok)
+        if len(content) > 12:
+            # HEIC files have 'ftyp' at offset 4-8 and 'heic' or 'mif1' at offset 8-12
+            if content[4:8] == b'ftyp' and (content[8:12] == b'heic' or content[8:12] == b'mif1'):
+                return True
+            # Alternative HEIC signature
+            if content[4:8] == b'ftyp' and content[8:12] == b'heix':
+                return True
+            # Additional HEIC variants
+            if content[4:8] == b'ftyp' and content[8:12] == b'msf1':
+                return True
+            # Check for any MP4-based image format (which HEIC is based on)
+            if content[4:8] == b'ftyp':
+                return True
+        
+        # AVIF format (another modern image format)
+        if len(content) > 12 and content[4:8] == b'ftyp' and content[8:12] == b'avif':
+            return True
+            
+        return False
+
     def get_video_download_url(self, api_data: Dict[str, Any]) -> str:
         """Get no-watermark video URL (for regular videos only)"""
         aweme = api_data["aweme_detail"]
@@ -667,17 +709,25 @@ class TikTokScraper:
                 try:
                     response = await client.get(img.url, headers=headers)
                     response.raise_for_status()
-                    image_contents.append(response.content)
-                    logger.info(
-                        f"Downloaded slideshow image {img.index + 1}/{len(slideshow_images)}"
-                    )
+                    
+                    # Validate that the content is actually an image
+                    content = response.content
+                    if self._is_valid_image(content):
+                        image_contents.append(content)
+                        logger.info(
+                            f"Downloaded slideshow image {img.index + 1}/{len(slideshow_images)}"
+                        )
+                    else:
+                        # Debug: Log the first 20 bytes to understand the format
+                        content_hex = content[:20].hex() if len(content) >= 20 else content.hex()
+                        logger.warning(f"Downloaded content for image {img.index} is not a valid image, skipping. Size: {len(content)} bytes, First 20 bytes: {content_hex}")
+                        
                 except Exception as e:
                     logger.error(f"Failed to download slideshow image {img.index}: {e}")
-                    # Add empty bytes as placeholder to maintain order
-                    image_contents.append(b"")
+                    # Don't add empty bytes or invalid content - just skip
 
         logger.info(
-            f"Downloaded {len([c for c in image_contents if c])} out of {len(slideshow_images)} slideshow images"
+            f"Downloaded {len(image_contents)} valid images out of {len(slideshow_images)} slideshow images"
         )
         return image_contents
 

@@ -30,3 +30,7 @@ google-cloud-monitoring==2.27.0
 
 # Health check
 requests==2.32.3
+
+# Image processing for format conversion
+Pillow==11.0.0
+pillow-heif==0.18.0
