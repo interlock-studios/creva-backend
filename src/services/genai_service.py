@@ -89,6 +89,7 @@ class GenAIService:
         video_content: bytes,
         transcript: Optional[str] = None,
         caption: Optional[str] = None,
+        description: Optional[str] = None,
         localization: Optional[str] = None,
     ) -> Optional[Dict[str, Any]]:
         """Analyze video/post with Gemini 2.0 Flash for relationship content"""
@@ -105,12 +106,15 @@ class GenAIService:
         if caption:
             prompt += f"\n\nCAPTION:\n{caption}"
 
+        if description:
+            prompt += f"\n\nDESCRIPTION:\n{description}"
+
         # Add localization instructions if specified
         localization_instruction = ""
         if localization:
             localization_instruction = f"\n\nIMPORTANT: Provide ALL text content (title, description, tips, location) in {localization} language ONLY. Translate ALL human-readable text fields consistently in the specified language. Maintain the exact JSON structure but translate all text to {localization}."
 
-        prompt += "\n\nAnalyze this social media post/video and extract relationship, dating, or lifestyle content. Return your response as a valid JSON object with NO additional text, explanations, or formatting."
+        prompt += "\n\nAnalyze this social media post/video and extract relationship, dating, or lifestyle content. Use ALL available information (video content, transcript, caption, and description) to create a comprehensive analysis. Return your response as a valid JSON object with NO additional text, explanations, or formatting."
         prompt += localization_instruction
         prompt += """
 
@@ -130,12 +134,15 @@ Required JSON structure:
 
 EXTRACTION GUIDELINES:
 - Focus on relationship, dating, and lifestyle content
+- Combine information from video visuals, transcript/audio, caption, and metadata description
+- For Instagram: Use both the caption (primary text) and description (additional metadata) to understand context
+- For TikTok: Use both the transcript (spoken content) and description (post text) for comprehensive analysis
 - Extract the main image URL if visible in the video/post
-- Identify any location mentioned in captions, tags, or content
-- Categorize the content type based on the main theme
-- Extract actionable tips or advice if present
-- Identify the mood and occasion if relevant
-- Include relevant hashtags or tags
+- Identify any location mentioned in captions, descriptions, tags, or visual content
+- Categorize the content type based on the main theme across all available sources
+- Extract actionable tips or advice from both spoken/written content and visual elements
+- Identify the mood and occasion based on visual, audio, and textual cues
+- Include relevant hashtags or tags from captions and descriptions
 
 CRITICAL CONSISTENCY RULE: If localization is specified, ALL text fields (title, description, tips, location) MUST be in the SAME target language consistently throughout the entire response.
 
@@ -194,6 +201,7 @@ IMPORTANT: Your response must be ONLY the JSON object, with no markdown formatti
         slideshow_images: List[bytes],
         transcript: Optional[str] = None,
         caption: Optional[str] = None,
+        description: Optional[str] = None,
         localization: Optional[str] = None,
     ) -> Optional[Dict[str, Any]]:
         """Analyze slideshow images with Gemini 2.0 Flash"""
@@ -210,13 +218,16 @@ IMPORTANT: Your response must be ONLY the JSON object, with no markdown formatti
         if caption:
             prompt += f"\n\nCAPTION:\n{caption}"
 
+        if description:
+            prompt += f"\n\nDESCRIPTION:\n{description}"
+
         # Add localization instructions if specified
         localization_instruction = ""
         if localization:
             localization_instruction = f"\n\nIMPORTANT: Provide ALL text content (title, description, tips, location) in {localization} language ONLY. Translate ALL human-readable text fields consistently in the specified language. Maintain the exact JSON structure but translate all text to {localization}."
 
         image_count = len(slideshow_images)
-        prompt += f"\n\nThis is a slideshow with {image_count} images. Analyze ALL the images together to extract relationship, dating, or lifestyle content. Use 'slideshow_image_1' as placeholder for the main image URL. Return your response as a valid JSON object with NO additional text, explanations, or formatting."
+        prompt += f"\n\nThis is a slideshow with {image_count} images. Analyze ALL the images together along with transcript, caption, and description to extract relationship, dating, or lifestyle content. Use ALL available information to create a comprehensive analysis. Use 'slideshow_image_1' as placeholder for the main image URL. Return your response as a valid JSON object with NO additional text, explanations, or formatting."
         prompt += localization_instruction
 
         prompt += """
@@ -237,12 +248,15 @@ Required JSON structure:
 
 EXTRACTION GUIDELINES:
 - Focus on relationship, dating, and lifestyle content
+- Combine information from all slideshow images, transcript/audio, caption, and metadata description
+- For Instagram: Use both the caption (primary text) and description (additional metadata) to understand context
+- For TikTok: Use both the transcript (spoken content) and description (post text) for comprehensive analysis
 - Use 'slideshow_image_1' as placeholder for the main image field
-- Look for location information in images or captions
+- Look for location information in images, captions, descriptions, or audio content
 - Analyze ALL images together to understand the complete story or advice
-- Extract actionable tips or advice if present across the images
-- Identify the overall mood and occasion
-- Include relevant hashtags or tags
+- Extract actionable tips or advice from both visual content and text/audio sources
+- Identify the overall mood and occasion based on visual progression and textual cues
+- Include relevant hashtags or tags from captions and descriptions
 
 CRITICAL CONSISTENCY RULE: If localization is specified, ALL text fields (title, description, tips, location) MUST be in the SAME target language consistently throughout the entire response.
 

@@ -57,7 +57,8 @@ async def process_video_direct(url: str, request_id: str, localization: str = No
 
         # Check if this is a slideshow
         is_slideshow = metadata.get("is_slideshow", False)
-        caption = metadata.get("caption", "") or metadata.get("description", "")
+        caption = metadata.get("caption", "")
+        description = metadata.get("description", "")
         transcript = metadata.get("transcript_text")
         extracted_image_base64 = None
 
@@ -98,7 +99,7 @@ async def process_video_direct(url: str, request_id: str, localization: str = No
 
                 # Analyze slideshow with Gemini
                 content_json = await genai_service.analyze_slideshow_with_transcript(
-                    slideshow_images, transcript, caption, localization
+                    slideshow_images, transcript, caption, description, localization
                 )
             else:
                 raise Exception("Instagram slideshows not yet supported")
@@ -126,7 +127,7 @@ async def process_video_direct(url: str, request_id: str, localization: str = No
 
             # Analyze with Gemini (no audio removal needed)
             content_json = await genai_service.analyze_video_with_transcript(
-                video_content, transcript, caption, localization
+                video_content, transcript, caption, description, localization
             )
 
         if not content_json:

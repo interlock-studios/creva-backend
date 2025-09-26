@@ -94,7 +94,8 @@ class VideoWorker:
 
             # Extract transcript from metadata
             transcript = metadata_dict.get("transcript_text")
-            caption = metadata_dict.get("caption", "") or metadata_dict.get("description", "")
+            caption = metadata_dict.get("caption", "")
+            description = metadata_dict.get("description", "")
             extracted_image_base64 = None
 
             if transcript:
@@ -134,7 +135,7 @@ class VideoWorker:
                     # Analyze slideshow with GenAI
                     logger.info(f"Job {job_id} - Analyzing slideshow with AI...")
                     workout_json = await self.genai_pool.analyze_slideshow(
-                        slideshow_images, transcript, caption
+                        slideshow_images, transcript, caption, description, localization
                     )
                 else:
                     # Instagram slideshows (if supported in the future)
@@ -157,7 +158,7 @@ class VideoWorker:
                 # 2. Analyze with Gemini (no audio removal needed)
                 logger.info(f"Job {job_id} - Analyzing video with AI...")
                 workout_json = await self.genai_pool.analyze_video(
-                    video_content, transcript, caption, localization
+                    video_content, transcript, caption, description, localization
                 )
 
             if not workout_json:
