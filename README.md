@@ -140,9 +140,13 @@ Process a TikTok or Instagram post/video
 
 ```bash
 # Basic usage
-curl -X POST http://localhost:8080/process \
+curl -X POST http://localhost:8000/process \
   -H "Content-Type: application/json" \
-  -d '{"url": "https://www.tiktok.com/@user/video/123"}'
+  -d '{"url": "https://www.instagram.com/p/DH2NALdyt2s/?igsh=dGR6eWs1d2o0azFk"}'
+
+curl -X POST http://localhost:8000/process \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://www.instagram.com/p/DPCGfg5jKx3/"}'
 
 # With Spanish localization
 curl -X POST http://localhost:8080/process \
