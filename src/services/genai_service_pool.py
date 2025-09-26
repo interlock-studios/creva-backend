@@ -264,7 +264,7 @@ class GenAIService:
 Required JSON structure:
 {
   "title": "descriptive title for the content",
-  "description": "brief description of the content or null",
+  "description": "concise description with brief summary and key tips formatted with \\n line breaks",
   "image": "main image URL from the post/video or null",
   "location": "location mentioned or tagged in the content or null",
   "content_type": "type of content (examples: date_idea, relationship_advice, couples_activity, lifestyle_tip, romantic_gesture, communication_tip, self_care) or null",
@@ -280,6 +280,11 @@ EXTRACTION GUIDELINES:
 - Combine information from video visuals, transcript/audio, caption, and metadata description
 - For Instagram: Use both the caption (primary text) and description (additional metadata) to understand context
 - For TikTok: Use both the transcript (spoken content) and description (post text) for comprehensive analysis
+- DESCRIPTION FIELD: Create a concise description that includes:
+  * Brief content summary (what the post/video is about)
+  * Key tips formatted with '\n' line breaks for readability
+  * Keep it focused and not overly verbose
+  * Format tips as a simple list within the description using line breaks
 - Extract the main image URL if visible in the video/post
 - Identify any location mentioned in captions, descriptions, tags, or visual content
 - Categorize the content type based on the main theme across all available sources
@@ -375,7 +380,7 @@ IMPORTANT: Your response must be ONLY the JSON object, with no markdown formatti
 Required JSON structure:
 {
   "title": "descriptive title for the content",
-  "description": "brief description of the content or null",
+  "description": "concise description with brief summary and key tips formatted with \\n line breaks",
   "image": "use 'slideshow_image_1' as placeholder",
   "location": "location mentioned or visible in the content or null",
   "content_type": "type of content (examples: date_idea, relationship_advice, couples_activity, lifestyle_tip, romantic_gesture, communication_tip, self_care) or null",
@@ -391,6 +396,11 @@ EXTRACTION GUIDELINES:
 - Combine information from all slideshow images, transcript/audio, caption, and metadata description
 - For Instagram: Use both the caption (primary text) and description (additional metadata) to understand context
 - For TikTok: Use both the transcript (spoken content) and description (post text) for comprehensive analysis
+- DESCRIPTION FIELD: Create a concise description that includes:
+  * Brief content summary (what the slideshow is about)
+  * Key tips formatted with '\n' line breaks for readability
+  * Keep it focused and not overly verbose
+  * Format tips as a simple list within the description using line breaks
 - Use 'slideshow_image_1' as placeholder for the main image field
 - Look for location information in images, captions, descriptions, or audio content
 - Analyze ALL images together to understand the complete story or advice
