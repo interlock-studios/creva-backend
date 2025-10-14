@@ -193,6 +193,12 @@ setup-lb-security: ## Setup load balancer with security policies
 	@chmod +x ./scripts/setup/setup-global-lb-fixed.sh
 	@./scripts/setup/setup-global-lb-fixed.sh
 
+.PHONY: update-lb-single-region
+update-lb-single-region: ## Update load balancer to only route to us-central1 (primary region)
+	@echo "$(GREEN)Updating load balancer to single region (us-central1 only)...$(NC)"
+	@chmod +x ./scripts/setup/update-lb-single-region.sh
+	@./scripts/setup/update-lb-single-region.sh
+
 .PHONY: logs
 logs: ## View Cloud Run logs from primary region
 	@echo "$(GREEN)Fetching logs from primary region...$(NC)"

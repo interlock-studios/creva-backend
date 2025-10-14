@@ -4,6 +4,8 @@
 
 This guide explains how to implement comprehensive cybersecurity checks at the Google Cloud Load Balancer level **before** requests reach your Cloud Run instances, preventing resource waste and improving security.
 
+**Current Configuration:** Load balancer routes all traffic to **us-central1** (primary region only). Secondary regions are deployed but scaled to zero to minimize costs.
+
 ## Problem Solved ✅
 
 **Bot requests to non-existent endpoints** like `/wp-admin`, `/phpmyadmin`, `/admin` were causing:
@@ -283,6 +285,33 @@ Edge security **complements** your existing application-level security:
 - **Edge**: Blocks obvious attacks and abuse
 - **Application**: Handles business logic security (App Check, authentication)
 - **Defense in Depth**: Multiple layers provide comprehensive protection
+
+## Load Balancer Configuration
+
+### Current Setup: Single Region Routing
+The load balancer is currently configured to route **all traffic to us-central1** (primary region only).
+
+**Benefits:**
+- 💰 **~95% cost reduction** - Secondary regions scale to zero when unused
+- 🎯 **Simplified routing** - All traffic goes to one region
+- 📊 **Easier monitoring** - Single region to track
+
+**To update routing:**
+```bash
+# Update to single region (us-central1 only)
+make update-lb-single-region
+
+# To restore multi-region routing, re-run setup
+make setup-lb-security
+```
+
+**Current backends:**
+- ✅ **us-central1** (active, min-instances=1)
+- ❌ us-east1 (removed from load balancer)
+- ❌ europe-west1 (removed from load balancer)
+- ❌ asia-southeast1 (removed from load balancer)
+
+**Note:** Secondary region Cloud Run services remain deployed but will scale to zero since they receive no traffic. Cost: ~$1-2/month for Docker image storage only.
 
 ## Next Steps
 

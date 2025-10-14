@@ -373,15 +373,17 @@ def record_appcheck_metric(metric_type: str, path: str = "", app_id: str = "", i
 async def get_regional_health():
     """Get health status of all regions for load balancer routing"""
     try:
-        from src.services.genai_service_pool import get_genai_service_pool
-        service_pool = await get_genai_service_pool()
-        pool_stats = service_pool.get_pool_stats()
+        from src.services.genai_service_pool import GenAIServicePool
+        
+        # Initialize pool to check health
+        pool = GenAIServicePool()
+        pool_size = pool.get_pool_size()
+        current_region = os.getenv("CLOUD_RUN_REGION", "us-central1")
         
         return {
-            "status": "healthy" if pool_stats["healthy_services"] > 0 else "unhealthy",
-            "regions": pool_stats["regions"],
-            "healthy_services": pool_stats["healthy_services"],
-            "total_services": pool_stats["total_services"],
+            "status": "healthy" if pool_size > 0 else "unhealthy",
+            "current_region": current_region,
+            "pool_size": pool_size,
             "timestamp": datetime.utcnow().isoformat(),
         }
     except Exception as e:

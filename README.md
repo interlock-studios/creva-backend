@@ -563,6 +563,33 @@ WORKER_PORT=8081        # Worker port
 LOG_LEVEL=INFO          # DEBUG|INFO|WARNING|ERROR
 ```
 
+## 📖 Documentation
+
+Comprehensive guides for operations, deployment, and architecture:
+
+- **[Scripts Directory](scripts/README.md)** - All deployment and setup scripts
+- **[Edge Security Setup](docs/operations/EDGE_SECURITY_SETUP.md)** - Cloud Armor and bot protection
+- **[Performance Optimizations](docs/operations/PERFORMANCE_OPTIMIZATIONS.md)** - Speed improvements
+- **[Deployment Guide](docs/operations/DEPLOYMENT_GUIDE.md)** - Production deployment steps
+- **[Project Structure](PROJECT_STRUCTURE.md)** - Quick guide to the codebase
+- **[Integration PRD](docs/architecture/INTEGRATION_PRD.md)** - Dual-service architecture
+
+### Quick Commands Reference
+```bash
+# Deployment
+make deploy                    # Multi-region deployment
+make deploy-preview           # Single-region preview
+
+# Infrastructure
+make setup-security           # Edge security (Cloud Armor)
+make update-lb-single-region  # Cost optimization (single region)
+
+# Monitoring
+make logs                     # View logs
+make test-endpoints          # Test all endpoints
+make security-logs           # View blocked requests
+```
+
 ## 📚 Architecture Details
 
 ### Service Architecture
