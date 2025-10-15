@@ -20,7 +20,7 @@ def test_full_video_processing_pipeline(client: TestClient, sample_workout_json:
          patch('src.api.process.MAX_DIRECT_PROCESSING', 5):
         
         # Mock cache miss (async method)
-        mock_cache.get_cached_workout = AsyncMock(return_value=None)
+        mock_cache.get_cached_bucket_list = AsyncMock(return_value=None)
         
         # Mock no existing job (async method)
         mock_queue.get_job_by_url = AsyncMock(return_value=None)
@@ -36,7 +36,7 @@ def test_full_video_processing_pipeline(client: TestClient, sample_workout_json:
         mock_genai.analyze_video_with_transcript = AsyncMock(return_value=sample_workout_json)
         
         # Mock cache write (async method)
-        mock_cache.cache_workout = AsyncMock(return_value=None)
+        mock_cache.cache_bucket_list = AsyncMock(return_value=None)
         
         # Test the full pipeline
         response = client.post("/process", json={

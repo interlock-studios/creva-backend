@@ -1,13 +1,13 @@
 import httpx
 import logging
 import asyncio
-from typing import Dict, Any, Optional, Tuple
+from typing import Dict, Any, Optional, Tuple, List
 import os
 from urllib.parse import urlparse
 import re
 from dataclasses import dataclass
 
-from src.models.parser_result import VideoMetadata
+from src.models.parser_result import VideoMetadata, SlideshowImage
 
 
 """
@@ -24,6 +24,7 @@ Features:
 - Logging for monitoring and debugging
 - Support for posts and reels
 - Video content downloading
+- Slideshow support
 
 Environment Variables:
     SCRAPECREATORS_API_KEY: Your ScrapeCreators API key (required)
@@ -88,6 +89,9 @@ class InstagramScraper:
                 "SCRAPECREATORS_API_KEY environment variable is required and must be set to a valid API key. "
                 "Please update your .env file with your actual ScrapeCreators API key."
             )
+        
+        # Clean the API key to prevent header issues (remove whitespace and newlines)
+        self.api_key = self.api_key.strip()
 
         self.base_url = "https://api.scrapecreators.com/v1/instagram/post"
         logger.info("Instagram scraper initialized with API key validation")
@@ -306,7 +310,7 @@ class InstagramScraper:
                 elif response.status_code == 401:
                     raise APIError("Unauthorized - check your API key", response.status_code)
                 elif response.status_code == 403:
-                    raise APIError("Forbidden - insufficient permissions", response.status_code)
+                    raise APIError(f"Forbidden - insufficient permissions (API key issue or rate limit). Response: {response.text[:200]}", response.status_code)
                 elif response.status_code == 404:
                     raise APIError("Post/Reel not found or unavailable", response.status_code)
                 elif response.status_code == 429:
@@ -377,7 +381,7 @@ class InstagramScraper:
             raise
 
     def extract_metadata(self, api_data: Dict[str, Any]) -> VideoMetadata:
-        """Extract metadata from API response"""
+        """Extract metadata from API response, handling both videos and slideshows"""
         media_data = api_data["data"]["xdt_shortcode_media"]
 
         # Extract caption/description
@@ -397,8 +401,26 @@ class InstagramScraper:
         comment_count = media_data.get("edge_media_to_parent_comment", {}).get("count", 0)
         view_count = media_data.get("video_view_count", 0)
 
-        # Duration (in seconds)
-        duration_seconds = media_data.get("video_duration")
+        # Check if this is a slideshow (carousel) - Instagram uses __typename
+        # XDTGraphSidecar indicates a slideshow/carousel
+        is_slideshow = media_data.get("__typename") == "XDTGraphSidecar"
+
+        slideshow_images = None
+        slideshow_duration = None
+        image_count = None
+        duration_seconds = None
+
+        if is_slideshow:
+            # Extract slideshow-specific data - same pattern as TikTok
+            slideshow_images = self._extract_slideshow_images(media_data)
+            image_count = len(slideshow_images) if slideshow_images else 0
+            # Instagram slideshows don't have duration like TikTok
+            slideshow_duration = None
+            duration_seconds = None
+            logger.info(f"Detected Instagram slideshow with {image_count} images")
+        else:
+            # Regular video - extract duration
+            duration_seconds = media_data.get("video_duration")
 
         # Timestamp
         taken_at = media_data.get("taken_at_timestamp")
@@ -424,6 +446,11 @@ class InstagramScraper:
             sound_title=sound_title,
             sound_author=sound_author,
             file_size_bytes=None,
+            # Slideshow-specific fields - same as TikTok
+            is_slideshow=is_slideshow,
+            slideshow_images=slideshow_images,
+            slideshow_duration=slideshow_duration,
+            image_count=image_count,
         )
 
     def get_video_download_url(self, api_data: Dict[str, Any]) -> str:
@@ -452,3 +479,146 @@ class InstagramScraper:
             response = await client.get(download_url, headers=headers)
             response.raise_for_status()
             return response.content
+
+    def get_slideshow_images(self, api_data: Dict[str, Any]) -> List[SlideshowImage]:
+        """Get slideshow images from API response - Instagram pattern"""
+        media_data = api_data["data"]["xdt_shortcode_media"]
+        
+        # Check if it's a slideshow
+        if media_data.get("__typename") != "XDTGraphSidecar":
+            raise APIError("This is not a slideshow")
+
+        return self._extract_slideshow_images(media_data)
+
+    def _extract_slideshow_images(self, media_data: Dict[str, Any]) -> List[SlideshowImage]:
+        """Extract slideshow images from Instagram carousel - Instagram pattern"""
+        images = []
+
+        # For Instagram slideshows, the API endpoint might not return all images
+        # For now, use the main display_url as the primary image
+        image_url = media_data.get("display_url")
+        if image_url:
+            # Since we can't get dimensions easily, use None
+            images.append(SlideshowImage(url=image_url, width=None, height=None, index=0))
+            
+        # Also try thumbnail as a fallback/additional image
+        thumbnail_url = media_data.get("thumbnail_src")
+        if thumbnail_url and thumbnail_url != image_url:
+            images.append(SlideshowImage(url=thumbnail_url, width=None, height=None, index=1))
+
+        logger.info(f"Extracted {len(images)} Instagram slideshow images")
+        return images
+
+    def _is_valid_image(self, content: bytes) -> bool:
+        """Validate if the content is a valid image by checking headers - copied from TikTok"""
+        if not content or len(content) < 10:
+            return False
+            
+        # Check for common image format headers
+        # JPEG
+        if content.startswith(b'\xff\xd8\xff'):
+            return True
+        # PNG
+        if content.startswith(b'\x89PNG\r\n\x1a\n'):
+            return True
+        # WebP
+        if len(content) > 12 and content[8:12] == b'WEBP':
+            return True
+        # GIF
+        if content.startswith(b'GIF87a') or content.startswith(b'GIF89a'):
+            return True
+        # BMP
+        if content.startswith(b'BM'):
+            return True
+        # HEIC/HEIF (Apple's format used by TikTok)
+        if len(content) > 12:
+            # HEIC files have 'ftyp' at offset 4-8 and 'heic' or 'mif1' at offset 8-12
+            if content[4:8] == b'ftyp' and (content[8:12] == b'heic' or content[8:12] == b'mif1'):
+                return True
+            # Alternative HEIC signature
+            if content[4:8] == b'ftyp' and content[8:12] == b'heix':
+                return True
+            # Additional HEIC variants
+            if content[4:8] == b'ftyp' and content[8:12] == b'msf1':
+                return True
+            # Check for any MP4-based image format (which HEIC is based on)
+            if content[4:8] == b'ftyp':
+                return True
+        
+        # AVIF format (another modern image format)
+        if len(content) > 12 and content[4:8] == b'ftyp' and content[8:12] == b'avif':
+            return True
+            
+        return False
+
+    async def download_slideshow_images(self, api_data: Dict[str, Any]) -> List[bytes]:
+        """Download all images from a slideshow - same pattern as TikTok"""
+        slideshow_images = self.get_slideshow_images(api_data)
+
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+            "Referer": "https://www.instagram.com/",
+        }
+
+        image_contents = []
+
+        async with httpx.AsyncClient(timeout=60) as client:
+            for img in slideshow_images:
+                try:
+                    response = await client.get(img.url, headers=headers)
+                    response.raise_for_status()
+                    
+                    # Validate that the content is actually an image
+                    content = response.content
+                    if self._is_valid_image(content):
+                        image_contents.append(content)
+                        logger.info(
+                            f"Downloaded Instagram slideshow image {img.index + 1}/{len(slideshow_images)}"
+                        )
+                    else:
+                        # Debug: Log the first 20 bytes to understand the format - same as TikTok
+                        content_hex = content[:20].hex() if len(content) >= 20 else content.hex()
+                        logger.warning(f"Downloaded content for Instagram image {img.index} is not a valid image, skipping. Size: {len(content)} bytes, First 20 bytes: {content_hex}")
+                        
+                except Exception as e:
+                    logger.error(f"Failed to download Instagram slideshow image {img.index}: {e}")
+                    # Don't add empty bytes or invalid content - just skip
+
+        logger.info(
+            f"Downloaded {len(image_contents)} valid images out of {len(slideshow_images)} Instagram slideshow images"
+        )
+        return image_contents
+
+    async def scrape_instagram_slideshow(
+        self, url: str, options: Optional[ScrapingOptions] = None
+    ) -> Tuple[List[bytes], VideoMetadata, Optional[str]]:
+        """Specialized method for scraping Instagram slideshows - same pattern as TikTok"""
+        if options is None:
+            options = ScrapingOptions()
+
+        logger.info(f"Starting Instagram slideshow scraping for URL: {url}")
+
+        try:
+            # Get metadata
+            api_data = await self.fetch_instagram_data(url, options)
+            metadata = self.extract_metadata(api_data)
+
+            if not metadata.is_slideshow:
+                raise Exception(
+                    "URL does not contain a slideshow - use scrape_instagram_complete() for regular videos"
+                )
+
+            # Download all slideshow images
+            slideshow_images = await self.download_slideshow_images(api_data)
+
+            # Instagram doesn't have transcripts like TikTok
+            transcript = None
+
+            logger.info(
+                f"Successfully scraped Instagram slideshow. {len(slideshow_images)} images downloaded, Transcript: {'Yes' if transcript else 'No'}"
+            )
+            return slideshow_images, metadata, transcript
+
+        except Exception as e:
+            logger.error(f"Failed to scrape Instagram slideshow: {e}")
+            raise

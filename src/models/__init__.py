@@ -6,9 +6,7 @@ Data models for the application
 from .parser_result import SlideshowImage, VideoMetadata
 from .requests import ProcessRequest, CacheInvalidationRequest
 from .responses import (
-    ExerciseSet,
-    Exercise,
-    WorkoutData,
+    RelationshipContent,
     QueuedResponse,
     HealthResponse,
     StatusResponse,
@@ -27,9 +25,7 @@ __all__ = [
     "ProcessRequest",
     "CacheInvalidationRequest",
     # Response models
-    "ExerciseSet",
-    "Exercise",
-    "WorkoutData",
+    "RelationshipContent",
     "QueuedResponse",
     "HealthResponse",
     "StatusResponse",

@@ -1,9 +1,9 @@
 // Smart client-side region selection
 const REGIONAL_ENDPOINTS = {
-  'us-central1': 'https://workout-parser-v2-341666880405.us-central1.run.app',
-  'us-east1': 'https://workout-parser-v2-341666880405.us-east1.run.app',
-  'europe-west1': 'https://workout-parser-v2-341666880405.europe-west1.run.app',
-  'asia-southeast1': 'https://workout-parser-v2-341666880405.asia-southeast1.run.app'
+  'us-central1': 'https://zest-parser-g4zcestszq-uc.a.run.app',
+  'us-east1': 'https://zest-parser-g4zcestszq-ue.a.run.app',
+  'europe-west1': 'https://zest-parser-g4zcestszq-ew.a.run.app',
+  'asia-southeast1': 'https://zest-parser-g4zcestszq-as.a.run.app'
 };
 
 function getOptimalEndpoint() {
@@ -25,3 +25,4 @@ function getOptimalEndpoint() {
 // Usage in your frontend
 const apiEndpoint = getOptimalEndpoint();
 console.log('Using endpoint:', apiEndpoint);
+    

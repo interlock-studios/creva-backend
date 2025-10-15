@@ -7,36 +7,20 @@ from typing import Optional, List, Dict, Any, Union
 from datetime import datetime
 
 
-class ExerciseSet(BaseModel):
-    """Individual exercise set"""
+class RelationshipContent(BaseModel):
+    """Complete relationship/lifestyle content information"""
 
-    reps: Optional[int] = Field(None, description="Number of repetitions")
-    weight_lbs: Optional[float] = Field(None, description="Weight in pounds")
-    duration_seconds: Optional[int] = Field(None, description="Duration in seconds")
-    distance_miles: Optional[float] = Field(None, description="Distance in miles")
-    rest_seconds: Optional[int] = Field(90, description="Rest time in seconds")
-
-
-class Exercise(BaseModel):
-    """Individual exercise in workout"""
-
-    name: str = Field(..., description="Exercise name")
-    muscle_groups: List[str] = Field(..., description="Target muscle groups")
-    equipment: str = Field(..., description="Required equipment")
-    sets: List[ExerciseSet] = Field(..., description="Exercise sets")
-    instructions: Optional[str] = Field(None, description="Exercise instructions")
-
-
-class WorkoutData(BaseModel):
-    """Complete workout information"""
-
-    title: str = Field(..., description="Workout title")
-    description: Optional[str] = Field(None, description="Workout description")
-    workout_type: str = Field(..., description="Type of workout")
-    duration_minutes: Optional[int] = Field(None, description="Total workout duration")
-    difficulty_level: int = Field(..., ge=1, le=10, description="Difficulty from 1-10")
-    exercises: List[Exercise] = Field(..., description="List of exercises")
-    tags: Optional[List[str]] = Field(None, description="Workout tags")
+    title: str = Field(..., description="Content title")
+    description: Optional[str] = Field(None, description="Content description")
+    image: Optional[str] = Field(None, description="Main image URL from the post/video")
+    location: Optional[str] = Field(None, description="Location mentioned or tagged")
+    content_type: Optional[str] = Field(
+        None, description="Type of content (date_idea, advice, lifestyle)"
+    )
+    mood: Optional[str] = Field(None, description="Mood or vibe of the content")
+    occasion: Optional[str] = Field(None, description="Relevant occasion or context")
+    tips: Optional[List[str]] = Field(None, description="Extracted tips or advice")
+    tags: Optional[List[str]] = Field(None, description="Content tags")
     creator: Optional[str] = Field(None, description="Content creator")
 
 
@@ -86,7 +70,9 @@ class JobStatusResponse(BaseModel):
     completed_at: Optional[datetime] = Field(None, description="Job completion time")
     attempts: Optional[int] = Field(None, description="Number of attempts")
     last_error: Optional[str] = Field(None, description="Last error message")
-    result: Optional[WorkoutData] = Field(None, description="Processing result if completed")
+    result: Optional[RelationshipContent] = Field(
+        None, description="Processing result if completed"
+    )
 
 
 class ErrorResponse(BaseModel):

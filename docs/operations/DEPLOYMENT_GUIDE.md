@@ -19,7 +19,7 @@ If you prefer to deploy in stages:
 # 1. Deploy to all regions first
 make deploy
 
-# 2. (Optional) Setup global load balancer with setsai.app
+# 2. (Optional) Setup global load balancer with zestai.app
 make setup-load-balancer
 
 # 3. Check status
@@ -52,7 +52,7 @@ make status-lb
 # View all regional deployments
 make status
 
-# Check load balancer and setsai.app domain
+# Check load balancer and zestai.app domain
 make status-lb
 
 # Test API in all regions
@@ -67,20 +67,20 @@ make logs-all-regions
 Global Load Balancer Status:
 Backend Service:
 NAME                    BACKENDS                PROTOCOL  LOAD_BALANCING_SCHEME
-workout-parser-backend  us-central1,us-east1... HTTPS     EXTERNAL
+zest-parser-backend  us-central1,us-east1... HTTPS     EXTERNAL
 
 URL Map:
 NAME                   DEFAULT_SERVICE
-workout-parser-url-map workout-parser-backend
+zest-parser-url-map zest-parser-backend
 
 Global IP: 34.102.136.180
 
-SSL Certificates (setsai.app):
+SSL Certificates (zestai.app):
 NAME           DOMAINS         MANAGED_STATUS
-setsai-ssl-cert api.setsai.app ACTIVE
+zestai-ssl-cert api.zestai.app ACTIVE
 
 Domain Status:
-Expected domain: api.setsai.app
+Expected domain: api.zestai.app
 Load balancer IP: 34.102.136.180
 ✅ DNS correctly configured
 ```
@@ -88,7 +88,7 @@ Load balancer IP: 34.102.136.180
 ## 🌍 Global Architecture After Deployment
 
 ```
-                    🌐 api.setsai.app
+                    🌐 api.zestai.app
                            |
                     [Global Load Balancer]
                            |
@@ -118,7 +118,7 @@ Load balancer IP: 34.102.136.180
 - **Optimized latency**: 50-150ms from any region
 - **High availability**: Automatic failover between regions
 - **Unlimited scaling**: Each region scales independently
-- **Professional domain**: `api.setsai.app` instead of long Google URLs
+- **Professional domain**: `api.zestai.app` instead of long Google URLs
 
 ## 🔧 Troubleshooting
 
@@ -127,7 +127,7 @@ Load balancer IP: 34.102.136.180
 **DNS not resolving:**
 ```bash
 # Check DNS propagation
-dig api.setsai.app
+dig api.zestai.app
 
 # Expected: Should return the load balancer IP
 # If not, wait up to 24 hours for DNS propagation
@@ -154,7 +154,7 @@ make deploy-single-region
 **Load balancer not routing traffic:**
 ```bash
 # Check backend service configuration
-gcloud compute backend-services describe workout-parser-backend --global
+gcloud compute backend-services describe zest-parser-backend --global
 
 # Verify all regions are listed as backends
 ```
@@ -175,7 +175,7 @@ gcloud compute backend-services describe workout-parser-backend --global
 
 ## 🎯 Next Steps After Deployment
 
-1. **Update frontend applications** to use `https://api.setsai.app`
+1. **Update frontend applications** to use `https://api.zestai.app`
 2. **Monitor performance** across regions using the monitoring dashboard
 3. **Test failover** by temporarily disabling one region
 4. **Set up alerts** for load balancer health and SSL certificate expiration

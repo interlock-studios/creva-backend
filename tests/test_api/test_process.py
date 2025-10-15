@@ -21,7 +21,7 @@ def test_process_endpoint_valid_url(
          patch('src.api.process.genai_service', mock_genai_service):
         
         # Setup mocks
-        mock_cache_service.get_cached_workout.return_value = None  # No cache hit
+        mock_cache_service.get_cached_bucket_list.return_value = None  # No cache hit
         mock_genai_service.analyze_video_with_transcript.return_value = sample_workout_json
         
         response = client.post("/process", json={
@@ -62,7 +62,7 @@ def test_process_endpoint_cached_result(
 ):
     """Test process endpoint returns cached result when available"""
     with patch('src.api.process.cache_service', mock_cache_service):
-        mock_cache_service.get_cached_workout.return_value = sample_workout_json
+        mock_cache_service.get_cached_bucket_list.return_value = sample_workout_json
         
         response = client.post("/process", json={
             "url": valid_tiktok_url
@@ -73,7 +73,7 @@ def test_process_endpoint_cached_result(
         assert data["title"] == sample_workout_json["title"]
         
         # Verify cache was checked
-        mock_cache_service.get_cached_workout.assert_called_once_with(valid_tiktok_url, None)
+        mock_cache_service.get_cached_bucket_list.assert_called_once_with(valid_tiktok_url, None)
 
 
 @pytest.mark.unit
@@ -94,7 +94,7 @@ def test_process_endpoint_with_localization(
          patch('src.api.process.MAX_DIRECT_PROCESSING', 5):
         
         # Mock cache miss (async method)
-        mock_cache_service.get_cached_workout = AsyncMock(return_value=None)
+        mock_cache_service.get_cached_bucket_list = AsyncMock(return_value=None)
         
         # Mock no existing job (async method)
         mock_queue_service.get_job_by_url = AsyncMock(return_value=None)
@@ -113,7 +113,7 @@ def test_process_endpoint_with_localization(
         })
         
         # Mock cache write (async method)
-        mock_cache_service.cache_workout = AsyncMock(return_value=None)
+        mock_cache_service.cache_bucket_list = AsyncMock(return_value=None)
         
         response = client.post("/process", json={
             "url": valid_tiktok_url,
@@ -124,7 +124,7 @@ def test_process_endpoint_with_localization(
         assert response.status_code == 200
         
         # Verify cache was checked with localization
-        mock_cache_service.get_cached_workout.assert_called_once_with(valid_tiktok_url, "es")
+        mock_cache_service.get_cached_bucket_list.assert_called_once_with(valid_tiktok_url, "es")
 
 
 @pytest.mark.unit
@@ -139,7 +139,7 @@ def test_process_endpoint_queue_fallback(
          patch('src.api.process.queue_service', mock_queue_service), \
          patch('src.api.process.active_direct_processing', 10):  # At capacity
         
-        mock_cache_service.get_cached_workout.return_value = None
+        mock_cache_service.get_cached_bucket_list.return_value = None
         mock_queue_service.get_job_by_url.return_value = None  # No existing job
         mock_queue_service.enqueue_video.return_value = "test_job_123"
         
@@ -165,7 +165,7 @@ def test_process_endpoint_existing_job(
     with patch('src.api.process.cache_service', mock_cache_service), \
          patch('src.api.process.queue_service', mock_queue_service):
         
-        mock_cache_service.get_cached_workout.return_value = None
+        mock_cache_service.get_cached_bucket_list.return_value = None
         mock_queue_service.get_job_by_url.return_value = {
             "job_id": "existing_job_456",
             "status": "pending"

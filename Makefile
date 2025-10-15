@@ -1,9 +1,9 @@
-# TikTok Workout Parser V2 - Makefile
+# Zest - Relationship Content Parser - Makefile
 # Standardized commands for development and deployment
 
 # Variables
-PROJECT_ID := sets-ai
-SERVICE_NAME := workout-parser-v2
+PROJECT_ID := zest-45e51
+SERVICE_NAME := zest-parser
 PRIMARY_REGION := us-central1
 SECONDARY_REGIONS := us-east1,us-west1,europe-west1,europe-west4,europe-north1,asia-southeast1,asia-northeast1,asia-south1,australia-southeast1,southamerica-east1
 PYTHON := python3.11
@@ -19,7 +19,7 @@ NC := \033[0m # No Color
 
 .PHONY: help
 help: ## Display this help message
-	@echo "$(GREEN)TikTok Workout Parser V2 - Available Commands$(NC)"
+	@echo "$(GREEN)Zest - Relationship Content Parser - Available Commands$(NC)"
 	@echo ""
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "$(YELLOW)%-20s$(NC) %s\n", $$1, $$2}'
 
@@ -407,27 +407,27 @@ setup-firestore: ## Setup Firestore database and indexes
 	@echo "$(GREEN)Firestore setup complete$(NC)"
 
 .PHONY: setup-load-balancer
-setup-load-balancer: ## Setup Global HTTPS Load Balancer with setsai.app domain
-	@echo "$(GREEN)Setting up Global HTTPS Load Balancer with setsai.app domain...$(NC)"
+setup-load-balancer: ## Setup Global HTTPS Load Balancer with zestai.app domain
+	@echo "$(GREEN)Setting up Global HTTPS Load Balancer with zestai.app domain...$(NC)"
 	@chmod +x scripts/setup/setup-global-lb-custom-domain.sh
 	@./scripts/setup/setup-global-lb-custom-domain.sh
 	@echo "$(GREEN)Global Load Balancer setup complete$(NC)"
 
 .PHONY: add-custom-domain
-add-custom-domain: ## Add setsai.app domain to existing load balancer
-	@echo "$(GREEN)Adding setsai.app domain to load balancer...$(NC)"
+add-custom-domain: ## Add zestai.app domain to existing load balancer
+	@echo "$(GREEN)Adding zestai.app domain to load balancer...$(NC)"
 	@chmod +x scripts/setup/add-domain-later.sh
-	@./scripts/setup/add-domain-later.sh api.setsai.app
+	@./scripts/setup/add-domain-later.sh api.zestai.app
 
 .PHONY: deploy-full
-deploy-full: ## Deploy to all regions AND setup global load balancer with setsai.app
-	@echo "$(GREEN)Full deployment: Multi-region + Global Load Balancer + setsai.app...$(NC)"
+deploy-full: ## Deploy to all regions AND setup global load balancer with zestai.app
+	@echo "$(GREEN)Full deployment: Multi-region + Global Load Balancer + zestai.app...$(NC)"
 	@echo "$(YELLOW)Step 1: Deploying to all regions...$(NC)"
 	@$(MAKE) deploy
-	@echo "$(YELLOW)Step 2: Setting up Global Load Balancer with setsai.app...$(NC)"
+	@echo "$(YELLOW)Step 2: Setting up Global Load Balancer with zestai.app...$(NC)"
 	@$(MAKE) setup-load-balancer
 	@echo "$(GREEN)✅ Full deployment complete!$(NC)"
-	@echo "$(BLUE)🌐 Your API is now available at: https://api.setsai.app$(NC)"
+	@echo "$(BLUE)🌐 Your API is now available at: https://api.zestai.app$(NC)"
 	@echo "$(BLUE)🔒 HTTPS load balancing across all regions$(NC)"
 
 .PHONY: deploy-global
@@ -442,22 +442,22 @@ deploy-global: ## Deploy to MAXIMUM global regions (11 regions total!)
 	@echo "$(BLUE)🌐 Your API is now deployed in 11 regions worldwide!$(NC)"
 
 .PHONY: status-lb
-status-lb: ## Show Global Load Balancer status and setsai.app domain info
+status-lb: ## Show Global Load Balancer status and zestai.app domain info
 	@echo "$(GREEN)Global Load Balancer Status:$(NC)"
 	@echo "$(YELLOW)Backend Service:$(NC)"
-	@gcloud compute backend-services describe workout-parser-backend --global --format="table(name,backends[].group:label=BACKENDS,protocol,loadBalancingScheme)" 2>/dev/null || echo "Backend service not found"
+	@gcloud compute backend-services describe zest-parser-backend --global --format="table(name,backends[].group:label=BACKENDS,protocol,loadBalancingScheme)" 2>/dev/null || echo "Backend service not found"
 	@echo "$(YELLOW)URL Map:$(NC)"
-	@gcloud compute url-maps describe workout-parser-url-map --global --format="table(name,defaultService)" 2>/dev/null || echo "URL map not found"
+	@gcloud compute url-maps describe zest-parser-url-map --global --format="table(name,defaultService)" 2>/dev/null || echo "URL map not found"
 	@echo "$(YELLOW)Global IP:$(NC)"
-	@gcloud compute forwarding-rules describe workout-parser-forwarding-rule --global --format="value(IPAddress)" 2>/dev/null || echo "Forwarding rule not found"
-	@echo "$(YELLOW)SSL Certificates (setsai.app):$(NC)"
-	@gcloud compute ssl-certificates list --filter="name~setsai" --format="table(name,domains,managed.status)" 2>/dev/null || echo "No SSL certificates found"
+	@gcloud compute forwarding-rules describe zest-parser-forwarding-rule --global --format="value(IPAddress)" 2>/dev/null || echo "Forwarding rule not found"
+	@echo "$(YELLOW)SSL Certificates (zestai.app):$(NC)"
+	@gcloud compute ssl-certificates list --filter="name~zestai" --format="table(name,domains,managed.status)" 2>/dev/null || echo "No SSL certificates found"
 	@echo "$(YELLOW)Domain Status:$(NC)"
-	@echo "Expected domain: api.setsai.app"
-	@GLOBAL_IP=$$(gcloud compute forwarding-rules describe workout-parser-forwarding-rule --global --format="value(IPAddress)" 2>/dev/null); \
+	@echo "Expected domain: api.zestai.app"
+	@GLOBAL_IP=$$(gcloud compute forwarding-rules describe zest-parser-forwarding-rule --global --format="value(IPAddress)" 2>/dev/null); \
 	if [ ! -z "$$GLOBAL_IP" ]; then \
 		echo "Load balancer IP: $$GLOBAL_IP"; \
-		RESOLVED_IP=$$(dig +short api.setsai.app | tail -n1); \
+		RESOLVED_IP=$$(dig +short api.zestai.app | tail -n1); \
 		if [ "$$RESOLVED_IP" = "$$GLOBAL_IP" ]; then \
 			echo "✅ DNS correctly configured"; \
 		else \

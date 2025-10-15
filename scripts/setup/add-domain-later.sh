@@ -4,7 +4,7 @@
 # Usage: ./add-domain-later.sh your-domain.com
 
 DOMAIN=$1
-PROJECT_ID="sets-ai"
+PROJECT_ID="zest-45e51"
 
 if [ -z "$DOMAIN" ]; then
     echo "Usage: ./add-domain-later.sh your-domain.com"
@@ -14,7 +14,7 @@ fi
 echo "🌐 Adding domain $DOMAIN to existing load balancer..."
 
 # Get current global IP
-GLOBAL_IP=$(gcloud compute forwarding-rules describe workout-parser-forwarding-rule --global --format="value(IPAddress)" --project=$PROJECT_ID)
+GLOBAL_IP=$(gcloud compute forwarding-rules describe zest-parser-forwarding-rule --global --format="value(IPAddress)" --project=$PROJECT_ID)
 
 echo "📋 Steps to complete:"
 echo "1. Point your domain's A record to: $GLOBAL_IP"
@@ -30,24 +30,24 @@ if [ "$RESOLVED_IP" = "$GLOBAL_IP" ]; then
     
     # Create SSL certificate
     echo "🔒 Creating SSL certificate..."
-    gcloud compute ssl-certificates create workout-parser-ssl-cert \
+    gcloud compute ssl-certificates create zest-parser-ssl-cert \
         --domains=$DOMAIN \
         --global \
         --project=$PROJECT_ID
     
     # Create HTTPS target proxy
     echo "🎯 Creating HTTPS proxy..."
-    gcloud compute target-https-proxies create workout-parser-https-proxy \
-        --url-map=workout-parser-url-map \
-        --ssl-certificates=workout-parser-ssl-cert \
+    gcloud compute target-https-proxies create zest-parser-https-proxy \
+        --url-map=zest-parser-url-map \
+        --ssl-certificates=zest-parser-ssl-cert \
         --global \
         --project=$PROJECT_ID
     
     # Create HTTPS forwarding rule
     echo "🌐 Creating HTTPS forwarding rule..."
-    gcloud compute forwarding-rules create workout-parser-https-rule \
+    gcloud compute forwarding-rules create zest-parser-https-rule \
         --global \
-        --target-https-proxy=workout-parser-https-proxy \
+        --target-https-proxy=zest-parser-https-proxy \
         --ports=443 \
         --project=$PROJECT_ID
     

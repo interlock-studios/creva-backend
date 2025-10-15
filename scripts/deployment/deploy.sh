@@ -10,8 +10,8 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Configuration
-SERVICE_NAME="${SERVICE_NAME:-workout-parser-v2}"
-PROJECT_ID="${PROJECT_ID:-sets-ai}"
+SERVICE_NAME="${SERVICE_NAME:-zest-parser}"
+PROJECT_ID="${PROJECT_ID:-zest-45e51}"
 PRIMARY_REGION="${PRIMARY_REGION:-us-central1}"
 SECONDARY_REGIONS="${SECONDARY_REGIONS:-us-east1,us-west1,europe-west1,europe-west4,europe-north1,asia-southeast1,asia-northeast1,asia-south1,australia-southeast1,southamerica-east1}"
 ENVIRONMENT="${ENVIRONMENT:-production}"
@@ -55,7 +55,9 @@ if [ "$SINGLE_REGION" = "true" ]; then
         --max-instances 50 \
         --min-instances 1 \
         --concurrency 80 \
+        --service-account "${SERVICE_NAME}@${PROJECT_ID}.iam.gserviceaccount.com" \
         --set-env-vars "GOOGLE_CLOUD_PROJECT_ID=${PROJECT_ID},ENVIRONMENT=${ENVIRONMENT},MAX_CONCURRENT_PROCESSING=60,RATE_LIMIT_REQUESTS=40,MAX_DIRECT_PROCESSING=15,GEMINI_REGIONS=${PRIMARY_REGION}" \
+        --set-secrets "SCRAPECREATORS_API_KEY=scrapecreators-api-key:latest" \
         --quiet
 else
     # Multi-region deployment - build once, deploy to all regions
@@ -81,6 +83,7 @@ else
         --timeout 900 \
         --cpu-throttling \
         --execution-environment gen2 \
+        --service-account "${SERVICE_NAME}@${PROJECT_ID}.iam.gserviceaccount.com" \
         --set-env-vars "GOOGLE_CLOUD_PROJECT_ID=${PROJECT_ID},ENVIRONMENT=${ENVIRONMENT},MAX_CONCURRENT_PROCESSING=60,RATE_LIMIT_REQUESTS=40,MAX_DIRECT_PROCESSING=15,GEMINI_REGIONS=${GEMINI_REGIONS_FORMATTED},CLOUD_RUN_REGION=${PRIMARY_REGION},APPCHECK_REQUIRED=false" \
         --set-secrets "SCRAPECREATORS_API_KEY=scrapecreators-api-key:latest" \
         --quiet
@@ -100,6 +103,7 @@ else
         --timeout 3600 \
         --cpu-throttling \
         --execution-environment gen2 \
+        --service-account "${SERVICE_NAME}@${PROJECT_ID}.iam.gserviceaccount.com" \
         --set-env-vars "GOOGLE_CLOUD_PROJECT_ID=${PROJECT_ID},ENVIRONMENT=${ENVIRONMENT},CLOUD_RUN_REGION=${PRIMARY_REGION}" \
         --set-secrets "SCRAPECREATORS_API_KEY=scrapecreators-api-key:latest" \
         --command "uvicorn" \
@@ -128,6 +132,7 @@ else
             --timeout 900 \
             --cpu-throttling \
             --execution-environment gen2 \
+            --service-account "${SERVICE_NAME}@${PROJECT_ID}.iam.gserviceaccount.com" \
             --set-env-vars "GOOGLE_CLOUD_PROJECT_ID=${PROJECT_ID},ENVIRONMENT=${ENVIRONMENT},MAX_CONCURRENT_PROCESSING=60,RATE_LIMIT_REQUESTS=40,MAX_DIRECT_PROCESSING=15,GEMINI_REGIONS=${GEMINI_REGIONS_FORMATTED},CLOUD_RUN_REGION=$region,APPCHECK_REQUIRED=false" \
             --set-secrets "SCRAPECREATORS_API_KEY=scrapecreators-api-key:latest" \
             --quiet || {
@@ -149,6 +154,7 @@ else
             --timeout 3600 \
             --cpu-throttling \
             --execution-environment gen2 \
+            --service-account "${SERVICE_NAME}@${PROJECT_ID}.iam.gserviceaccount.com" \
             --set-env-vars "GOOGLE_CLOUD_PROJECT_ID=${PROJECT_ID},ENVIRONMENT=${ENVIRONMENT},CLOUD_RUN_REGION=$region" \
             --set-secrets "SCRAPECREATORS_API_KEY=scrapecreators-api-key:latest" \
             --command "uvicorn" \

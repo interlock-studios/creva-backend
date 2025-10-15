@@ -7,6 +7,7 @@ import os
 import asyncio
 import logging
 import time
+import base64
 from datetime import datetime, timedelta, timezone
 from contextlib import asynccontextmanager
 from dotenv import load_dotenv
@@ -82,10 +83,10 @@ class VideoWorker:
             logger.info(f"Processing job {job_id} - URL: {url[:50]}...")
 
             # Check cache first (in case it was processed by another worker)
-            cached_workout = await self.cache_service.get_cached_workout(url, localization)
-            if cached_workout:
+            cached_bucket_list = await self.cache_service.get_cached_bucket_list(url, localization)
+            if cached_bucket_list:
                 logger.info(f"Job {job_id} - Found in cache, marking complete")
-                await self.queue_service.mark_job_complete(job_id, cached_workout)
+                await self.queue_service.mark_job_complete(job_id, cached_bucket_list)
                 return
 
             # 1. Download content using video processor (handles both TikTok and Instagram)
@@ -97,7 +98,9 @@ class VideoWorker:
 
             # Extract transcript from metadata
             transcript = metadata_dict.get("transcript_text")
-            caption = metadata_dict.get("caption", "") or metadata_dict.get("description", "")
+            caption = metadata_dict.get("caption", "")
+            description = metadata_dict.get("description", "")
+            extracted_image_base64 = None
 
             if transcript:
                 logger.info(f"Job {job_id} - Got transcript/caption: {len(transcript)} characters")
@@ -122,27 +125,75 @@ class VideoWorker:
                     if slideshow_transcript:
                         transcript = slideshow_transcript
 
+                    # Extract first image from slideshow
+                    if slideshow_images:
+                        try:
+                            first_image = await self.video_processor.extract_image_from_slideshow(
+                                slideshow_images
+                            )
+                            extracted_image_base64 = f"data:image/jpeg;base64,{base64.b64encode(first_image).decode('utf-8')}"
+                            logger.info(f"Job {job_id} - Extracted first image from slideshow")
+                        except Exception as e:
+                            logger.warning(f"Job {job_id} - Failed to extract slideshow image: {e}")
+
                     # Analyze slideshow with GenAI
                     logger.info(f"Job {job_id} - Analyzing slideshow with AI...")
                     workout_json = await self.genai_pool.analyze_slideshow(
-                        slideshow_images, transcript, caption
+                        slideshow_images, transcript, caption, description, localization
                     )
                 else:
-                    # Instagram slideshows (if supported in the future)
-                    logger.warning(f"Job {job_id} - Instagram slideshows not yet supported")
-                    raise Exception("Instagram slideshows not yet supported")
+                    # Handle Instagram slideshows - same pattern as TikTok
+                    logger.info(f"Job {job_id} - Processing Instagram slideshow")
+                    slideshow_images, slideshow_metadata, slideshow_transcript = (
+                        await self.video_processor.instagram_scraper.scrape_instagram_slideshow(url)
+                    )
+
+                    # Use the slideshow-specific transcript if available
+                    if slideshow_transcript:
+                        transcript = slideshow_transcript
+
+                    # Extract first image from slideshow
+                    if slideshow_images:
+                        try:
+                            first_image = await self.video_processor.extract_image_from_slideshow(
+                                slideshow_images
+                            )
+                            extracted_image_base64 = f"data:image/jpeg;base64,{base64.b64encode(first_image).decode('utf-8')}"
+                            logger.info(f"Job {job_id} - Extracted first image from Instagram slideshow")
+                        except Exception as e:
+                            logger.warning(f"Job {job_id} - Failed to extract Instagram slideshow image: {e}")
+
+                    # Analyze slideshow with GenAI
+                    logger.info(f"Job {job_id} - Analyzing Instagram slideshow with AI...")
+                    workout_json = await self.genai_pool.analyze_slideshow(
+                        slideshow_images, transcript, caption, description, localization
+                    )
             else:
                 # Handle regular video content
                 logger.info(f"Job {job_id} - Processing regular video")
 
+                # Extract first frame from video
+                try:
+                    first_frame = await self.video_processor.extract_first_frame(video_content)
+                    extracted_image_base64 = (
+                        f"data:image/jpeg;base64,{base64.b64encode(first_frame).decode('utf-8')}"
+                    )
+                    logger.info(f"Job {job_id} - Extracted first frame from video")
+                except Exception as e:
+                    logger.warning(f"Job {job_id} - Failed to extract video frame: {e}")
+
                 # 2. Analyze with Gemini (no audio removal needed)
                 logger.info(f"Job {job_id} - Analyzing video with AI...")
                 workout_json = await self.genai_pool.analyze_video(
-                    video_content, transcript, caption, localization
+                    video_content, transcript, caption, description, localization
                 )
 
             if not workout_json:
                 raise Exception("Could not extract workout information from video")
+
+            # Override the image field with the extracted frame/image if available
+            if extracted_image_base64:
+                workout_json["image"] = extracted_image_base64
 
             # 5. Cache the result
             cache_metadata = {
@@ -153,7 +204,7 @@ class VideoWorker:
                 "worker_id": WORKER_ID,
                 "platform": metadata_dict.get("platform", "unknown"),
             }
-            await self.cache_service.cache_workout(url, workout_json, cache_metadata, localization)
+            await self.cache_service.cache_bucket_list(url, workout_json, cache_metadata, localization)
 
             # 6. Mark job complete
             await self.queue_service.mark_job_complete(job_id, workout_json)
