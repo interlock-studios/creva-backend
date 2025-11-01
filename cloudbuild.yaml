@@ -1,6 +1,7 @@
 # Cloud Build configuration with multi-region deployment and performance optimizations
+# Dishly Recipe Parser Backend
 substitutions:
-  _SERVICE_NAME: zest-parser
+  _SERVICE_NAME: dishly-parser
   _PRIMARY_REGION: us-central1
   _SECONDARY_REGIONS: us-east1,europe-west1,asia-southeast1
   _ENVIRONMENT: production

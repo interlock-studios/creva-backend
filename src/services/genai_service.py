@@ -19,6 +19,99 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
+# Emoji mapping for common cooking ingredients (hybrid approach)
+# AI will use this mapping first, fall back to generating emoji if ingredient not found
+INGREDIENT_EMOJI_MAP = {
+    # Proteins
+    "chicken": "🍗", "chicken breast": "🍗", "chicken thighs": "🍗",
+    "beef": "🥩", "steak": "🥩", "ground beef": "🥩",
+    "pork": "🥓", "bacon": "🥓", "ham": "🍖",
+    "fish": "🐟", "salmon": "🐟", "tuna": "🐟", "cod": "🐟",
+    "shrimp": "🍤", "prawns": "🍤",
+    "eggs": "🥚", "egg": "🥚",
+    "tofu": "🥢",
+
+    # Vegetables
+    "broccoli": "🥦",
+    "carrot": "🥕", "carrots": "🥕",
+    "tomato": "🍅", "tomatoes": "🍅",
+    "onion": "🧅", "onions": "🧅",
+    "garlic": "🧄", "garlic cloves": "🧄",
+    "pepper": "🫑", "bell pepper": "🫑", "peppers": "🫑",
+    "chili": "🌶️", "chili pepper": "🌶️",
+    "potato": "🥔", "potatoes": "🥔",
+    "sweet potato": "🍠",
+    "corn": "🌽",
+    "eggplant": "🍆", "aubergine": "🍆",
+    "mushroom": "🍄", "mushrooms": "🍄",
+    "lettuce": "🥬", "salad": "🥗",
+    "cucumber": "🥒",
+    "avocado": "🥑",
+    "spinach": "🥬",
+    "kale": "🥬",
+
+    # Fruits
+    "lemon": "🍋", "lemons": "🍋",
+    "lime": "🍋", "limes": "🍋",
+    "apple": "🍎", "apples": "🍎",
+    "banana": "🍌", "bananas": "🍌",
+    "strawberry": "🍓", "strawberries": "🍓",
+    "orange": "🍊", "oranges": "🍊",
+    "grape": "🍇", "grapes": "🍇",
+    "watermelon": "🍉",
+    "pineapple": "🍍",
+    "mango": "🥭",
+    "peach": "🍑", "peaches": "🍑",
+    "cherry": "🍒", "cherries": "🍒",
+
+    # Grains & Pasta
+    "pasta": "🍝", "spaghetti": "🍝", "noodles": "🍜",
+    "rice": "🍚",
+    "bread": "🍞", "baguette": "🥖",
+    "flour": "🌾",
+    "oats": "🌾", "oatmeal": "🌾",
+
+    # Dairy
+    "milk": "🥛",
+    "cheese": "🧀", "cheddar": "🧀", "parmesan": "🧀",
+    "butter": "🧈",
+    "cream": "🥛", "heavy cream": "🥛",
+    "yogurt": "🥛", "yoghurt": "🥛",
+
+    # Condiments & Oils
+    "olive oil": "🫒", "oil": "🫒",
+    "salt": "🧂",
+    "pepper": "🫑",
+    "soy sauce": "🥫",
+    "honey": "🍯",
+    "sugar": "🧂",
+
+    # Herbs & Spices
+    "basil": "🌿",
+    "parsley": "🌿",
+    "cilantro": "🌿", "coriander": "🌿",
+    "rosemary": "🌿",
+    "thyme": "🌿",
+    "oregano": "🌿",
+    "mint": "🌿",
+
+    # Nuts & Seeds
+    "peanut": "🥜", "peanuts": "🥜",
+    "almond": "🌰", "almonds": "🌰",
+    "walnut": "🌰", "walnuts": "🌰",
+
+    # Beverages
+    "water": "💧",
+    "wine": "🍷",
+    "beer": "🍺",
+
+    # Other
+    "coconut": "🥥",
+    "beans": "🫘",
+    "chocolate": "🍫",
+    "vanilla": "🌿",
+}
+
 
 class GenAIService:
     def __init__(self, config=None):
@@ -98,7 +191,7 @@ class GenAIService:
         await self._rate_limit()
 
         # Build prompt
-        prompt = "You are an expert relationship coach and lifestyle content analyst analyzing social media content."
+        prompt = "You are an expert culinary AI specializing in extracting structured recipe data from cooking videos and social media posts."
 
         if transcript:
             prompt += f"\n\nTRANSCRIPT:\n{transcript}"
@@ -112,44 +205,140 @@ class GenAIService:
         # Add localization instructions if specified
         localization_instruction = ""
         if localization:
-            localization_instruction = f"\n\nIMPORTANT: Provide ALL text content (title, description, tips, location) in {localization} language ONLY. Translate ALL human-readable text fields consistently in the specified language. Maintain the exact JSON structure but translate all text to {localization}."
+            localization_instruction = f"\n\nIMPORTANT: Provide ALL text content (title, description, ingredient names, instruction text, location) in {localization} language ONLY. Translate ALL human-readable text fields consistently in the specified language. Maintain the exact JSON structure but translate all text to {localization}."
 
-        prompt += "\n\nAnalyze this social media post/video and extract relationship, dating, or lifestyle content. Use ALL available information (video content, transcript, caption, and description) to create a comprehensive analysis. Return your response as a valid JSON object with NO additional text, explanations, or formatting."
+        prompt += "\n\nAnalyze this cooking video/post and extract structured recipe data. Use ALL available information (video content, transcript, caption, and description) to create a comprehensive recipe extraction. Return your response as a valid JSON object with NO additional text, explanations, or formatting."
         prompt += localization_instruction
         prompt += """
 
 Required JSON structure:
 {
-  "title": "descriptive title for the content",
-  "description": "concise description with brief summary and key tips formatted with \\n line breaks",
+  "title": "short, descriptive recipe name (e.g., 'Broccoli Pasta', 'Creamy Garlic Chicken')",
+  "description": "brief 1-2 sentence summary of the dish and its appeal",
   "image": "main image URL from the post/video or null",
-  "location": "location mentioned or tagged in the content or null",
-  "content_type": "type of content (examples: date_idea, relationship_advice, couples_activity, lifestyle_tip, romantic_gesture, communication_tip, self_care) or null",
-  "mood": "mood or vibe (examples: romantic, fun, adventurous, cozy, intimate, playful, serious, inspiring) or null",
-  "occasion": "relevant occasion (examples: date_night, anniversary, valentine, weekend, vacation, everyday, special_occasion) or null",
-  "tips": ["array of extracted tips or advice points"] or null,
-  "tags": ["array of relevant hashtags or tags"] or null,
+  "location": "cuisine origin or region mentioned (e.g., 'Italy', 'Thailand', 'Mediterranean') or null",
+  "prepTimeMinutes": "estimated preparation time in minutes (integer) or null",
+  "cookTimeMinutes": "estimated cooking time in minutes (integer) or null",
+  "baseServings": "number of servings this recipe makes (integer) or null",
+  "structuredIngredients": [
+    {
+      "name": "ingredient name (e.g., 'broccoli', 'chicken breast')",
+      "amount": "numeric quantity as float (e.g., 2.0, 500, 0.5) or null for qualitative amounts",
+      "unit": "measurement unit (e.g., 'cups', 'g', 'tbsp', 'heads', 'cloves') or null",
+      "preparation": "how to prepare (e.g., 'chopped', 'sliced', 'minced', 'diced') or null",
+      "emoji": "single emoji representing the ingredient (e.g., '🥦', '🍝', '🧄') or null",
+      "notes": "substitution notes or alternatives (e.g., 'or canned tomatoes') or null"
+    }
+  ],
+  "instructions": [
+    {
+      "stepNumber": "sequential step number starting from 1",
+      "text": "clear, complete cooking instruction for this step",
+      "durationMinutes": "time required for this step in minutes (integer) or null",
+      "highlightedIngredients": ["array of ingredient names mentioned in this step"]
+    }
+  ],
+  "tags": ["array of relevant hashtags or cooking tags from the post"] or null,
   "creator": "creator username or null"
 }
 
 EXTRACTION GUIDELINES:
-- Focus on relationship, dating, and lifestyle content
-- Combine information from video visuals, transcript/audio, caption, and metadata description
-- For Instagram: Use both the caption (primary text) and description (additional metadata) to understand context
-- For TikTok: Use both the transcript (spoken content) and description (post text) for comprehensive analysis
-- DESCRIPTION FIELD: Create a concise description that includes:
-  * Brief content summary (what the post/video is about)
-  * Key tips formatted with '\n' line breaks for readability
-  * Keep it focused and not overly verbose
-  * Format tips as a simple list within the description using line breaks
-- Extract the main image URL if visible in the video/post
-- Identify any location mentioned in captions, descriptions, tags, or visual content
-- Categorize the content type based on the main theme across all available sources
-- Extract actionable tips or advice from both spoken/written content and visual elements
-- Identify the mood and occasion based on visual, audio, and textual cues
-- Include relevant hashtags or tags from captions and descriptions
+- Focus on extracting recipe cooking instructions and ingredients
+- Combine information from video visuals, spoken audio/transcript, caption, and description
+- For Instagram: Use both the caption (primary text) and description (additional metadata)
+- For TikTok: Use both the transcript (spoken content) and description (post text)
 
-CRITICAL CONSISTENCY RULE: If localization is specified, ALL text fields (title, description, tips, location) MUST be in the SAME target language consistently throughout the entire response.
+INGREDIENTS EXTRACTION:
+- Extract ALL ingredients mentioned in video/audio/text
+- Parse quantities (amounts + units) from spoken or written content
+- Identify preparation methods (chopped, diced, minced, etc.)
+- Add appropriate food emojis for common ingredients (or null if uncertain)
+- Note substitutions or alternatives mentioned by creator
+- For qualitative amounts (e.g., "a drizzle", "a pinch", "to taste"), set amount to null and describe in unit field
+- Keep ingredient names simple and lowercase (e.g., "garlic" not "Garlic Cloves")
+
+INSTRUCTIONS EXTRACTION:
+- Break cooking process into numbered sequential steps
+- Extract timing information for each step when mentioned (e.g., "cook for 10 minutes")
+- Track which ingredients are used in each step for highlighting
+- Keep step text clear and actionable
+- Maintain chronological order from video/audio content
+- If no timing mentioned for a step, set durationMinutes to null
+
+METADATA EXTRACTION:
+- Estimate prep and cook times based on video content and creator's statements
+- Count servings mentioned by creator or estimate from ingredient quantities
+- Identify cuisine type or geographic origin for location field
+- Extract relevant hashtags and tags for discoverability
+
+EXAMPLE OUTPUT:
+{
+  "title": "Broccoli Pasta",
+  "description": "A quick and healthy 15-minute pasta dish with garlic and broccoli.",
+  "image": "https://example.com/image.jpg",
+  "location": "Italy",
+  "prepTimeMinutes": 5,
+  "cookTimeMinutes": 10,
+  "baseServings": 4,
+  "structuredIngredients": [
+    {
+      "name": "broccoli",
+      "amount": 2.0,
+      "unit": "heads",
+      "preparation": null,
+      "emoji": "🥦",
+      "notes": null
+    },
+    {
+      "name": "pasta",
+      "amount": 500,
+      "unit": "g",
+      "preparation": null,
+      "emoji": "🍝",
+      "notes": "any shape works"
+    },
+    {
+      "name": "garlic",
+      "amount": 4,
+      "unit": "cloves",
+      "preparation": "sliced",
+      "emoji": "🧄",
+      "notes": null
+    },
+    {
+      "name": "olive oil",
+      "amount": null,
+      "unit": "drizzle",
+      "preparation": null,
+      "emoji": "🫒",
+      "notes": null
+    }
+  ],
+  "instructions": [
+    {
+      "stepNumber": 1,
+      "text": "Bring a large pot of salted water to boil. Add pasta and cook according to package directions.",
+      "durationMinutes": 10,
+      "highlightedIngredients": ["pasta", "water"]
+    },
+    {
+      "stepNumber": 2,
+      "text": "Meanwhile, heat olive oil in a large pan over medium heat. Add sliced garlic and sauté until fragrant.",
+      "durationMinutes": 2,
+      "highlightedIngredients": ["olive oil", "garlic"]
+    },
+    {
+      "stepNumber": 3,
+      "text": "Add broccoli florets to the pan and cook until tender. Season with salt and pepper.",
+      "durationMinutes": 7,
+      "highlightedIngredients": ["broccoli"]
+    }
+  ],
+  "tags": ["#pasta", "#quickdinner", "#healthyrecipes"],
+  "creator": "@cammienoodle"
+}
+
+CRITICAL CONSISTENCY RULE: If localization is specified, ALL text fields (title, description, ingredient names, instruction text, location) MUST be in the SAME target language consistently throughout the entire response.
 
 IMPORTANT: Your response must be ONLY the JSON object, with no markdown formatting, no code blocks, no explanations before or after."""
 
@@ -162,7 +351,7 @@ IMPORTANT: Your response must be ONLY the JSON object, with no markdown formatti
                 model=self.model,
                 contents=contents,
                 config=GenerateContentConfig(
-                    max_output_tokens=2048,  # Increased for more complex workouts
+                    max_output_tokens=4096,  # Increased for complex recipes with many ingredients/steps
                     temperature=0.1,
                     top_p=0.8,
                     response_mime_type="application/json",  # Force JSON response
@@ -192,6 +381,10 @@ IMPORTANT: Your response must be ONLY the JSON object, with no markdown formatti
 
             parsed_json = json.loads(response_text)
             logger.debug(f"Gemini returned image field: {parsed_json.get('image', 'NOT_SET')}")
+
+            # Apply emoji mapping to ingredients (hybrid approach)
+            parsed_json = self._apply_emoji_mapping(parsed_json)
+
             return parsed_json
         except Exception as e:
             logger.error(f"Failed to parse Gemini response: {e}")
@@ -215,7 +408,7 @@ IMPORTANT: Your response must be ONLY the JSON object, with no markdown formatti
         await self._rate_limit()
 
         # Build prompt for slideshow analysis
-        prompt = "You are an expert relationship coach and lifestyle content analyst analyzing a social media slideshow."
+        prompt = "You are an expert culinary AI specializing in extracting structured recipe data from cooking videos and social media posts."
 
         if transcript:
             prompt += f"\n\nTRANSCRIPT:\n{transcript}"
@@ -229,46 +422,142 @@ IMPORTANT: Your response must be ONLY the JSON object, with no markdown formatti
         # Add localization instructions if specified
         localization_instruction = ""
         if localization:
-            localization_instruction = f"\n\nIMPORTANT: Provide ALL text content (title, description, tips, location) in {localization} language ONLY. Translate ALL human-readable text fields consistently in the specified language. Maintain the exact JSON structure but translate all text to {localization}."
+            localization_instruction = f"\n\nIMPORTANT: Provide ALL text content (title, description, ingredient names, instruction text, location) in {localization} language ONLY. Translate ALL human-readable text fields consistently in the specified language. Maintain the exact JSON structure but translate all text to {localization}."
 
         image_count = len(slideshow_images)
-        prompt += f"\n\nThis is a slideshow with {image_count} images. Analyze ALL the images together along with transcript, caption, and description to extract relationship, dating, or lifestyle content. Use ALL available information to create a comprehensive analysis. Use 'slideshow_image_1' as placeholder for the main image URL. Return your response as a valid JSON object with NO additional text, explanations, or formatting."
+        prompt += f"\n\nThis is a slideshow with {image_count} images. Analyze ALL the images together along with transcript, caption, and description to extract structured recipe data. Use ALL available information to create a comprehensive recipe extraction. Use 'slideshow_image_1' as placeholder for the main image URL. Return your response as a valid JSON object with NO additional text, explanations, or formatting."
         prompt += localization_instruction
 
         prompt += """
 
 Required JSON structure:
 {
-  "title": "descriptive title for the content",
-  "description": "concise description with brief summary and key tips formatted with \\n line breaks",
+  "title": "short, descriptive recipe name (e.g., 'Broccoli Pasta', 'Creamy Garlic Chicken')",
+  "description": "brief 1-2 sentence summary of the dish and its appeal",
   "image": "use 'slideshow_image_1' as placeholder",
-  "location": "location mentioned or visible in the content or null",
-  "content_type": "type of content (examples: date_idea, relationship_advice, couples_activity, lifestyle_tip, romantic_gesture, communication_tip, self_care) or null",
-  "mood": "mood or vibe (examples: romantic, fun, adventurous, cozy, intimate, playful, serious, inspiring) or null",
-  "occasion": "relevant occasion (examples: date_night, anniversary, valentine, weekend, vacation, everyday, special_occasion) or null",
-  "tips": ["array of extracted tips or advice points from all images"] or null,
-  "tags": ["array of relevant hashtags or tags"] or null,
+  "location": "cuisine origin or region mentioned (e.g., 'Italy', 'Thailand', 'Mediterranean') or null",
+  "prepTimeMinutes": "estimated preparation time in minutes (integer) or null",
+  "cookTimeMinutes": "estimated cooking time in minutes (integer) or null",
+  "baseServings": "number of servings this recipe makes (integer) or null",
+  "structuredIngredients": [
+    {
+      "name": "ingredient name (e.g., 'broccoli', 'chicken breast')",
+      "amount": "numeric quantity as float (e.g., 2.0, 500, 0.5) or null for qualitative amounts",
+      "unit": "measurement unit (e.g., 'cups', 'g', 'tbsp', 'heads', 'cloves') or null",
+      "preparation": "how to prepare (e.g., 'chopped', 'sliced', 'minced', 'diced') or null",
+      "emoji": "single emoji representing the ingredient (e.g., '🥦', '🍝', '🧄') or null",
+      "notes": "substitution notes or alternatives (e.g., 'or canned tomatoes') or null"
+    }
+  ],
+  "instructions": [
+    {
+      "stepNumber": "sequential step number starting from 1",
+      "text": "clear, complete cooking instruction for this step",
+      "durationMinutes": "time required for this step in minutes (integer) or null",
+      "highlightedIngredients": ["array of ingredient names mentioned in this step"]
+    }
+  ],
+  "tags": ["array of relevant hashtags or cooking tags from the post"] or null,
   "creator": "creator username or null"
 }
 
 EXTRACTION GUIDELINES:
-- Focus on relationship, dating, and lifestyle content
-- Combine information from all slideshow images, transcript/audio, caption, and metadata description
-- For Instagram: Use both the caption (primary text) and description (additional metadata) to understand context
-- For TikTok: Use both the transcript (spoken content) and description (post text) for comprehensive analysis
-- DESCRIPTION FIELD: Create a concise description that includes:
-  * Brief content summary (what the slideshow is about)
-  * Key tips formatted with '\n' line breaks for readability
-  * Keep it focused and not overly verbose
-  * Format tips as a simple list within the description using line breaks
-- Use 'slideshow_image_1' as placeholder for the main image field
-- Look for location information in images, captions, descriptions, or audio content
-- Analyze ALL images together to understand the complete story or advice
-- Extract actionable tips or advice from both visual content and text/audio sources
-- Identify the overall mood and occasion based on visual progression and textual cues
-- Include relevant hashtags or tags from captions and descriptions
+- Focus on extracting recipe cooking instructions and ingredients
+- Combine information from all slideshow images, spoken audio/transcript, caption, and description
+- For Instagram: Use both the caption (primary text) and description (additional metadata)
+- For TikTok: Use both the transcript (spoken content) and description (post text)
 
-CRITICAL CONSISTENCY RULE: If localization is specified, ALL text fields (title, description, tips, location) MUST be in the SAME target language consistently throughout the entire response.
+INGREDIENTS EXTRACTION:
+- Extract ALL ingredients mentioned in images/audio/text
+- Parse quantities (amounts + units) from visual or written content
+- Identify preparation methods (chopped, diced, minced, etc.)
+- Add appropriate food emojis for common ingredients (or null if uncertain)
+- Note substitutions or alternatives mentioned by creator
+- For qualitative amounts (e.g., "a drizzle", "a pinch", "to taste"), set amount to null and describe in unit field
+- Keep ingredient names simple and lowercase (e.g., "garlic" not "Garlic Cloves")
+
+INSTRUCTIONS EXTRACTION:
+- Break cooking process into numbered sequential steps
+- Extract timing information for each step when mentioned (e.g., "cook for 10 minutes")
+- Track which ingredients are used in each step for highlighting
+- Keep step text clear and actionable
+- Maintain chronological order across all slideshow images
+- If no timing mentioned for a step, set durationMinutes to null
+
+METADATA EXTRACTION:
+- Estimate prep and cook times based on slideshow content and creator's statements
+- Count servings mentioned by creator or estimate from ingredient quantities
+- Identify cuisine type or geographic origin for location field
+- Extract relevant hashtags and tags for discoverability
+
+EXAMPLE OUTPUT:
+{
+  "title": "Broccoli Pasta",
+  "description": "A quick and healthy 15-minute pasta dish with garlic and broccoli.",
+  "image": "slideshow_image_1",
+  "location": "Italy",
+  "prepTimeMinutes": 5,
+  "cookTimeMinutes": 10,
+  "baseServings": 4,
+  "structuredIngredients": [
+    {
+      "name": "broccoli",
+      "amount": 2.0,
+      "unit": "heads",
+      "preparation": null,
+      "emoji": "🥦",
+      "notes": null
+    },
+    {
+      "name": "pasta",
+      "amount": 500,
+      "unit": "g",
+      "preparation": null,
+      "emoji": "🍝",
+      "notes": "any shape works"
+    },
+    {
+      "name": "garlic",
+      "amount": 4,
+      "unit": "cloves",
+      "preparation": "sliced",
+      "emoji": "🧄",
+      "notes": null
+    },
+    {
+      "name": "olive oil",
+      "amount": null,
+      "unit": "drizzle",
+      "preparation": null,
+      "emoji": "🫒",
+      "notes": null
+    }
+  ],
+  "instructions": [
+    {
+      "stepNumber": 1,
+      "text": "Bring a large pot of salted water to boil. Add pasta and cook according to package directions.",
+      "durationMinutes": 10,
+      "highlightedIngredients": ["pasta", "water"]
+    },
+    {
+      "stepNumber": 2,
+      "text": "Meanwhile, heat olive oil in a large pan over medium heat. Add sliced garlic and sauté until fragrant.",
+      "durationMinutes": 2,
+      "highlightedIngredients": ["olive oil", "garlic"]
+    },
+    {
+      "stepNumber": 3,
+      "text": "Add broccoli florets to the pan and cook until tender. Season with salt and pepper.",
+      "durationMinutes": 7,
+      "highlightedIngredients": ["broccoli"]
+    }
+  ],
+  "tags": ["#pasta", "#quickdinner", "#healthyrecipes"],
+  "creator": "@cammienoodle"
+}
+
+CRITICAL CONSISTENCY RULE: If localization is specified, ALL text fields (title, description, ingredient names, instruction text, location) MUST be in the SAME target language consistently throughout the entire response.
 
 IMPORTANT: Your response must be ONLY the JSON object, with no markdown formatting, no code blocks, no explanations before or after."""
 
@@ -319,7 +608,7 @@ IMPORTANT: Your response must be ONLY the JSON object, with no markdown formatti
                 model=self.model,
                 contents=contents,
                 config=GenerateContentConfig(
-                    max_output_tokens=2048,
+                    max_output_tokens=4096,  # Increased for complex recipes with many ingredients/steps
                     temperature=0.1,
                     top_p=0.8,
                     response_mime_type="application/json",
@@ -348,10 +637,43 @@ IMPORTANT: Your response must be ONLY the JSON object, with no markdown formatti
             logger.debug(
                 f"Gemini slideshow returned image field: {parsed_json.get('image', 'NOT_SET')}"
             )
+
+            # Apply emoji mapping to ingredients (hybrid approach)
+            parsed_json = self._apply_emoji_mapping(parsed_json)
+
             return parsed_json
         except Exception as e:
             logger.error(f"Failed to parse slideshow response: {e}")
             return None
+
+    def _apply_emoji_mapping(self, recipe_data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Apply predefined emoji mapping to ingredients that don't have emojis.
+        Hybrid approach: Use predefined map for common ingredients, keep AI-generated for rare ones.
+        """
+        if not recipe_data or "structuredIngredients" not in recipe_data:
+            return recipe_data
+
+        structured_ingredients = recipe_data.get("structuredIngredients", [])
+        if not structured_ingredients:
+            return recipe_data
+
+        # Process each ingredient
+        for ingredient in structured_ingredients:
+            if not isinstance(ingredient, dict):
+                continue
+
+            ingredient_name = ingredient.get("name", "").lower().strip()
+            current_emoji = ingredient.get("emoji")
+
+            # If no emoji from AI or emoji is null/empty, try predefined mapping
+            if not current_emoji:
+                mapped_emoji = INGREDIENT_EMOJI_MAP.get(ingredient_name)
+                if mapped_emoji:
+                    ingredient["emoji"] = mapped_emoji
+                    logger.debug(f"Applied predefined emoji '{mapped_emoji}' to '{ingredient_name}'")
+
+        return recipe_data
 
     def _is_valid_image_content(self, content: bytes) -> bool:
         """Validate if the content is a valid image by checking headers"""

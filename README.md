@@ -1,60 +1,69 @@
-# Zest - Relationship Content Parser
+# Dishly - Recipe Parser
 
-**Extract meaningful relationship and lifestyle content from TikTok and Instagram posts with AI-powered analysis!**
+**Extract recipes, ingredients, and cooking instructions from TikTok and Instagram cooking videos with AI-powered analysis!**
 
-Send a TikTok or Instagram URL → Get back structured content data with title, description, image, and location.
+Send a TikTok or Instagram recipe video URL → Get back structured recipe data with title, description, ingredients, instructions, and images.
 
 ## 🚀 Try It Now
 
-**Live API:** https://zest-parser-g4zcestszq-uc.a.run.app
-**Production API:** https://api.zestai.app
 **Preview API:** run `make deploy-preview` (prints the current preview URL)
+**Production API:** Will be available after deployment
 
 ```bash
-# TikTok Example
-curl -X POST "https://zest-parser-g4zcestszq-uc.a.run.app/process" \
+# TikTok Recipe Example
+curl -X POST "http://localhost:8080/process" \
   -H "Content-Type: application/json" \
-  -d '{"url": "https://www.tiktok.com/@relationshipcoach/video/1234567890"}'
+  -d '{"url": "https://www.tiktok.com/@cookingwithlove/video/1234567890"}'
 
-# Instagram Example  
-curl -X POST "https://zest-parser-g4zcestszq-uc.a.run.app/process" \
+# Instagram Recipe Example
+curl -X POST "http://localhost:8080/process" \
   -H "Content-Type: application/json" \
   -d '{"url": "https://www.instagram.com/reel/ABC123XYZ/"}'
 
-# With Localization
-curl -X POST "https://zest-parser-g4zcestszq-uc.a.run.app/process" \
+# With Localization (Spanish recipe)
+curl -X POST "http://localhost:8080/process" \
   -H "Content-Type: application/json" \
-  -d '{"url": "https://www.tiktok.com/@datenight/video/9876543210", "localization": "Spanish"}'
+  -d '{"url": "https://www.tiktok.com/@recetasfaciles/video/9876543210", "localization": "Spanish"}'
 ```
 
 ## 🎯 How It Works
 
 ### Simple Flow
-1. **Send TikTok/Instagram URL** → API receives your request
+1. **Send TikTok/Instagram URL** → API receives your recipe video request
 2. **Detect Platform** → Automatically routes to appropriate scraper
-3. **Check Cache** → If we've seen this content before, instant result!
-4. **Process Content** → Download video/post, extract captions, analyze with AI
-5. **Return Data** → Get structured relationship content JSON
+3. **Check Cache** → If we've seen this recipe before, instant result!
+4. **Process Content** → Download video, extract captions, analyze with AI
+5. **Return Data** → Get structured recipe JSON with ingredients and instructions
 
 ### Three Response Types
 
 #### 1. Cached (Instant - 90% of popular content)
 ```json
 {
-  "title": "5 Perfect Date Night Ideas",
-  "description": "Creative and romantic date ideas for couples",
+  "title": "Easy Pasta Carbonara",
+  "description": "Classic Italian pasta dish ready in 20 minutes",
   "image": "https://example.com/image.jpg",
-  "location": "New York, NY",
-  "content_type": "date_idea",
-  "mood": "romantic",
-  "occasion": "date_night",
-  "tips": [
-    "Plan a picnic in Central Park",
-    "Visit a rooftop restaurant at sunset",
-    "Take a couples cooking class"
+  "ingredients": [
+    "1 lb spaghetti",
+    "4 large eggs",
+    "1 cup grated parmesan cheese",
+    "8 oz bacon or pancetta",
+    "2 cloves garlic",
+    "Salt and black pepper to taste"
   ],
-  "tags": ["datenight", "romance", "couples"],
-  "creator": "@relationshipcoach"
+  "instructions": [
+    "Bring a large pot of salted water to boil",
+    "Cook spaghetti according to package directions",
+    "Fry bacon until crispy, then set aside",
+    "Whisk eggs and parmesan together in a bowl",
+    "Toss hot pasta with egg mixture",
+    "Add bacon and serve with extra parmesan"
+  ],
+  "servings": "4 servings",
+  "prep_time": "10 minutes",
+  "cook_time": "15 minutes",
+  "tags": ["pasta", "italian", "quick", "dinner"],
+  "creator": "@cookingwithlove"
 }
 ```
 
@@ -72,7 +81,7 @@ Same JSON as above, but takes 10-15 seconds to process.
 
 Then check status:
 ```bash
-curl "https://zest-parser-g4zcestszq-uc.a.run.app/status/req123_1234567890"
+curl "http://localhost:8080/status/req123_1234567890"
 ```
 
 ## 🏗️ Technical Overview
@@ -81,8 +90,8 @@ curl "https://zest-parser-g4zcestszq-uc.a.run.app/status/req123_1234567890"
 - **FastAPI** - Main API service
 - **Cloud Run** - Serverless hosting (auto-scales)
 - **Firestore** - Queue system and caching
-- **Worker Service** - Background content processing
-- **Google Gemini AI** - Content analysis
+- **Worker Service** - Background recipe processing
+- **Google Gemini AI** - Recipe content analysis and extraction
 
 ### Smart Processing
 - **Cache First** - Popular content returns instantly
@@ -100,14 +109,13 @@ curl "https://zest-parser-g4zcestszq-uc.a.run.app/status/req123_1234567890"
 
 ### Install & Run
 ```bash
-# 1. Clone and setup
-git clone <repo-url>
-cd zest-backend
+# 1. Navigate to dishly-backend (already forked)
+cd dishly-backend
 make setup
 
-# 2. Add your API key to .env file
-nano .env
-# Set: SCRAPECREATORS_API_KEY=your_key_here
+# 2. Your .env file is already configured with:
+# GOOGLE_CLOUD_PROJECT_ID=dishly-476904
+# SCRAPECREATORS_API_KEY=TqHKAnqkrYcEQDRFDf2mjyPawR43
 
 # 3. Start everything
 make dev
@@ -330,17 +338,19 @@ make dev-force
 - **After free tier** - ~$0.40 per million requests
 
 ### Typical Monthly Costs
-- **Personal use** (< 1,000 posts): $0-5
-- **Small business** (10,000 posts): $10-30
-- **High volume** (100,000 posts): $50-150
+- **Personal use** (< 1,000 recipes): $0-5
+- **Small app** (10,000 recipes): $10-30
+- **High volume** (100,000 recipes): $50-150
 
 ## 🏆 What Makes This Special
 
-- **Smart Caching** - Popular content is instant
+- **Smart Caching** - Popular recipes load instantly
 - **Hybrid Processing** - Fast when quiet, scalable when busy
 - **Production Ready** - Handles failures, retries, monitoring
 - **Cost Efficient** - Only pay for what you use
-- **AI-Powered** - Advanced content analysis with Gemini 2.0
+- **AI-Powered** - Intelligent recipe extraction with Gemini 2.0
+- **Ingredient Extraction** - Automatically parses ingredients with quantities
+- **Step-by-Step Instructions** - Converts videos to clear cooking steps
 
 ## 👨‍💻 For Developers
 
@@ -511,12 +521,12 @@ curl -X GET "https://api.scrapecreators.com/health"  # If available
 
 ### Project Structure
 ```
-zest-backend/
+dishly-backend/
 ├── main.py                     # Main FastAPI application
 ├── src/
 │   ├── services/              # Core business logic services
-│   │   ├── tiktok_scraper.py      # TikTok video downloading & metadata
-│   │   ├── instagram_scraper.py   # Instagram video downloading & metadata
+│   │   ├── tiktok_scraper.py      # TikTok recipe video downloading & metadata
+│   │   ├── instagram_scraper.py   # Instagram recipe video downloading & metadata
 │   │   ├── url_router.py          # Platform detection and URL validation
 │   │   ├── genai_service.py       # Single GenAI service instance
 │   │   ├── genai_service_pool.py  # Multiple GenAI services for workers
@@ -587,13 +597,13 @@ make security-logs           # View blocked requests
 - **Cache System** (`src/services/cache_service.py`): Result caching with TTL
 
 ### Processing Flow
-1. **Request comes in** → `main.py` receives TikTok/Instagram URL
+1. **Request comes in** → `main.py` receives TikTok/Instagram recipe URL
 2. **Platform detection** → `url_router.py` determines TikTok vs Instagram
 3. **Cache check** → `cache_service.py` looks for existing results
 4. **Processing decision** → Direct processing or queue based on load
-5. **Video download** → Platform-specific scraper downloads video
-6. **AI analysis** → `genai_service_pool.py` analyzes with Gemini
-7. **Result storage** → Cache and return structured workout data
+5. **Video download** → Platform-specific scraper downloads recipe video
+6. **AI analysis** → `genai_service_pool.py` analyzes with Gemini to extract recipe
+7. **Result storage** → Cache and return structured recipe data (ingredients, instructions, etc.)
 
 ### Scaling Strategy
 - **Hybrid processing**: Direct for low load, queue for high load

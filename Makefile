@@ -1,9 +1,9 @@
-# Zest - Relationship Content Parser - Makefile
+# Dishly - Recipe Parser - Makefile
 # Standardized commands for development and deployment
 
 # Variables
-PROJECT_ID := zest-45e51
-SERVICE_NAME := zest-parser
+PROJECT_ID := dishly-476904
+SERVICE_NAME := dishly-parser
 PRIMARY_REGION := us-central1
 SECONDARY_REGIONS := us-east1,us-west1,europe-west1,europe-west4,europe-north1,asia-southeast1,asia-northeast1,asia-south1,australia-southeast1,southamerica-east1
 PYTHON := python3.11
@@ -19,7 +19,7 @@ NC := \033[0m # No Color
 
 .PHONY: help
 help: ## Display this help message
-	@echo "$(GREEN)Zest - Relationship Content Parser - Available Commands$(NC)"
+	@echo "$(GREEN)Dishly - Recipe Parser - Available Commands$(NC)"
 	@echo ""
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "$(YELLOW)%-20s$(NC) %s\n", $$1, $$2}'
 
