@@ -78,7 +78,7 @@ dev: check-requirements check-ports ## Run API and Worker in development mode
 	@echo "$(YELLOW)Press Ctrl+C to stop both services$(NC)"
 	@trap 'echo "$(YELLOW)Stopping services...$(NC)"; kill 0' INT; \
 	ENVIRONMENT=development $(VENV)/bin/uvicorn main:app --reload --host 0.0.0.0 --port $(PORT) & \
-	ENVIRONMENT=development $(VENV)/bin/python -m src.worker.worker_service & \
+	ENVIRONMENT=development PORT=$(WORKER_PORT) $(VENV)/bin/python -m src.worker.worker_service & \
 	wait
 
 .PHONY: dev-force
@@ -88,7 +88,7 @@ dev-force: check-requirements kill-ports ## Run API and Worker in development mo
 	@echo "$(YELLOW)Press Ctrl+C to stop both services$(NC)"
 	@trap 'echo "$(YELLOW)Stopping services...$(NC)"; kill 0' INT; \
 	ENVIRONMENT=development $(VENV)/bin/uvicorn main:app --reload --host 0.0.0.0 --port $(PORT) & \
-	ENVIRONMENT=development $(VENV)/bin/python -m src.worker.worker_service & \
+	ENVIRONMENT=development PORT=$(WORKER_PORT) $(VENV)/bin/python -m src.worker.worker_service & \
 	wait
 
 .PHONY: dev-api
