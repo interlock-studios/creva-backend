@@ -11,7 +11,9 @@ NC='\033[0m' # No Color
 
 # Configuration
 SERVICE_NAME="${SERVICE_NAME:-workout-parser-v2}"
-PROJECT_ID="${PROJECT_ID:-sets-ai}"
+PROJECT_ID="${PROJECT_ID:-sets-ai}"  # Cloud Run deployment project
+FIREBASE_PROJECT_ID="${FIREBASE_PROJECT_ID:-dishly-prod-fafd3}"  # Firebase resources project
+SERVICE_ACCOUNT="${SERVICE_ACCOUNT:-dishly-parser@zest-45e51.iam.gserviceaccount.com}"  # Service account
 PRIMARY_REGION="${PRIMARY_REGION:-us-central1}"
 SECONDARY_REGIONS="${SECONDARY_REGIONS:-us-east1,us-west1,europe-west1,europe-west4,europe-north1,asia-southeast1,asia-northeast1,asia-south1,australia-southeast1,southamerica-east1}"
 ENVIRONMENT="${ENVIRONMENT:-production}"
@@ -55,7 +57,8 @@ if [ "$SINGLE_REGION" = "true" ]; then
         --max-instances 50 \
         --min-instances 1 \
         --concurrency 80 \
-        --set-env-vars "GOOGLE_CLOUD_PROJECT_ID=${PROJECT_ID},ENVIRONMENT=${ENVIRONMENT},MAX_CONCURRENT_PROCESSING=60,RATE_LIMIT_REQUESTS=40,MAX_DIRECT_PROCESSING=15,GEMINI_REGIONS=${PRIMARY_REGION}" \
+        --set-env-vars "GOOGLE_CLOUD_PROJECT_ID=${FIREBASE_PROJECT_ID},ENVIRONMENT=${ENVIRONMENT},MAX_CONCURRENT_PROCESSING=60,RATE_LIMIT_REQUESTS=40,MAX_DIRECT_PROCESSING=15,GEMINI_REGIONS=${PRIMARY_REGION}" \
+        --service-account="${SERVICE_ACCOUNT}" \
         --quiet
 else
     # Multi-region deployment - build once, deploy to all regions IN PARALLEL
@@ -81,7 +84,8 @@ else
         --timeout 900 \
         --cpu-throttling \
         --execution-environment gen2 \
-        --set-env-vars "GOOGLE_CLOUD_PROJECT_ID=${PROJECT_ID},ENVIRONMENT=${ENVIRONMENT},MAX_CONCURRENT_PROCESSING=60,RATE_LIMIT_REQUESTS=40,MAX_DIRECT_PROCESSING=15,GEMINI_REGIONS=${GEMINI_REGIONS_FORMATTED},CLOUD_RUN_REGION=${PRIMARY_REGION},APPCHECK_REQUIRED=false" \
+        --set-env-vars "GOOGLE_CLOUD_PROJECT_ID=${FIREBASE_PROJECT_ID},ENVIRONMENT=${ENVIRONMENT},MAX_CONCURRENT_PROCESSING=60,RATE_LIMIT_REQUESTS=40,MAX_DIRECT_PROCESSING=15,GEMINI_REGIONS=${GEMINI_REGIONS_FORMATTED},CLOUD_RUN_REGION=${PRIMARY_REGION},APPCHECK_REQUIRED=false" \
+        --service-account="${SERVICE_ACCOUNT}" \
         --set-secrets "SCRAPECREATORS_API_KEY=scrapecreators-api-key:latest" \
         --quiet
 
@@ -100,7 +104,8 @@ else
         --timeout 3600 \
         --cpu-throttling \
         --execution-environment gen2 \
-        --set-env-vars "GOOGLE_CLOUD_PROJECT_ID=${PROJECT_ID},ENVIRONMENT=${ENVIRONMENT},CLOUD_RUN_REGION=${PRIMARY_REGION}" \
+        --set-env-vars "GOOGLE_CLOUD_PROJECT_ID=${FIREBASE_PROJECT_ID},ENVIRONMENT=${ENVIRONMENT},CLOUD_RUN_REGION=${PRIMARY_REGION}" \
+        --service-account="${SERVICE_ACCOUNT}" \
         --set-secrets "SCRAPECREATORS_API_KEY=scrapecreators-api-key:latest" \
         --command "uvicorn" \
         --args "src.worker.worker_service:app,--host,0.0.0.0,--port,8080,--workers,1" \
@@ -128,7 +133,8 @@ else
             --timeout 900 \
             --cpu-throttling \
             --execution-environment gen2 \
-            --set-env-vars "GOOGLE_CLOUD_PROJECT_ID=${PROJECT_ID},ENVIRONMENT=${ENVIRONMENT},MAX_CONCURRENT_PROCESSING=60,RATE_LIMIT_REQUESTS=40,MAX_DIRECT_PROCESSING=15,GEMINI_REGIONS=${GEMINI_REGIONS_FORMATTED},CLOUD_RUN_REGION=$region,APPCHECK_REQUIRED=false" \
+            --set-env-vars "GOOGLE_CLOUD_PROJECT_ID=${FIREBASE_PROJECT_ID},ENVIRONMENT=${ENVIRONMENT},MAX_CONCURRENT_PROCESSING=60,RATE_LIMIT_REQUESTS=40,MAX_DIRECT_PROCESSING=15,GEMINI_REGIONS=${GEMINI_REGIONS_FORMATTED},CLOUD_RUN_REGION=$region,APPCHECK_REQUIRED=false" \
+            --service-account="${SERVICE_ACCOUNT}" \
             --set-secrets "SCRAPECREATORS_API_KEY=scrapecreators-api-key:latest" \
             --quiet >> "$log_file" 2>&1; then
             echo -e "${GREEN}[${region}] ✅ API service deployed successfully${NC}"
@@ -151,7 +157,8 @@ else
             --timeout 3600 \
             --cpu-throttling \
             --execution-environment gen2 \
-            --set-env-vars "GOOGLE_CLOUD_PROJECT_ID=${PROJECT_ID},ENVIRONMENT=${ENVIRONMENT},CLOUD_RUN_REGION=$region" \
+            --set-env-vars "GOOGLE_CLOUD_PROJECT_ID=${FIREBASE_PROJECT_ID},ENVIRONMENT=${ENVIRONMENT},CLOUD_RUN_REGION=$region" \
+            --service-account="${SERVICE_ACCOUNT}" \
             --set-secrets "SCRAPECREATORS_API_KEY=scrapecreators-api-key:latest" \
             --command "uvicorn" \
             --args "src.worker.worker_service:app,--host,0.0.0.0,--port,8080,--workers,1" \

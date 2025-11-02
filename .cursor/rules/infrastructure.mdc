@@ -1,0 +1,95 @@
+---
+description: Critical infrastructure rules for Dishly backend - NEVER touch Zest services
+---
+
+# 🚨 CRITICAL: Dishly vs Zest Infrastructure Separation
+
+## **NEVER Touch Zest Services - This is Dishly Backend**
+
+### DO NOT MODIFY, DEPLOY, OR INTERACT WITH:
+- ❌ `zest-parser` (Cloud Run service)
+- ❌ `zest-parser-worker` (Cloud Run service)
+- ❌ `zest-parser@zest-45e51.iam.gserviceaccount.com` (Service account)
+- ❌ Zest's Firebase project (different from dishly-prod-fafd3)
+- ❌ ANY service, function, worker, or resource with "zest" in the name
+
+### ONLY WORK WITH DISHLY SERVICES:
+- ✅ `dishly-parser` → https://dishly-parser-g4zcestszq-uc.a.run.app
+- ✅ `dishly-parser-worker` → https://dishly-parser-worker-g4zcestszq-uc.a.run.app
+- ✅ `dishly-parser@zest-45e51.iam.gserviceaccount.com` (Service account)
+- ✅ Firebase project: `dishly-prod-fafd3`
+
+## Infrastructure Isolation
+
+```
+Cloud Run Project (Shared):    zest-45e51
+  ├─ Dishly Services:           dishly-parser, dishly-parser-worker
+  └─ Zest Services (UNTOUCHED): zest-parser, zest-parser-worker
+
+Firebase Projects (Separate):
+  ├─ Dishly:                    dishly-prod-fafd3 (USE THIS)
+  └─ Zest:                      [Different project] (DO NOT ACCESS)
+
+Service Accounts:
+  ├─ Dishly:                    dishly-parser@zest-45e51.iam.gserviceaccount.com
+  └─ Zest:                      zest-parser@zest-45e51.iam.gserviceaccount.com (DO NOT USE)
+```
+
+## Why This Matters
+
+- **Zest is a separate production application** serving real users
+- We **share GCP project `zest-45e51`** for compute/billing consolidation only
+- **Firebase projects are completely separate** - no data sharing
+- Modifying Zest services **will break a production app** and affect real users
+- Touching Zest infrastructure is a **CRITICAL incident**
+
+## Before ANY Operation
+
+1. ✅ Verify service name contains `dishly-parser` (NOT `zest-parser`)
+2. ✅ Verify Firebase operations use `dishly-prod-fafd3`
+3. ✅ When deploying, confirm you're deploying `dishly-parser*` services
+4. ❌ Never run gcloud commands that affect `zest-parser*`
+
+## Deployment Commands - ALWAYS VERIFY
+
+```bash
+# ✅ CORRECT - Deploys Dishly services
+make deploy-single-region
+make deploy
+
+# ❌ WRONG - Never manually deploy with wrong service names
+gcloud run deploy zest-parser ...  # NEVER DO THIS
+gcloud run deploy zest-parser-worker ...  # NEVER DO THIS
+```
+
+## Quick Reference
+
+**Dishly URLs:**
+- API: https://dishly-parser-g4zcestszq-uc.a.run.app
+- Worker: https://dishly-parser-worker-g4zcestszq-uc.a.run.app
+
+**Verify deployment:**
+```bash
+# Check Dishly services (should see both)
+gcloud run services list --project=zest-45e51 --filter="metadata.name~dishly"
+
+# Verify Zest untouched (should be unchanged from before your deployment)
+gcloud run services list --project=zest-45e51 --filter="metadata.name~zest-parser"
+```
+
+**Emergency rollback if you accidentally touched Zest:**
+```bash
+# STOP - Contact team immediately
+# DO NOT attempt to fix yourself
+# Zest may need restoration from backup
+```
+
+## When in Doubt
+
+**ASK BEFORE:**
+- Any gcloud deployment command
+- Any service account changes
+- Any Firebase configuration
+- Any changes to cloudbuild.yaml or deployment scripts
+
+**VERIFY service names contain "dishly" not "zest"**

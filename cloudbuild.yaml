@@ -201,11 +201,11 @@ steps:
         echo "Deploying worker service..."
         
         # Create worker service account if needed
-        WORKER_SA="zest-parser-worker@${PROJECT_ID}.iam.gserviceaccount.com"
+        WORKER_SA="dishly-parser@${PROJECT_ID}.iam.gserviceaccount.com"
         if ! gcloud iam service-accounts describe "$${WORKER_SA}" 2>/dev/null; then
           echo "Creating worker service account..."
-          gcloud iam service-accounts create zest-parser-worker \
-            --display-name="Zest Parser Worker Service Account"
+          gcloud iam service-accounts create dishly-parser \
+            --display-name="Dishly Parser Service Account"
         else
           echo "Worker service account already exists: $${WORKER_SA}"
         fi
@@ -231,7 +231,7 @@ steps:
           --role="roles/aiplatform.serviceAgent" || true
         
         # Deploy worker service to primary region
-        gcloud run deploy zest-parser-worker \
+        gcloud run deploy dishly-parser-worker \
           --image ${_PRIMARY_REGION}-docker.pkg.dev/${PROJECT_ID}/${_SERVICE_NAME}/${_SERVICE_NAME}:${SHORT_SHA} \
           --region ${_PRIMARY_REGION} \
           --platform managed \

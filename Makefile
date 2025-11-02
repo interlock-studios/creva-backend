@@ -2,7 +2,8 @@
 # Standardized commands for development and deployment
 
 # Variables
-PROJECT_ID := dishly-476904
+# Project where Cloud Run service will be deployed (Zest's project)
+PROJECT_ID := zest-45e51
 SERVICE_NAME := dishly-parser
 PRIMARY_REGION := us-central1
 SECONDARY_REGIONS := us-east1,us-west1,europe-west1,europe-west4,europe-north1,asia-southeast1,asia-northeast1,asia-south1,australia-southeast1,southamerica-east1
@@ -152,7 +153,7 @@ deploy: ## Deploy to production (multi-region) - PARALLEL deployment for speed!
 	@echo "$(YELLOW)Primary region: $(PRIMARY_REGION)$(NC)"
 	@echo "$(YELLOW)Secondary regions: $(SECONDARY_REGIONS)$(NC)"
 	@chmod +x scripts/deployment/deploy-parallel.sh
-	@ENVIRONMENT=production PRIMARY_REGION=$(PRIMARY_REGION) SECONDARY_REGIONS=$(SECONDARY_REGIONS) ./scripts/deployment/deploy-parallel.sh
+	@PROJECT_ID=$(PROJECT_ID) SERVICE_NAME=$(SERVICE_NAME) FIREBASE_PROJECT_ID=dishly-prod-fafd3 SERVICE_ACCOUNT=dishly-parser@zest-45e51.iam.gserviceaccount.com ENVIRONMENT=production PRIMARY_REGION=$(PRIMARY_REGION) SECONDARY_REGIONS=$(SECONDARY_REGIONS) ./scripts/deployment/deploy-parallel.sh
 
 .PHONY: deploy-staging
 deploy-staging: ## Deploy to staging
@@ -172,7 +173,7 @@ deploy-sequential: ## Deploy to production (multi-region) - OLD sequential metho
 .PHONY: deploy-single-region
 deploy-single-region: ## Deploy to single region only
 	@echo "$(GREEN)Deploying to single region: $(PRIMARY_REGION)...$(NC)"
-	@ENVIRONMENT=production SINGLE_REGION=true ./scripts/deployment/deploy.sh
+	@PROJECT_ID=$(PROJECT_ID) SERVICE_NAME=$(SERVICE_NAME) FIREBASE_PROJECT_ID=dishly-prod-fafd3 SERVICE_ACCOUNT=dishly-parser@zest-45e51.iam.gserviceaccount.com ENVIRONMENT=production SINGLE_REGION=true PRIMARY_REGION=$(PRIMARY_REGION) ./scripts/deployment/deploy.sh
 
 .PHONY: setup-security
 setup-security: ## Setup Cloud Armor security policies with edge bot blocking

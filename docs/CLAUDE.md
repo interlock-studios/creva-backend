@@ -2,6 +2,47 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+---
+
+## 🚨 CRITICAL: Dishly vs Zest Infrastructure
+
+### **NEVER Touch Zest Services - This is Dishly Backend**
+
+**DO NOT MODIFY, DEPLOY, OR INTERACT WITH:**
+- ❌ `zest-parser` (Cloud Run service)
+- ❌ `zest-parser-worker` (Cloud Run service)
+- ❌ `zest-parser@zest-45e51.iam.gserviceaccount.com` (Service account)
+- ❌ Zest's Firebase project (different from dishly-prod-fafd3)
+
+**ONLY WORK WITH DISHLY SERVICES:**
+- ✅ `dishly-parser` → https://dishly-parser-g4zcestszq-uc.a.run.app
+- ✅ `dishly-parser-worker` → https://dishly-parser-worker-g4zcestszq-uc.a.run.app
+- ✅ `dishly-parser@zest-45e51.iam.gserviceaccount.com` (Service account)
+- ✅ Firebase project: `dishly-prod-fafd3`
+
+**Infrastructure Isolation:**
+```
+Cloud Run Project (Shared):    zest-45e51
+  ├─ Dishly Services:           dishly-parser, dishly-parser-worker
+  └─ Zest Services (UNTOUCHED): zest-parser, zest-parser-worker
+
+Firebase Projects (Separate):
+  ├─ Dishly:                    dishly-prod-fafd3 (USE THIS)
+  └─ Zest:                      [Different project] (DO NOT ACCESS)
+
+Service Accounts:
+  ├─ Dishly:                    dishly-parser@zest-45e51.iam.gserviceaccount.com
+  └─ Zest:                      zest-parser@zest-45e51.iam.gserviceaccount.com (DO NOT USE)
+```
+
+**Before ANY operation:**
+1. Verify service name contains `dishly-parser` (NOT `zest-parser`)
+2. Verify Firebase operations use `dishly-prod-fafd3`
+3. When deploying, confirm you're deploying `dishly-parser*` services
+4. Never run gcloud commands that affect `zest-parser*`
+
+---
+
 ## Project Overview
 
 Social Media Workout Parser is a Python FastAPI backend service that transforms TikTok and Instagram workout videos into structured workout data. The system features:
@@ -73,14 +114,14 @@ curl -X POST http://localhost:8080/process \
   -H "Content-Type: application/json" \
   -d '{"url": "https://www.tiktok.com/@lastairbender222/video/7518493301046119710"}'
 
-# Production testing
-curl https://zest-parser-g4zcestszq-uc.a.run.app/health
-curl -X POST https://zest-parser-g4zcestszq-uc.a.run.app/process \
+# Production testing (Dishly API)
+curl https://dishly-parser-g4zcestszq-uc.a.run.app/health
+curl -X POST https://dishly-parser-g4zcestszq-uc.a.run.app/process \
   -H "Content-Type: application/json" \
   -d '{"url": "https://www.tiktok.com/@user/video/1234567890"}'
 
 # Instagram testing
-curl -X POST https://zest-parser-g4zcestszq-uc.a.run.app/process \
+curl -X POST https://dishly-parser-g4zcestszq-uc.a.run.app/process \
   -H "Content-Type: application/json" \
   -d '{"url": "https://www.instagram.com/reel/CS7CshJjb15/"}'
 ```

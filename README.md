@@ -4,6 +4,53 @@
 
 Send a TikTok or Instagram recipe video URL → Get back structured recipe data with title, description, ingredients, instructions, and images.
 
+---
+
+## 🚨 CRITICAL INFRASTRUCTURE RULES
+
+### **Dishly Backend is Separate from Zest - NEVER Touch Zest Services**
+
+**Infrastructure Setup:**
+- **GCP Project (Shared):** `zest-45e51` - Shared for Cloud Run compute/hosting only
+- **Firebase Project (Dishly):** `dishly-prod-fafd3` - Completely separate Firestore database
+- **Firebase Project (Zest):** Separate project - **DO NOT ACCESS**
+
+**Deployed Services:**
+```
+✅ DISHLY (This Project):
+- dishly-parser          → https://dishly-parser-g4zcestszq-uc.a.run.app
+- dishly-parser-worker   → https://dishly-parser-worker-g4zcestszq-uc.a.run.app
+
+❌ ZEST (DO NOT TOUCH):
+- zest-parser            → DO NOT MODIFY
+- zest-parser-worker     → DO NOT MODIFY
+```
+
+**Service Account:**
+```
+✅ Dishly: dishly-parser@zest-45e51.iam.gserviceaccount.com
+   - Created in: zest-45e51 (Cloud Run project)
+   - Has permissions in: zest-45e51 AND dishly-prod-fafd3
+   - Used by: Both dishly-parser and dishly-parser-worker
+
+❌ Zest: zest-parser@zest-45e51.iam.gserviceaccount.com
+   - DO NOT USE OR MODIFY
+```
+
+**Why This Matters:**
+- Different service names prevent collisions
+- Different Firebase projects prevent data leakage
+- Same GCP project for billing consolidation only
+- **Zest is a separate production app - do not interfere with it**
+
+**Before ANY deployment or change:**
+1. ✅ Verify you're working with `dishly-parser` or `dishly-parser-worker`
+2. ✅ Verify Firebase operations use `dishly-prod-fafd3`
+3. ❌ NEVER run commands that affect `zest-parser*` services
+4. ❌ NEVER modify Zest's Firebase project
+
+---
+
 ## 🚀 Try It Now
 
 **Preview API:** run `make deploy-preview` (prints the current preview URL)
@@ -282,7 +329,7 @@ make create-secrets
 make deploy
 ```
 
-Your API will be live at: `https://zest-parser-g4zcestszq-uc.a.run.app`
+Your API will be live at: `https://dishly-parser-g4zcestszq-uc.a.run.app`
 
 ## 📊 Monitoring & Analytics
 
