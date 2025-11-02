@@ -7,21 +7,35 @@ from typing import Optional, List, Dict, Any, Union
 from datetime import datetime
 
 
-class RelationshipContent(BaseModel):
-    """Complete relationship/lifestyle content information"""
+class RecipeContent(BaseModel):
+    """Complete recipe content extracted from social media videos"""
 
-    title: str = Field(..., description="Content title")
-    description: Optional[str] = Field(None, description="Content description")
-    image: Optional[str] = Field(None, description="Main image URL from the post/video")
-    location: Optional[str] = Field(None, description="Location mentioned or tagged")
-    content_type: Optional[str] = Field(
-        None, description="Type of content (date_idea, advice, lifestyle)"
+    # Core fields
+    title: str = Field(..., description="Recipe name")
+    description: Optional[str] = Field(None, description="Brief recipe summary (1-2 sentences)")
+    image: Optional[str] = Field(None, description="Main recipe image URL or base64-encoded JPEG")
+    location: Optional[str] = Field(None, description="Cuisine origin or region (e.g., 'Italy', 'Thailand')")
+    tags: Optional[List[str]] = Field(None, description="Hashtags from the post (e.g., ['#recipe', '#dinner'])")
+    creator: Optional[str] = Field(None, description="Content creator username (e.g., '@chef')")
+
+    # Recipe metadata
+    prepTimeMinutes: Optional[int] = Field(None, description="Preparation time in minutes")
+    cookTimeMinutes: Optional[int] = Field(None, description="Cooking/baking time in minutes")
+    baseServings: Optional[int] = Field(None, description="Number of servings this recipe makes")
+
+    # Structured recipe data
+    structuredIngredients: Optional[List[Dict[str, Any]]] = Field(
+        None,
+        description="""Array of ingredient objects with name, amount, unit, preparation, emoji, notes"""
     )
-    mood: Optional[str] = Field(None, description="Mood or vibe of the content")
-    occasion: Optional[str] = Field(None, description="Relevant occasion or context")
-    tips: Optional[List[str]] = Field(None, description="Extracted tips or advice")
-    tags: Optional[List[str]] = Field(None, description="Content tags")
-    creator: Optional[str] = Field(None, description="Content creator")
+    instructions: Optional[List[Dict[str, Any]]] = Field(
+        None,
+        description="""Array of cooking step objects with stepNumber, text, durationMinutes, highlightedIngredients"""
+    )
+
+
+# Legacy alias for backward compatibility (if needed)
+RelationshipContent = RecipeContent
 
 
 class QueuedResponse(BaseModel):
