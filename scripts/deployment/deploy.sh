@@ -34,19 +34,19 @@ fi
 
 # Set project
 echo -e "${YELLOW}📋 Setting up Google Cloud project...${NC}"
-gcloud config set project ${PROJECT_ID}
+# gcloud config set project ${PROJECT_ID}  # Commented out - project already configured
 
 # Enable required APIs
 echo -e "${YELLOW}🔧 Enabling required APIs...${NC}"
 gcloud services enable cloudbuild.googleapis.com run.googleapis.com artifactregistry.googleapis.com --quiet 2>/dev/null || true
 
 if [ "$SINGLE_REGION" = "true" ]; then
-    # Single region deployment (original logic)
+    # Single region deployment - deploy both API and Worker services
     echo -e "${YELLOW}🏗️ Building and deploying to single region...${NC}"
     gcloud builds submit --tag ${PRIMARY_REGION}-docker.pkg.dev/${PROJECT_ID}/${SERVICE_NAME}/${SERVICE_NAME}:${ENVIRONMENT} .
 
-    # Deploy to Cloud Run
-    echo -e "${GREEN}🚀 Deploying to Cloud Run (${PRIMARY_REGION})...${NC}"
+    # Deploy API service
+    echo -e "${GREEN}🚀 Deploying API service to Cloud Run (${PRIMARY_REGION})...${NC}"
     gcloud run deploy ${SERVICE_NAME} \
         --image ${PRIMARY_REGION}-docker.pkg.dev/${PROJECT_ID}/${SERVICE_NAME}/${SERVICE_NAME}:${ENVIRONMENT} \
         --region ${PRIMARY_REGION} \
@@ -57,9 +57,34 @@ if [ "$SINGLE_REGION" = "true" ]; then
         --max-instances 50 \
         --min-instances 1 \
         --concurrency 80 \
+        --timeout 900 \
+        --cpu-throttling \
+        --execution-environment gen2 \
         --service-account "${SERVICE_ACCOUNT}" \
-        --set-env-vars "GOOGLE_CLOUD_PROJECT_ID=${FIREBASE_PROJECT_ID},ENVIRONMENT=${ENVIRONMENT},MAX_CONCURRENT_PROCESSING=60,RATE_LIMIT_REQUESTS=40,MAX_DIRECT_PROCESSING=15,GEMINI_REGIONS=${PRIMARY_REGION}" \
+        --set-env-vars "GOOGLE_CLOUD_PROJECT_ID=${FIREBASE_PROJECT_ID},ENVIRONMENT=${ENVIRONMENT},MAX_CONCURRENT_PROCESSING=60,RATE_LIMIT_REQUESTS=40,MAX_DIRECT_PROCESSING=15,GEMINI_REGIONS=${PRIMARY_REGION},CLOUD_RUN_REGION=${PRIMARY_REGION},APPCHECK_REQUIRED=false" \
         --set-secrets "SCRAPECREATORS_API_KEY=scrapecreators-api-key:latest" \
+        --quiet
+
+    # Deploy Worker service
+    echo -e "${BLUE}Deploying Worker service to Cloud Run (${PRIMARY_REGION})...${NC}"
+    gcloud run deploy ${SERVICE_NAME}-worker \
+        --image ${PRIMARY_REGION}-docker.pkg.dev/${PROJECT_ID}/${SERVICE_NAME}/${SERVICE_NAME}:${ENVIRONMENT} \
+        --region ${PRIMARY_REGION} \
+        --platform managed \
+        --allow-unauthenticated \
+        --memory 1Gi \
+        --cpu 1 \
+        --max-instances 10 \
+        --min-instances 1 \
+        --concurrency 1 \
+        --timeout 3600 \
+        --cpu-throttling \
+        --execution-environment gen2 \
+        --service-account "${SERVICE_ACCOUNT}" \
+        --set-env-vars "GOOGLE_CLOUD_PROJECT_ID=${FIREBASE_PROJECT_ID},ENVIRONMENT=${ENVIRONMENT},CLOUD_RUN_REGION=${PRIMARY_REGION}" \
+        --set-secrets "SCRAPECREATORS_API_KEY=scrapecreators-api-key:latest" \
+        --command "uvicorn" \
+        --args "src.worker.worker_service:app,--host,0.0.0.0,--port,8080,--workers,1" \
         --quiet
 else
     # Multi-region deployment - build once, deploy to all regions

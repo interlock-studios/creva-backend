@@ -38,6 +38,20 @@ MAX_DIRECT_PROCESSING = int(os.getenv("MAX_DIRECT_PROCESSING", "15"))
 active_direct_processing = 0
 
 
+def _has_structured_recipe_data(data: dict) -> bool:
+    """Check if cached data already includes structured recipe details."""
+    if not isinstance(data, dict):
+        return False
+
+    structured_ingredients = data.get("structuredIngredients")
+    instructions = data.get("instructions")
+
+    has_ingredients = isinstance(structured_ingredients, list) and len(structured_ingredients) > 0
+    has_instructions = isinstance(instructions, list) and len(instructions) > 0
+
+    return has_ingredients and has_instructions
+
+
 async def process_video_direct(url: str, request_id: str, localization: str = None) -> dict:
     """Process video directly (not through queue)"""
     global active_direct_processing
@@ -216,10 +230,22 @@ async def process_video(
         logger.debug(f"App Check not provided (optional) - Request ID: {request_id}")
 
     # Check cache first
-    cached_bucket_list = await cache_service.get_cached_bucket_list(request.url, request.localization)
+    cached_bucket_list = await cache_service.get_cached_bucket_list(
+        request.url, request.localization
+    )
     if cached_bucket_list:
-        logger.info(f"Returning cached result - Request ID: {request_id}, URL: {request.url}")
-        return RelationshipContent(**cached_bucket_list)
+        if _has_structured_recipe_data(cached_bucket_list):
+            logger.info(
+                f"Returning cached result - Request ID: {request_id}, URL: {request.url}"
+            )
+            return RelationshipContent(**cached_bucket_list)
+
+        logger.info(
+            "Cached result missing structured recipe data; invalidating and reprocessing",
+            url=request.url,
+            request_id=request_id,
+        )
+        cache_service.invalidate_cache(request.url, request.localization)
 
     # Check if already in queue (with localization)
     existing_job = await queue_service.get_job_by_url(request.url, status="pending", localization=request.localization)
