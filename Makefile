@@ -6,7 +6,7 @@
 PROJECT_ID := zest-45e51
 SERVICE_NAME := dishly-parser
 PRIMARY_REGION := us-central1
-SECONDARY_REGIONS := us-east1,us-west1,europe-west1,europe-west4,europe-north1,asia-southeast1,asia-northeast1,asia-south1,australia-southeast1,southamerica-east1
+SECONDARY_REGIONS := us-east1
 PYTHON := python3.11
 VENV := .venv
 PORT := 8080
