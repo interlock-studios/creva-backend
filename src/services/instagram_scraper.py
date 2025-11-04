@@ -281,13 +281,13 @@ class InstagramScraper:
 
                         # Check for API-level errors
                         # Instagram API returns errors with a "message" field
-                        if "message" in data and "data" not in data:
+                        if "message" in data and "xdt_shortcode_media" not in data:
                             error_msg = data.get("message", "Unknown API error")
                             raise APIError(f"API returned error: {error_msg}", response.status_code)
 
                         # Validate required fields
-                        if "data" not in data:
-                            raise APIError("Missing 'data' in response")
+                        if "xdt_shortcode_media" not in data:
+                            raise APIError("Missing 'xdt_shortcode_media' in response")
 
                         logger.info(
                             f"Successfully fetched Instagram data. Response size: {len(response.content)} bytes"
@@ -382,7 +382,7 @@ class InstagramScraper:
 
     def extract_metadata(self, api_data: Dict[str, Any]) -> VideoMetadata:
         """Extract metadata from API response, handling both videos and slideshows"""
-        media_data = api_data["data"]["xdt_shortcode_media"]
+        media_data = api_data["xdt_shortcode_media"]
 
         # Extract caption/description
         caption_edges = media_data.get("edge_media_to_caption", {}).get("edges", [])
@@ -455,7 +455,7 @@ class InstagramScraper:
 
     def get_video_download_url(self, api_data: Dict[str, Any]) -> str:
         """Get video URL from API response"""
-        media_data = api_data["data"]["xdt_shortcode_media"]
+        media_data = api_data["xdt_shortcode_media"]
 
         # Check if it's a video
         if not media_data.get("is_video", False):
@@ -482,7 +482,7 @@ class InstagramScraper:
 
     def get_slideshow_images(self, api_data: Dict[str, Any]) -> List[SlideshowImage]:
         """Get slideshow images from API response - Instagram pattern"""
-        media_data = api_data["data"]["xdt_shortcode_media"]
+        media_data = api_data["xdt_shortcode_media"]
         
         # Check if it's a slideshow
         if media_data.get("__typename") != "XDTGraphSidecar":
