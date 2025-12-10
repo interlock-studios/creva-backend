@@ -1,0 +1,650 @@
+---
+description: Creva PRD Creation - Product Requirements for Mobile Features
+applies_to:
+  - "**/docs/**/*.md"
+  - "**/PRD*.md"
+---
+
+# PRD Creation Guidelines for Creva
+
+## 🎯 Overview
+
+Product Requirement Documents (PRDs) help plan new features for Creva. This guide provides templates for creating effective PRDs for mobile app features, UI improvements, and backend integrations.
+
+**Note**: Use generic naming in PRDs (video, topic, creator) - avoid app name "Creva" in code examples.
+
+## 📋 PRD Template Structure
+
+### 1. Executive Summary
+
+```markdown
+# PRD: [Feature Name]
+
+## Executive Summary
+**Date**: YYYY-MM-DD
+**Author**: [Name]
+**Status**: Draft | In Review | Approved | In Development | Complete
+**Priority**: P0 (Critical) | P1 (High) | P2 (Medium) | P3 (Low)
+**Platform**: iOS | Android | Both
+
+### One-Line Description
+[Single sentence describing what this feature does]
+
+### User Value
+[Why users will love this - focus on benefits, not implementation]
+
+### Success Metrics
+- [Metric 1: e.g., 80% of users complete video import]
+- [Metric 2: e.g., Reduce import time from 30s to 10s]
+- [Metric 3: e.g., 90% import success rate]
+- [Metric 4: e.g., 60% of users use transcripts weekly]
+```
+
+### 2. Problem Statement
+
+```markdown
+## Problem Statement
+
+### Current User Experience
+[Describe what users currently do and where they struggle]
+
+### Pain Points
+- **Pain point 1**: [Describe with example]
+- **Pain point 2**: [Describe with example]
+- **Pain point 3**: [Describe with example]
+
+### User Quotes
+> "[Example quote from user feedback]"
+
+### Impact
+[Quantify how many users are affected and frequency]
+```
+
+### 3. Solution Overview
+
+```markdown
+## Solution Overview
+
+### Proposed Solution
+[High-level description of how this solves the problem]
+
+### User Flow
+1. User does [action 1]
+2. App shows [screen/component]
+3. User completes [action 2]
+4. Result: [outcome]
+
+### Key Features
+1. **[Feature 1]**: [User-facing description]
+2. **[Feature 2]**: [User-facing description]
+3. **[Feature 3]**: [User-facing description]
+
+### Out of Scope
+- [What this PRD does NOT cover]
+- [Future enhancements to consider separately]
+```
+
+### 4. User Experience
+
+```markdown
+## User Experience
+
+### Screens Affected
+- [List of screens that will change]
+- [New screens to create]
+
+### User Journey
+**Scenario 1: Happy Path**
+1. User opens [screen]
+2. Taps [button]
+3. Sees [result]
+
+**Scenario 2: Error Case**
+1. User tries to [action]
+2. [Error occurs]
+3. User sees [helpful error message]
+4. User can [recovery action]
+
+### UI Requirements
+- Consistent with Material Design 3
+- Support dark mode
+- Accessible (minimum touch target 48x48dp)
+- Animations < 300ms
+
+### Copy Requirements
+- Button labels
+- Error messages
+- Empty states
+- Loading states
+```
+
+### 5. Technical Requirements
+
+```markdown
+## Technical Requirements
+
+### Architecture
+**Layer**: Domain | Presentation | Data
+**Components**:
+- Models: [List new/modified freezed classes]
+- Repositories: [List repository changes]
+- Cubits: [List state management needs]
+- Widgets: [List UI components]
+
+### Data Models
+```dart
+@freezed
+class NewModel with _$NewModel {
+  const factory NewModel({
+    required String id,
+    // Additional fields...
+  }) = _NewModel;
+
+  factory NewModel.fromJson(Map<String, dynamic> json) =>
+      _$NewModelFromJson(json);
+}
+```
+
+### Firebase Integration
+**Firestore**:
+- Collections: [List affected collections]
+- Security rules: [Required rule changes]
+- Indexes: [Required composite indexes]
+
+**Storage**:
+- Image paths: [Path structure]
+- Max file size: [Size limits]
+
+**Auth**:
+- Required permissions: [List]
+
+### Third-Party Services
+- **RevenueCat**: [Paywall triggers]
+- **Superwall**: [A/B test configuration]
+- **Mixpanel**: [Events to track]
+- **AppsFlyer**: [Deep link handling]
+
+### Performance Requirements
+- API response time: < [X] seconds
+- UI frame rate: 60 FPS
+- Image load time: < 2 seconds
+- Cold start impact: < 500ms
+
+### Platform-Specific
+**iOS**:
+- Minimum iOS version: 13.0
+- Platform features: [e.g., Share Sheet, Haptics]
+
+**Android**:
+- Minimum SDK: 21 (Lollipop)
+- Platform features: [e.g., Share Intent]
+```
+
+### 6. Implementation Plan
+
+```markdown
+## Implementation Plan
+
+### Phase 1: Foundation (Week 1)
+- [ ] Create data models (freezed classes)
+- [ ] Set up repository interfaces
+- [ ] Update Firestore security rules
+- [ ] Create basic UI structure
+
+### Phase 2: Core Features (Week 2)
+- [ ] Implement Cubit state management
+- [ ] Build main UI screens
+- [ ] Integrate Firebase operations
+- [ ] Add error handling
+
+### Phase 3: Polish (Week 3)
+- [ ] Loading states and animations
+- [ ] Error messages and empty states
+- [ ] Dark mode support
+- [ ] Accessibility improvements
+
+### Phase 4: Testing & Launch (Week 4)
+- [ ] Unit tests for Cubits and repositories
+- [ ] Widget tests for UI components
+- [ ] Manual testing on iOS and Android
+- [ ] TestFlight/Internal Testing
+- [ ] Mixpanel event verification
+
+### File Changes
+**New Files**:
+- `lib/domain/models/[feature]/[model].dart`
+- `lib/presentation/pages/[feature]/view/[screen]_page.dart`
+- `lib/presentation/pages/[feature]/cubit/[feature]_cubit.dart`
+
+**Modified Files**:
+- [List existing files that need updates]
+
+### Dependencies
+- [External dependency 1: e.g., New Flutter package]
+- [Service access 2: e.g., API credentials]
+- [Blocker 3: e.g., Backend deployment]
+
+### Risks & Mitigations
+| Risk | Probability | Impact | Mitigation |
+|------|-------------|--------|------------|
+| AI backend timeout | Medium | High | Add retry logic, show progress |
+| Image upload fails | Medium | Medium | Local caching, background retry |
+| [Risk] | High/Med/Low | High/Med/Low | [Strategy] |
+```
+
+### 7. Testing Strategy
+
+```markdown
+## Testing Strategy
+
+### Unit Tests
+- [ ] Model serialization (fromJson/toJson)
+- [ ] Repository CRUD operations
+- [ ] Cubit state transitions
+- [ ] Business logic functions
+
+### Widget Tests
+- [ ] [Screen] renders correctly
+- [ ] Button interactions work
+- [ ] Error states display properly
+- [ ] Loading states show correctly
+
+### Integration Tests
+- [ ] Complete user flow (end-to-end)
+- [ ] Firebase read/write operations
+- [ ] Image upload and retrieval
+- [ ] Navigation between screens
+
+### Manual Testing Checklist
+**iOS**:
+- [ ] iPhone SE (small screen)
+- [ ] iPhone 14 Pro (notch)
+- [ ] iPad (tablet layout)
+- [ ] Dark mode
+- [ ] Offline mode
+- [ ] Share Sheet integration
+
+**Android**:
+- [ ] Pixel 6 (Android 13)
+- [ ] Samsung Galaxy (One UI)
+- [ ] Small screen device
+- [ ] Dark mode
+- [ ] Offline mode
+- [ ] Share Intent integration
+
+### Acceptance Criteria
+- [ ] [Criterion 1: User can complete primary task]
+- [ ] [Criterion 2: Error handling works]
+- [ ] [Criterion 3: Performance targets met]
+- [ ] [Criterion 4: Analytics tracking verified]
+```
+
+## 📱 PRD Examples
+
+### Example 1: Video Search Feature
+
+```markdown
+# PRD: Video Search
+
+## Executive Summary
+**Date**: 2025-11-24
+**Priority**: P1
+**Platform**: Both
+
+### One-Line Description
+Add search functionality to help creators quickly find videos in their collection.
+
+### User Value
+Creators with 50+ saved videos struggle to find specific ideas. Search reduces time from browsing to instant results, especially when searching transcripts.
+
+### Success Metrics
+- 70% of users with 20+ videos use search weekly
+- Average search completion < 3 seconds
+- 90% search satisfaction (Mixpanel survey)
+- 50% of searches use transcript content
+
+## Problem Statement
+
+### Current User Experience
+Creators scroll through entire video list to find specific ideas. With growing collections (avg. 30+ videos), this becomes tedious. They can't search transcripts for hooks or scripts.
+
+### Pain Points
+- **No filtering**: Can't filter by topic or status
+- **Slow scrolling**: Manual scrolling through 50+ items
+- **Lost ideas**: Creators forget they saved certain videos
+- **Can't search transcripts**: Can't find hooks or scripts without watching videos
+
+### User Quotes
+> "I have so many videos saved, I can't find that hook I wanted to use"
+
+### Impact
+- 60% of users have 20+ videos
+- Average time to find video: 45 seconds
+- 15% of users stop using app due to this
+
+## Solution Overview
+
+### Proposed Solution
+Add search bar at top of video list with real-time filtering by title, description, topics, and transcript content.
+
+### User Flow
+1. User opens Videos page
+2. Taps search bar at top
+3. Types query ("hook about productivity")
+4. Results filter in real-time (including transcript matches)
+5. User taps result to open video
+
+### Key Features
+1. **Real-time search**: Results update as user types
+2. **Multi-field search**: Searches title, description, topics, transcript
+3. **Transcript search**: Highlights matching text in transcripts
+4. **Search history**: Recent searches saved locally
+5. **Empty state**: Helpful message when no results found
+
+## Technical Requirements
+
+### Architecture
+**Components**:
+- Models: No changes needed
+- Repositories: Add `searchVideos(String query)` method
+- Cubits: Add search state to VideosCubit
+- Widgets: New SearchBar widget
+
+### Data Models
+No new models needed. Extend VideosState:
+```dart
+@freezed
+class VideosState with _$VideosState {
+  const factory VideosState({
+    required LoadStatus status,
+    @Default([]) List<VideoItem> videos,
+    @Default([]) List<VideoItem> filteredVideos,
+    String? searchQuery,
+    // ...
+  }) = _VideosState;
+}
+```
+
+### Firebase Integration
+**Firestore**:
+- Use local filtering (videos already loaded)
+- Search transcript field for text matches
+- For large collections (100+), consider Algolia later
+
+### Performance Requirements
+- Search response: < 100ms for 100 videos
+- Debounce typing: 300ms
+- No UI blocking
+- Transcript search: < 200ms
+
+## Implementation Plan
+
+### Phase 1: Foundation (Days 1-2)
+- [ ] Add searchQuery to VideosState
+- [ ] Add search method to VideosCubit
+- [ ] Implement local filtering logic
+
+### Phase 2: UI (Days 3-4)
+- [ ] Create SearchBar widget
+- [ ] Add to RecipesPage
+- [ ] Empty state design
+- [ ] Clear button
+
+### Phase 3: Polish (Days 5-7)
+- [ ] Search history (local storage)
+- [ ] Keyboard handling
+- [ ] Animations
+- [ ] Testing
+
+### File Changes
+**New Files**:
+- `lib/presentation/pages/videos/view/widgets/video_search_bar_widget.dart`
+
+**Modified Files**:
+- `lib/presentation/pages/videos/cubit/videos_cubit.dart`
+- `lib/presentation/pages/videos/cubit/videos_state.dart`
+- `lib/presentation/pages/videos/view/videos_page.dart`
+
+### Risks & Mitigations
+| Risk | Probability | Impact | Mitigation |
+|------|-------------|--------|------------|
+| Slow for 100+ videos | Low | Medium | Use isolate for filtering |
+| Search doesn't find results | Medium | High | Fuzzy matching algorithm |
+| Transcript search slow | Medium | Medium | Index transcript field, debounce search |
+```
+
+### Example 2: Calendar Scheduling Feature
+
+```markdown
+# PRD: Calendar Scheduling
+
+## Executive Summary
+**Date**: 2025-11-24
+**Priority**: P1
+**Platform**: Both
+
+### One-Line Description
+Allow creators to schedule videos to specific dates and view them in a calendar format.
+
+### User Value
+Creators can plan content ahead of time, see their schedule at a glance, and track when ideas should be executed.
+
+### Success Metrics
+- 40% of users schedule at least 5 videos
+- 30% of users use calendar view weekly
+- Average scheduling time < 10 seconds
+
+## Problem Statement
+
+### Current User Experience
+Creators save videos but can't plan when to use them. They lose track of ideas and struggle to plan content ahead.
+
+### Pain Points
+- **No planning**: Can't assign videos to dates
+- **Lost ideas**: Videos get forgotten without scheduling
+- **No overview**: Can't see content schedule at a glance
+- **Manual tracking**: Use external calendar apps
+
+### User Quotes
+> "I save so many ideas but forget when I wanted to post them"
+
+### Impact
+- 50% of users have unscheduled videos
+- Creators use external tools for planning
+- Ideas get lost without dates
+
+## Solution Overview
+
+### Proposed Solution
+Add date picker to video detail/edit pages and create calendar view showing scheduled videos.
+
+### User Flow
+1. User opens video detail page
+2. Taps "Schedule" button
+3. Selects date from date picker
+4. Video appears on calendar view
+5. User can filter calendar by status
+
+### Key Features
+1. **Date Picker**: Easy date selection
+2. **Calendar View**: Monthly/weekly views
+3. **Status Indicators**: Show video status on calendar
+4. **Filter by Date**: Filter videos by date range
+5. **Quick Actions**: Tap calendar entry to open video
+
+## Technical Requirements
+
+### Architecture
+**Components**:
+- Models: Add `scheduledDate` field to VideoItem
+- Repositories: Add date queries
+- Cubits: Handle calendar state
+- Widgets: CalendarView widget, DatePicker
+
+### Data Models
+```dart
+@freezed
+class VideoItem with _$VideoItem {
+  const factory VideoItem({
+    required String id,
+    required String title,
+    DateTime? scheduledDate, // NEW
+    @Default(VideoStatus.planned) VideoStatus status,
+    // ...
+  }) = _VideoItem;
+}
+```
+
+### Firebase Integration
+**Firestore**:
+- Add `scheduledDate` field to video documents
+- Query videos by date range
+- Index on `scheduledDate` field
+
+**Queries**:
+```dart
+// Get videos for date range
+final videos = await _firestore
+    .collection('videos/$userId/items')
+    .where('scheduledDate', isGreaterThanOrEqualTo: startDate)
+    .where('scheduledDate', isLessThanOrEqualTo: endDate)
+    .get();
+```
+
+### Third-Party Services
+- **Mixpanel**: Track scheduling events
+
+## Implementation Plan
+
+### Phase 1: Backend (Week 1)
+- [ ] Update data models
+- [ ] Firestore security rules
+- [ ] Partner linking logic
+
+### Phase 2: UI (Week 2)
+- [ ] Partner settings page
+- [ ] Invite flow
+- [ ] Category visibility toggle
+
+### Phase 3: Testing (Week 3)
+- [ ] Two-device testing
+- [ ] Security rule testing
+- [ ] Real-time sync verification
+```
+
+## ✅ PRD Best Practices
+
+### 1. User-Focused Language
+
+**Bad**:
+```
+"Implement real-time WebSocket connection for bidirectional data sync"
+```
+
+**Good**:
+```
+"Changes appear instantly for your partner without refreshing"
+```
+
+### 2. Include Visual Mockups
+
+Add screenshots or wireframes:
+```markdown
+### Search Bar Mockup
+[Image: search_bar_mockup.png]
+
+### Empty State
+[Image: empty_state.png]
+```
+
+### 3. Consider Edge Cases
+
+```markdown
+### Edge Cases
+- User has no internet: Cache and sync later
+- Partner deletes account: Show graceful message
+- 500+ recipes: Paginate or use virtual scrolling
+```
+
+### 4. Define Success Metrics
+
+**Bad**: "Users should like it"
+**Good**: "70% of users with 20+ recipes use search weekly"
+
+### 5. Mobile-Specific Considerations
+
+```markdown
+### Mobile Considerations
+- Keyboard dismissal on scroll
+- Pull-to-refresh integration
+- Haptic feedback on interactions
+- Status bar color in dark mode
+- Safe area handling (notch, home indicator)
+```
+
+## 🚫 PRD Anti-Patterns
+
+### 1. Solution Before Problem
+❌ "We need to add AI"
+✅ "Users struggle to organize recipes. We could use AI for auto-categorization."
+
+### 2. Implementation Details
+❌ "Use firebase_firestore v4.2.1 with StreamBuilder"
+✅ "Real-time sync keeps recipes updated across devices"
+
+### 3. Missing Platform Differences
+❌ "Add share button"
+✅ "Add share button (iOS: Share Sheet, Android: Share Intent)"
+
+### 4. No Analytics Plan
+❌ Just building features
+✅ "Track: search_initiated, search_completed, search_empty_results"
+
+### 5. Ignoring Offline
+❌ Assuming internet always works
+✅ "Cache last 50 recipes. Show cached version offline with banner."
+
+## 🔗 PRD with Cursor
+
+### Generate PRD
+
+```
+@prd-creation.mdc @project-overview.mdc
+Create a PRD for adding transcript search to Creva
+```
+
+### Review PRD
+
+```
+@prd-creation.mdc @folder-structure.mdc @code-style.mdc
+Review this PRD for technical feasibility following Creva architecture
+```
+
+### Convert to Tasks
+
+```
+@prd-creation.mdc
+Convert this PRD into a checklist of development tasks
+```
+
+## 📁 PRD File Organization
+
+```
+docs/prds/
+├── 2025-10-recipe-search.md
+├── 2025-11-partner-sharing.md
+├── 2025-12-offline-mode.md
+└── archive/
+    └── completed/
+```
+
+## 🔗 Related
+
+- [project-overview.mdc](./project-overview.mdc) - Understand Creva architecture
+- [folder-structure.mdc](./folder-structure.mdc) - Where to implement features
+- [code-style.mdc](./code-style.mdc) - How to write the code
+- [../AGENTS.md](../AGENTS.md) - Development workflow
+
+---
+
+Last Updated: October 2025

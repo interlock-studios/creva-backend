@@ -37,7 +37,7 @@ class SecurityConfig:
             return [
                 "*.run.app",
                 "*.a.run.app",
-                "api.zestai.app",
+                "api.creva.app",
             ]
         else:
             # Development: Allow all for testing

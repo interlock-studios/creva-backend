@@ -2,77 +2,78 @@
 
 ## Pitch
 
-Sets AI is a fitness companion app that helps fitness enthusiasts seamlessly convert social media workout content into personalized, actionable workout guides by providing AI-powered exercise analysis and custom workout creation directly from TikTok and Instagram videos.
+Creva is a creator workflow app that helps content creators seamlessly save, organize, and plan content from TikTok and Instagram by providing AI-powered video transcription, hook extraction, and content scheduling directly from social media videos.
 
 ## Users
 
 ### Primary Customers
 
-- **Fitness Enthusiasts**: Active individuals who discover workout content on social media and want structured guidance
-- **Social Media Fitness Consumers**: Users who follow fitness influencers and want to try their workouts with proper form and progression
+- **Content Creators**: Active creators on TikTok, Instagram, and YouTube who discover inspiration and want to organize ideas
+- **Social Media Managers**: Professionals managing multiple accounts who need to save and schedule content ideas
 
 ### User Personas
 
-**Fitness Explorer** (22-35 years old)
-- **Role:** Young professional or student
-- **Context:** Discovers workout content through social media feeds, wants to stay fit but lacks structured guidance
-- **Pain Points:** Hard to remember workout details from videos, no form guidance, difficulty tracking progress
-- **Goals:** Convert inspiring social content into actionable workouts, improve fitness with proper guidance
+**Aspiring Creator** (18-30 years old)
+- **Role:** Content creator building their presence
+- **Context:** Discovers inspiring content on social media, wants to learn from successful videos
+- **Pain Points:** Hard to save ideas, can't read transcripts without rewatching, loses track of inspiration
+- **Goals:** Save ideas organized by topic, study hooks and scripts, plan content calendar
 
-**Busy Professional** (28-45 years old)
-- **Role:** Working professional with limited gym time
-- **Context:** Uses social media for quick fitness inspiration during breaks
-- **Pain Points:** Limited time to research proper form, wants efficient workouts, needs structured progression
-- **Goals:** Quick access to effective workouts, maximize limited workout time, maintain consistency
+**Professional Creator** (25-40 years old)
+- **Role:** Full-time content creator with established following
+- **Context:** Needs to research competitors and trends efficiently
+- **Pain Points:** Wastes time rewatching videos, no central place for content ideas, manual transcript creation
+- **Goals:** Quick access to transcripts, organized inspiration library, streamlined content planning
 
 ## The Problem
 
-### Workout Content is Hard to Follow
+### Content Ideas Get Lost
 
-Social media fitness content is inspiring but lacks the structure needed for effective workouts. Users watch a 30-second TikTok and struggle to remember the exercises, proper form, and progression. This leads to ineffective workouts and potential injury.
+Creators discover amazing content on social media but have no way to save and organize it effectively. Ideas get lost in likes, saved folders are unorganized, and there's no way to search or filter.
 
-**Our Solution:** AI-powered video analysis that extracts workout details and creates comprehensive, personalized workout guides.
+**Our Solution:** Save videos from TikTok and Instagram with automatic organization by topics, status tracking, and scheduling.
 
-### No Guidance for Proper Form
+### Transcripts Are Essential But Missing
 
-Fitness videos on social platforms focus on entertainment over education, leaving users without proper form instruction or safety guidance. This creates barriers for beginners and increases injury risk.
+Creators need to read what was said in videos - to study hooks, understand scripts, and reference talking points. Currently they have to rewatch videos or manually transcribe.
 
-**Our Solution:** Intelligent exercise recognition that provides detailed form cues, modifications, and safety tips for each movement.
+**Our Solution:** AI-powered transcription that extracts full transcripts and identifies hooks automatically.
 
-### Disconnected Fitness Journey
+### Content Planning Is Fragmented
 
-Users discover great workout content but have no way to track progress, build routines, or create structured fitness programs from their social media discoveries.
+Creators use multiple tools to track ideas - notes apps, spreadsheets, calendar apps. There's no unified workflow from inspiration to execution.
 
-**Our Solution:** Seamless integration that transforms social content into trackable, progressive workout programs.
+**Our Solution:** Integrated calendar scheduling, status tracking (Planned → In Progress → Completed), and topic organization.
 
 ## Differentiators
 
-### Seamless Social Integration
+### Instant Transcripts
 
-Unlike traditional fitness apps that require manual workout entry, Sets AI integrates directly with social media sharing, allowing users to instantly convert any TikTok or Instagram workout into a structured guide with a single share action.
+Unlike other apps that just save links, Creva extracts the full transcript from every video. Creators can read hooks, study scripts, and search through transcripts.
 
-### AI-Powered Exercise Recognition
+### Hook Extraction
 
-Unlike generic fitness apps, Sets AI uses advanced computer vision and AI to automatically identify exercises, count reps, analyze form, and provide personalized modifications based on the specific movements shown in social media content.
+Creva automatically identifies the attention-grabbing opening lines (hooks) from videos. Creators can quickly scan and study what makes videos engaging.
 
-### Content-to-Program Pipeline
+### Creator-First Workflow
 
-Unlike fitness apps that provide static workouts, Sets AI creates dynamic, personalized workout programs that evolve based on the user's social media fitness interests and progress tracking.
+Built specifically for content creators with features like topic organization, content calendar, and status tracking. Not a generic bookmark tool.
 
 ## Key Features
 
 ### Core Features
 
-- **One-Tap Workout Import:** Share any TikTok or Instagram workout video directly to Sets AI for instant conversion
-- **AI Exercise Recognition:** Automatically identify exercises, rep counts, and movement patterns from video content
-- **Custom Workout Guides:** Generate detailed workout instructions with form cues, modifications, and progression tips
-- **Smart Form Analysis:** Provide exercise-specific form guidance and safety recommendations
-- **Progress Tracking:** Track completed workouts, reps, weights, and personal records
-- **Workout Library:** Build a personal collection of converted social media workouts
+- **One-Tap Save:** Share any TikTok or Instagram video directly to Creva
+- **Automatic Transcription:** AI extracts full transcript from every video
+- **Hook Detection:** Identify and highlight attention-grabbing openers
+- **Topic Organization:** Organize videos by custom topics (niches, projects, themes)
+- **Calendar Scheduling:** Assign videos to dates for content planning
+- **Status Tracking:** Track progress (Planned → In Progress → Completed)
+- **Transcript Search:** Search across all saved video transcripts
 
-### Collaboration Features
+### Future Features
 
-- **Social Workout Sharing:** Share your converted workout guides with friends and the Sets AI community
-- **Influencer Integration:** Follow favorite fitness creators and automatically organize their workout content
-- **Community Challenges:** Participate in workout challenges based on trending social media fitness content
-- **Workout Collections:** Create and share themed workout collections (e.g., "Morning Routines," "HIIT Workouts")
+- **AI Content Ideas:** Generate content ideas based on saved inspiration
+- **Trending Analysis:** Identify trending hooks and formats
+- **Team Collaboration:** Share ideas with team members
+- **Export to Tools:** Export to CapCut, Notion, etc.

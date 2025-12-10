@@ -86,6 +86,8 @@ class VideoWorker:
             cached_bucket_list = await self.cache_service.get_cached_bucket_list(url, localization)
             if cached_bucket_list:
                 logger.info(f"Job {job_id} - Found in cache, marking complete")
+                # Mark as cached when returning from cache
+                cached_bucket_list["cached"] = True
                 await self.queue_service.mark_job_complete(job_id, cached_bucket_list)
                 return
 

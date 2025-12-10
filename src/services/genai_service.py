@@ -19,98 +19,55 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
-# Emoji mapping for common cooking ingredients (hybrid approach)
-# AI will use this mapping first, fall back to generating emoji if ingredient not found
-INGREDIENT_EMOJI_MAP = {
-    # Proteins
-    "chicken": "🍗", "chicken breast": "🍗", "chicken thighs": "🍗",
-    "beef": "🥩", "steak": "🥩", "ground beef": "🥩",
-    "pork": "🥓", "bacon": "🥓", "ham": "🍖",
-    "fish": "🐟", "salmon": "🐟", "tuna": "🐟", "cod": "🐟",
-    "shrimp": "🍤", "prawns": "🍤",
-    "eggs": "🥚", "egg": "🥚",
-    "tofu": "🥢",
+# Video format categories - how the video is produced/presented
+VIDEO_FORMATS = [
+    "voiceover",           # Voice narration over footage/B-roll
+    "talking_head",        # Creator speaking directly to camera
+    "talking_back_forth",  # Two perspectives/arguments presented
+    "reaction",            # Reacting to other content
+    "setting_changes",     # Multiple location/outfit changes
+    "whiteboard",          # Text/drawing on screen explanations
+    "shot_angle_change",   # Dynamic camera angle cuts
+    "multitasking",        # Creator doing activity while talking
+    "visual",              # Primarily visual content, minimal talking
+    "green_screen",        # Green screen background content
+    "clone",               # Same person appears multiple times
+    "slideshow",           # Image carousel with text/voiceover
+    "tutorial",            # Step-by-step how-to
+    "duet",                # Side-by-side with another video (TikTok)
+    "stitch",              # Response to another creator's clip
+    "pov",                 # Point-of-view storytelling
+    "before_after",        # Transformation/comparison
+    "day_in_life",         # DITL vlog format
+    "interview",           # Q&A or interview style
+    "list",                # Listicle (5 tips, 10 things, etc.)
+    "other"                # Doesn't fit above categories
+]
 
-    # Vegetables
-    "broccoli": "🥦",
-    "carrot": "🥕", "carrots": "🥕",
-    "tomato": "🍅", "tomatoes": "🍅",
-    "onion": "🧅", "onions": "🧅",
-    "garlic": "🧄", "garlic cloves": "🧄",
-    "pepper": "🫑", "bell pepper": "🫑", "peppers": "🫑",
-    "chili": "🌶️", "chili pepper": "🌶️",
-    "potato": "🥔", "potatoes": "🥔",
-    "sweet potato": "🍠",
-    "corn": "🌽",
-    "eggplant": "🍆", "aubergine": "🍆",
-    "mushroom": "🍄", "mushrooms": "🍄",
-    "lettuce": "🥬", "salad": "🥗",
-    "cucumber": "🥒",
-    "avocado": "🥑",
-    "spinach": "🥬",
-    "kale": "🥬",
-
-    # Fruits
-    "lemon": "🍋", "lemons": "🍋",
-    "lime": "🍋", "limes": "🍋",
-    "apple": "🍎", "apples": "🍎",
-    "banana": "🍌", "bananas": "🍌",
-    "strawberry": "🍓", "strawberries": "🍓",
-    "orange": "🍊", "oranges": "🍊",
-    "grape": "🍇", "grapes": "🍇",
-    "watermelon": "🍉",
-    "pineapple": "🍍",
-    "mango": "🥭",
-    "peach": "🍑", "peaches": "🍑",
-    "cherry": "🍒", "cherries": "🍒",
-
-    # Grains & Pasta
-    "pasta": "🍝", "spaghetti": "🍝", "noodles": "🍜",
-    "rice": "🍚",
-    "bread": "🍞", "baguette": "🥖",
-    "flour": "🌾",
-    "oats": "🌾", "oatmeal": "🌾",
-
-    # Dairy
-    "milk": "🥛",
-    "cheese": "🧀", "cheddar": "🧀", "parmesan": "🧀",
-    "butter": "🧈",
-    "cream": "🥛", "heavy cream": "🥛",
-    "yogurt": "🥛", "yoghurt": "🥛",
-
-    # Condiments & Oils
-    "olive oil": "🫒", "oil": "🫒",
-    "salt": "🧂",
-    "pepper": "🫑",
-    "soy sauce": "🥫",
-    "honey": "🍯",
-    "sugar": "🧂",
-
-    # Herbs & Spices
-    "basil": "🌿",
-    "parsley": "🌿",
-    "cilantro": "🌿", "coriander": "🌿",
-    "rosemary": "🌿",
-    "thyme": "🌿",
-    "oregano": "🌿",
-    "mint": "🌿",
-
-    # Nuts & Seeds
-    "peanut": "🥜", "peanuts": "🥜",
-    "almond": "🌰", "almonds": "🌰",
-    "walnut": "🌰", "walnuts": "🌰",
-
-    # Beverages
-    "water": "💧",
-    "wine": "🍷",
-    "beer": "🍺",
-
-    # Other
-    "coconut": "🥥",
-    "beans": "🫘",
-    "chocolate": "🍫",
-    "vanilla": "🌿",
-}
+# Content niche/category - what topic the video is about
+CONTENT_NICHES = [
+    "fitness",        # Gym, workout, bodybuilding, yoga
+    "food",           # Cooking, recipes, meal prep, restaurants
+    "business",       # Entrepreneurship, startups, marketing
+    "finance",        # Investing, budgeting, crypto, real estate
+    "tech",           # Software, AI, gadgets, coding
+    "beauty",         # Skincare, makeup, haircare
+    "fashion",        # Outfits, styling, shopping
+    "lifestyle",      # Day in life, routines, organization
+    "education",      # Study tips, learning, career advice
+    "entertainment",  # Comedy, skits, memes, trends
+    "motivation",     # Mindset, self-improvement, productivity
+    "relationships",  # Dating, marriage, family dynamics
+    "parenting",      # Kids, pregnancy, family life
+    "health",         # Wellness, mental health, medical
+    "travel",         # Destinations, tips, vlogs
+    "gaming",         # Gameplay, reviews, esports
+    "music",          # Covers, production, dance
+    "art",            # Drawing, design, DIY, crafts
+    "pets",           # Dogs, cats, animals
+    "sports",         # Specific sports content
+    "other"           # Catch-all for uncategorized
+]
 
 
 class GenAIService:
@@ -185,16 +142,16 @@ class GenAIService:
         description: Optional[str] = None,
         localization: Optional[str] = None,
     ) -> Optional[Dict[str, Any]]:
-        """Analyze video/post with Gemini 2.0 Flash for relationship content"""
+        """Analyze video/post with Gemini 2.0 Flash for creator content extraction"""
 
         # Apply rate limiting
         await self._rate_limit()
 
-        # Build prompt
-        prompt = "You are an expert culinary AI specializing in extracting structured recipe data from cooking videos and social media posts."
+        # Build prompt for creator content extraction
+        prompt = "You are an expert content analyst specializing in extracting transcripts and hooks from social media videos for content creators."
 
         if transcript:
-            prompt += f"\n\nTRANSCRIPT:\n{transcript}"
+            prompt += f"\n\nEXISTING TRANSCRIPT (if available):\n{transcript}"
 
         if caption:
             prompt += f"\n\nCAPTION:\n{caption}"
@@ -202,145 +159,113 @@ class GenAIService:
         if description:
             prompt += f"\n\nDESCRIPTION:\n{description}"
 
-        # Add localization instructions if specified
-        localization_instruction = ""
-        if localization:
-            localization_instruction = f"\n\nIMPORTANT: Provide ALL text content (title, description, ingredient names, instruction text, location) in {localization} language ONLY. Translate ALL human-readable text fields consistently in the specified language. Maintain the exact JSON structure but translate all text to {localization}."
-
-        prompt += "\n\nAnalyze this cooking video/post and extract structured recipe data. Use ALL available information (video content, transcript, caption, and description) to create a comprehensive recipe extraction. Return your response as a valid JSON object with NO additional text, explanations, or formatting."
-        prompt += localization_instruction
         prompt += """
+
+TASK: Analyze this video and extract the full transcript, hook, format, and niche. Content creators save videos to study hooks, scripts, and content styles - your job is to provide accurate, complete analysis.
+
+Return your response as a valid JSON object with NO additional text, explanations, or formatting.
 
 Required JSON structure:
 {
-  "title": "short, descriptive recipe name (e.g., 'Broccoli Pasta', 'Creamy Garlic Chicken')",
-  "description": "brief 1-2 sentence summary of the dish and its appeal",
-  "image": "main image URL from the post/video or null",
-  "location": "cuisine origin or region mentioned (e.g., 'Italy', 'Thailand', 'Mediterranean') or null",
-  "prepTimeMinutes": "estimated preparation time in minutes (integer) or null",
-  "cookTimeMinutes": "estimated cooking time in minutes (integer) or null",
-  "baseServings": "number of servings this recipe makes (integer) or null",
-  "structuredIngredients": [
-    {
-      "name": "ingredient name (e.g., 'broccoli', 'chicken breast')",
-      "amount": "numeric quantity as float (e.g., 2.0, 500, 0.5) or null for qualitative amounts",
-      "unit": "measurement unit (e.g., 'cups', 'g', 'tbsp', 'heads', 'cloves') or null",
-      "preparation": "how to prepare (e.g., 'chopped', 'sliced', 'minced', 'diced') or null",
-      "emoji": "single emoji representing the ingredient (e.g., '🥦', '🍝', '🧄') or null",
-      "notes": "substitution notes or alternatives (e.g., 'or canned tomatoes') or null"
-    }
-  ],
-  "instructions": [
-    {
-      "stepNumber": "sequential step number starting from 1",
-      "text": "clear, complete cooking instruction for this step",
-      "durationMinutes": "time required for this step in minutes (integer) or null",
-      "highlightedIngredients": ["array of ingredient names mentioned in this step"]
-    }
-  ],
-  "tags": ["array of relevant hashtags or cooking tags from the post"] or null,
-  "creator": "creator username or null"
+  "title": "short, descriptive title for the video content",
+  "description": "brief 1-2 sentence summary of what the video is about",
+  "transcript": "FULL transcript of EVERYTHING said in the video. This is PRIORITY #1. Include all spoken words, including filler words, pauses, and natural speech patterns. If no speech, describe what's happening.",
+  "hook": "The attention-grabbing opening (first 10-30 seconds). This is the line or phrase that captures viewer attention immediately. Extract the exact opening words/hook used.",
+  "format": "video production format (see FORMAT CLASSIFICATION below)",
+  "niche": "primary content category (see NICHE CLASSIFICATION below)",
+  "niche_detail": "specific subcategory or topic detail (e.g., 'meal prep for bodybuilders', 'startup marketing tips')",
+  "secondary_niches": ["array of secondary topic categories if video spans multiple niches"] or null,
+  "creator": "creator username from the post or null",
+  "platform": "tiktok or instagram based on content style",
+  "tags": ["array of relevant hashtags from the post"] or null
 }
 
-EXTRACTION GUIDELINES:
-- Focus on extracting recipe cooking instructions and ingredients
-- Combine information from video visuals, spoken audio/transcript, caption, and description
-- For Instagram: Use both the caption (primary text) and description (additional metadata)
-- For TikTok: Use both the transcript (spoken content) and description (post text)
+TRANSCRIPT EXTRACTION (PRIORITY #1):
+- Extract EVERY word spoken in the video
+- Maintain natural speech flow including "um", "like", "you know" etc.
+- Include emphasis and emotion indicators when clear [laughs], [pauses]
+- For music-only videos, note "[No speech - background music]"
+- For text-on-screen videos, transcribe the on-screen text
+- Combine any existing transcript with what you hear in the video
+- Be thorough - creators need complete transcripts to study scripts
 
-INGREDIENTS EXTRACTION:
-- Extract ALL ingredients mentioned in video/audio/text
-- Parse quantities (amounts + units) from spoken or written content
-- Identify preparation methods (chopped, diced, minced, etc.)
-- Add appropriate food emojis for common ingredients (or null if uncertain)
-- Note substitutions or alternatives mentioned by creator
-- For qualitative amounts (e.g., "a drizzle", "a pinch", "to taste"), set amount to null and describe in unit field
-- Keep ingredient names simple and lowercase (e.g., "garlic" not "Garlic Cloves")
+HOOK EXTRACTION (PRIORITY #2):
+- The hook is typically the first 10-30 seconds
+- It's the attention-grabbing opening that makes viewers stop scrolling
+- Examples: "You're doing this wrong...", "Stop everything and watch this...", "I can't believe I'm sharing this..."
+- Extract the EXACT words used as the hook
+- If the video jumps right into content, the hook IS the opening content
 
-INSTRUCTIONS EXTRACTION:
-- Break cooking process into numbered sequential steps
-- Extract timing information for each step when mentioned (e.g., "cook for 10 minutes")
-- Track which ingredients are used in each step for highlighting
-- Keep step text clear and actionable
-- Maintain chronological order from video/audio content
-- If no timing mentioned for a step, set durationMinutes to null
+FORMAT CLASSIFICATION:
+Classify the video's production style. Choose ONE primary format:
+- "voiceover": Voice narration over footage/B-roll, creator not on screen
+- "talking_head": Creator speaking directly to camera, single angle
+- "talking_back_forth": Two perspectives or arguments presented (like angel/devil on shoulders)
+- "reaction": Reacting to other content shown on screen
+- "setting_changes": Multiple locations or outfit changes throughout
+- "whiteboard": Text, drawings, or explanations written on screen
+- "shot_angle_change": Dynamic camera angles, multiple cuts
+- "multitasking": Creator doing an activity while talking (cooking, cleaning, etc.)
+- "visual": Primarily visual content with minimal or no talking
+- "green_screen": Green screen background with creator overlaid
+- "clone": Same person appears multiple times in frame
+- "slideshow": Image carousel with text or voiceover
+- "tutorial": Step-by-step instructional content
+- "duet": Side-by-side with another video (TikTok duet feature)
+- "stitch": Response starting with another creator's clip
+- "pov": Point-of-view storytelling format
+- "before_after": Transformation or comparison content
+- "day_in_life": Day in the life vlog format
+- "interview": Q&A or interview style with questions
+- "list": Listicle format (5 tips, 10 things, etc.)
+- "other": Doesn't fit above categories
 
-METADATA EXTRACTION:
-- Estimate prep and cook times based on video content and creator's statements
-- Count servings mentioned by creator or estimate from ingredient quantities
-- Identify cuisine type or geographic origin for location field
-- Extract relevant hashtags and tags for discoverability
+NICHE CLASSIFICATION:
+Identify the primary topic/category. Choose ONE primary niche:
+- "fitness": Gym, workout, bodybuilding, yoga, exercise
+- "food": Cooking, recipes, meal prep, restaurants, eating
+- "business": Entrepreneurship, startups, marketing, sales
+- "finance": Investing, budgeting, crypto, real estate, money
+- "tech": Software, AI, gadgets, coding, apps
+- "beauty": Skincare, makeup, haircare, cosmetics
+- "fashion": Outfits, styling, shopping, clothing
+- "lifestyle": Daily routines, organization, productivity hacks
+- "education": Study tips, learning, academic content
+- "entertainment": Comedy, skits, memes, trends, pop culture
+- "motivation": Mindset, self-improvement, inspirational
+- "relationships": Dating, marriage, family dynamics, social
+- "parenting": Kids, pregnancy, family life, motherhood
+- "health": Wellness, mental health, medical, nutrition
+- "travel": Destinations, travel tips, adventure, vlogs
+- "gaming": Gameplay, game reviews, esports, streaming
+- "music": Covers, production, dance, musical content
+- "art": Drawing, design, DIY, crafts, creative
+- "pets": Dogs, cats, animals, pet care
+- "sports": Specific sports, athletics, training
+- "other": Doesn't fit above categories
+
+For niche_detail, provide a more specific description (e.g., if niche is "fitness", detail might be "home workout routines for beginners").
 
 EXAMPLE OUTPUT:
 {
-  "title": "Broccoli Pasta",
-  "description": "A quick and healthy 15-minute pasta dish with garlic and broccoli.",
-  "image": "https://example.com/image.jpg",
-  "location": "Italy",
-  "prepTimeMinutes": 5,
-  "cookTimeMinutes": 10,
-  "baseServings": 4,
-  "structuredIngredients": [
-    {
-      "name": "broccoli",
-      "amount": 2.0,
-      "unit": "heads",
-      "preparation": null,
-      "emoji": "🥦",
-      "notes": null
-    },
-    {
-      "name": "pasta",
-      "amount": 500,
-      "unit": "g",
-      "preparation": null,
-      "emoji": "🍝",
-      "notes": "any shape works"
-    },
-    {
-      "name": "garlic",
-      "amount": 4,
-      "unit": "cloves",
-      "preparation": "sliced",
-      "emoji": "🧄",
-      "notes": null
-    },
-    {
-      "name": "olive oil",
-      "amount": null,
-      "unit": "drizzle",
-      "preparation": null,
-      "emoji": "🫒",
-      "notes": null
-    }
-  ],
-  "instructions": [
-    {
-      "stepNumber": 1,
-      "text": "Bring a large pot of salted water to boil. Add pasta and cook according to package directions.",
-      "durationMinutes": 10,
-      "highlightedIngredients": ["pasta", "water"]
-    },
-    {
-      "stepNumber": 2,
-      "text": "Meanwhile, heat olive oil in a large pan over medium heat. Add sliced garlic and sauté until fragrant.",
-      "durationMinutes": 2,
-      "highlightedIngredients": ["olive oil", "garlic"]
-    },
-    {
-      "stepNumber": 3,
-      "text": "Add broccoli florets to the pan and cook until tender. Season with salt and pepper.",
-      "durationMinutes": 7,
-      "highlightedIngredients": ["broccoli"]
-    }
-  ],
-  "tags": ["#pasta", "#quickdinner", "#healthyrecipes"],
-  "creator": "@cammienoodle"
+  "title": "5 Ways to Grow Your TikTok",
+  "description": "Creator shares proven strategies for growing a TikTok following, including posting frequency and engagement tips.",
+  "transcript": "Hey everyone! Today I'm going to share 5 ways to grow your TikTok account. Number one - post consistently. I'm talking at least once a day, ideally twice. Number two - engage with your audience. Reply to every single comment in the first hour. Number three - use trending sounds. The algorithm loves trending audio. Number four - hook them in the first second. You have like one second to grab attention. And number five - be authentic. People can tell when you're being fake. Try these out and let me know how it goes!",
+  "hook": "Hey everyone! Today I'm going to share 5 ways to grow your TikTok account.",
+  "format": "talking_head",
+  "niche": "business",
+  "niche_detail": "social media growth strategies for content creators",
+  "secondary_niches": ["education"],
+  "creator": "@socialmediaguru",
+  "platform": "tiktok",
+  "tags": ["#tiktokgrowth", "#contentcreator", "#socialmediatips", "#fyp"]
 }
 
-CRITICAL CONSISTENCY RULE: If localization is specified, ALL text fields (title, description, ingredient names, instruction text, location) MUST be in the SAME target language consistently throughout the entire response.
-
-IMPORTANT: Your response must be ONLY the JSON object, with no markdown formatting, no code blocks, no explanations before or after."""
+IMPORTANT: 
+- Your response must be ONLY the JSON object
+- No markdown formatting, no code blocks, no explanations
+- Transcript accuracy is the most important thing - creators rely on this
+- Format and niche classification helps creators find similar content"""
 
         # Prepare content for Google Gen AI SDK
         contents = [prompt, Part.from_bytes(data=video_content, mime_type="video/mp4")]
@@ -407,11 +332,11 @@ IMPORTANT: Your response must be ONLY the JSON object, with no markdown formatti
         # Apply rate limiting
         await self._rate_limit()
 
-        # Build prompt for slideshow analysis
-        prompt = "You are an expert culinary AI specializing in extracting structured recipe data from cooking videos and social media posts."
+        # Build prompt for slideshow analysis (creator content extraction)
+        prompt = "You are an expert content analyst specializing in extracting transcripts, hooks, and content classification from social media slideshows for content creators."
 
         if transcript:
-            prompt += f"\n\nTRANSCRIPT:\n{transcript}"
+            prompt += f"\n\nTRANSCRIPT (audio from slideshow):\n{transcript}"
 
         if caption:
             prompt += f"\n\nCAPTION:\n{caption}"
@@ -422,142 +347,87 @@ IMPORTANT: Your response must be ONLY the JSON object, with no markdown formatti
         # Add localization instructions if specified
         localization_instruction = ""
         if localization:
-            localization_instruction = f"\n\nIMPORTANT: Provide ALL text content (title, description, ingredient names, instruction text, location) in {localization} language ONLY. Translate ALL human-readable text fields consistently in the specified language. Maintain the exact JSON structure but translate all text to {localization}."
+            localization_instruction = f"\n\nIMPORTANT: Provide ALL text content (title, description, transcript) in {localization} language ONLY. Translate ALL human-readable text fields consistently. Maintain the exact JSON structure but translate all text to {localization}."
 
         image_count = len(slideshow_images)
-        prompt += f"\n\nThis is a slideshow with {image_count} images. Analyze ALL the images together along with transcript, caption, and description to extract structured recipe data. Use ALL available information to create a comprehensive recipe extraction. Use 'slideshow_image_1' as placeholder for the main image URL. Return your response as a valid JSON object with NO additional text, explanations, or formatting."
+        prompt += f"\n\nThis is a slideshow with {image_count} images. Analyze ALL the images together along with any transcript, caption, and description to extract creator content data. Content creators save slideshows to study hooks, scripts, and content styles."
         prompt += localization_instruction
 
         prompt += """
 
+Return your response as a valid JSON object with NO additional text, explanations, or formatting.
+
 Required JSON structure:
 {
-  "title": "short, descriptive recipe name (e.g., 'Broccoli Pasta', 'Creamy Garlic Chicken')",
-  "description": "brief 1-2 sentence summary of the dish and its appeal",
-  "image": "use 'slideshow_image_1' as placeholder",
-  "location": "cuisine origin or region mentioned (e.g., 'Italy', 'Thailand', 'Mediterranean') or null",
-  "prepTimeMinutes": "estimated preparation time in minutes (integer) or null",
-  "cookTimeMinutes": "estimated cooking time in minutes (integer) or null",
-  "baseServings": "number of servings this recipe makes (integer) or null",
-  "structuredIngredients": [
-    {
-      "name": "ingredient name (e.g., 'broccoli', 'chicken breast')",
-      "amount": "numeric quantity as float (e.g., 2.0, 500, 0.5) or null for qualitative amounts",
-      "unit": "measurement unit (e.g., 'cups', 'g', 'tbsp', 'heads', 'cloves') or null",
-      "preparation": "how to prepare (e.g., 'chopped', 'sliced', 'minced', 'diced') or null",
-      "emoji": "single emoji representing the ingredient (e.g., '🥦', '🍝', '🧄') or null",
-      "notes": "substitution notes or alternatives (e.g., 'or canned tomatoes') or null"
-    }
-  ],
-  "instructions": [
-    {
-      "stepNumber": "sequential step number starting from 1",
-      "text": "clear, complete cooking instruction for this step",
-      "durationMinutes": "time required for this step in minutes (integer) or null",
-      "highlightedIngredients": ["array of ingredient names mentioned in this step"]
-    }
-  ],
-  "tags": ["array of relevant hashtags or cooking tags from the post"] or null,
-  "creator": "creator username or null"
+  "title": "short, descriptive title for the slideshow content",
+  "description": "brief 1-2 sentence summary of what the slideshow is about",
+  "transcript": "FULL transcript of any spoken audio AND all text visible on the slideshow images. This is PRIORITY #1. Include all text from each slide in order. If no audio, transcribe the on-screen text from each image.",
+  "hook": "The attention-grabbing opening text or line from the first slide/audio. This captures viewer attention immediately.",
+  "format": "slideshow (this is always 'slideshow' for image carousels)",
+  "niche": "primary content category (see NICHE CLASSIFICATION below)",
+  "niche_detail": "specific subcategory or topic detail (e.g., 'meal prep for bodybuilders', 'startup marketing tips')",
+  "secondary_niches": ["array of secondary topic categories if content spans multiple niches"] or null,
+  "creator": "creator username from the post or null",
+  "platform": "tiktok or instagram based on content style",
+  "tags": ["array of relevant hashtags from the post"] or null
 }
 
-EXTRACTION GUIDELINES:
-- Focus on extracting recipe cooking instructions and ingredients
-- Combine information from all slideshow images, spoken audio/transcript, caption, and description
-- For Instagram: Use both the caption (primary text) and description (additional metadata)
-- For TikTok: Use both the transcript (spoken content) and description (post text)
+TRANSCRIPT EXTRACTION (PRIORITY #1):
+- Transcribe ALL text visible on each slideshow image, in order
+- Include any spoken audio/voiceover content
+- Maintain the sequence of information as presented
+- For text-heavy slides, capture all readable text
+- Combine visual text with any audio transcript
+- Be thorough - creators need complete transcripts to study content
 
-INGREDIENTS EXTRACTION:
-- Extract ALL ingredients mentioned in images/audio/text
-- Parse quantities (amounts + units) from visual or written content
-- Identify preparation methods (chopped, diced, minced, etc.)
-- Add appropriate food emojis for common ingredients (or null if uncertain)
-- Note substitutions or alternatives mentioned by creator
-- For qualitative amounts (e.g., "a drizzle", "a pinch", "to taste"), set amount to null and describe in unit field
-- Keep ingredient names simple and lowercase (e.g., "garlic" not "Garlic Cloves")
+HOOK EXTRACTION (PRIORITY #2):
+- The hook is the opening text/line from the first slide
+- It's what makes viewers stop scrolling and engage
+- Extract the EXACT opening words or text used
+- If audio starts with a hook, use that
 
-INSTRUCTIONS EXTRACTION:
-- Break cooking process into numbered sequential steps
-- Extract timing information for each step when mentioned (e.g., "cook for 10 minutes")
-- Track which ingredients are used in each step for highlighting
-- Keep step text clear and actionable
-- Maintain chronological order across all slideshow images
-- If no timing mentioned for a step, set durationMinutes to null
+NICHE CLASSIFICATION:
+Identify the primary topic/category. Choose ONE primary niche:
+- "fitness": Gym, workout, bodybuilding, yoga, exercise
+- "food": Cooking, recipes, meal prep, restaurants, eating
+- "business": Entrepreneurship, startups, marketing, sales
+- "finance": Investing, budgeting, crypto, real estate, money
+- "tech": Software, AI, gadgets, coding, apps
+- "beauty": Skincare, makeup, haircare, cosmetics
+- "fashion": Outfits, styling, shopping, clothing
+- "lifestyle": Daily routines, organization, productivity hacks
+- "education": Study tips, learning, academic content
+- "entertainment": Comedy, skits, memes, trends, pop culture
+- "motivation": Mindset, self-improvement, inspirational
+- "relationships": Dating, marriage, family dynamics, social
+- "parenting": Kids, pregnancy, family life, motherhood
+- "health": Wellness, mental health, medical, nutrition
+- "travel": Destinations, travel tips, adventure, vlogs
+- "gaming": Gameplay, game reviews, esports, streaming
+- "music": Covers, production, dance, musical content
+- "art": Drawing, design, DIY, crafts, creative
+- "pets": Dogs, cats, animals, pet care
+- "sports": Specific sports, athletics, training
+- "other": Doesn't fit above categories
 
-METADATA EXTRACTION:
-- Estimate prep and cook times based on slideshow content and creator's statements
-- Count servings mentioned by creator or estimate from ingredient quantities
-- Identify cuisine type or geographic origin for location field
-- Extract relevant hashtags and tags for discoverability
+For niche_detail, provide a more specific description of the content topic.
 
 EXAMPLE OUTPUT:
 {
-  "title": "Broccoli Pasta",
-  "description": "A quick and healthy 15-minute pasta dish with garlic and broccoli.",
-  "image": "slideshow_image_1",
-  "location": "Italy",
-  "prepTimeMinutes": 5,
-  "cookTimeMinutes": 10,
-  "baseServings": 4,
-  "structuredIngredients": [
-    {
-      "name": "broccoli",
-      "amount": 2.0,
-      "unit": "heads",
-      "preparation": null,
-      "emoji": "🥦",
-      "notes": null
-    },
-    {
-      "name": "pasta",
-      "amount": 500,
-      "unit": "g",
-      "preparation": null,
-      "emoji": "🍝",
-      "notes": "any shape works"
-    },
-    {
-      "name": "garlic",
-      "amount": 4,
-      "unit": "cloves",
-      "preparation": "sliced",
-      "emoji": "🧄",
-      "notes": null
-    },
-    {
-      "name": "olive oil",
-      "amount": null,
-      "unit": "drizzle",
-      "preparation": null,
-      "emoji": "🫒",
-      "notes": null
-    }
-  ],
-  "instructions": [
-    {
-      "stepNumber": 1,
-      "text": "Bring a large pot of salted water to boil. Add pasta and cook according to package directions.",
-      "durationMinutes": 10,
-      "highlightedIngredients": ["pasta", "water"]
-    },
-    {
-      "stepNumber": 2,
-      "text": "Meanwhile, heat olive oil in a large pan over medium heat. Add sliced garlic and sauté until fragrant.",
-      "durationMinutes": 2,
-      "highlightedIngredients": ["olive oil", "garlic"]
-    },
-    {
-      "stepNumber": 3,
-      "text": "Add broccoli florets to the pan and cook until tender. Season with salt and pepper.",
-      "durationMinutes": 7,
-      "highlightedIngredients": ["broccoli"]
-    }
-  ],
-  "tags": ["#pasta", "#quickdinner", "#healthyrecipes"],
-  "creator": "@cammienoodle"
+  "title": "5 Morning Habits for Success",
+  "description": "Slideshow sharing five morning routine habits that successful entrepreneurs follow daily.",
+  "transcript": "Slide 1: 5 Morning Habits of Successful People. Slide 2: 1. Wake up at 5am - The most successful CEOs start their day early. Slide 3: 2. Exercise first thing - Gets your blood flowing and mind sharp. Slide 4: 3. No phone for the first hour - Protect your mental space. Slide 5: 4. Journal your goals - Write down what you want to achieve. Slide 6: 5. Eat a healthy breakfast - Fuel your body for peak performance. Slide 7: Follow for more tips! @productivityguru",
+  "hook": "5 Morning Habits of Successful People",
+  "format": "slideshow",
+  "niche": "lifestyle",
+  "niche_detail": "morning routines and productivity habits for entrepreneurs",
+  "secondary_niches": ["business", "motivation"],
+  "creator": "@productivityguru",
+  "platform": "instagram",
+  "tags": ["#morningroutine", "#productivity", "#successhabits", "#entrepreneur"]
 }
 
-CRITICAL CONSISTENCY RULE: If localization is specified, ALL text fields (title, description, ingredient names, instruction text, location) MUST be in the SAME target language consistently throughout the entire response.
+CRITICAL CONSISTENCY RULE: If localization is specified, ALL text fields (title, description, transcript) MUST be in the SAME target language consistently throughout the entire response.
 
 IMPORTANT: Your response must be ONLY the JSON object, with no markdown formatting, no code blocks, no explanations before or after."""
 

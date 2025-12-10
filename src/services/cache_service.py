@@ -28,8 +28,9 @@ class CacheService:
             self.db = None
             return
 
-        # Default TTL for cached bucket lists (1 week)
-        self.default_ttl_hours = int(os.getenv("CACHE_TTL_HOURS", "168"))  # 24 * 7 = 168 hours
+        # Default TTL for cached content (365 days - video content is immutable)
+        # If Joe saves a video Dec 10, Stacy saves same video April 15 = instant cache hit
+        self.default_ttl_hours = int(os.getenv("CACHE_TTL_HOURS", "8760"))  # 24 * 365 = 8760 hours
         
         # Connection configuration with more aggressive timeouts
         self.operation_timeout = 30  # 30 seconds for operations
@@ -57,7 +58,7 @@ class CacheService:
             try:
                 # Initialize Firestore client with timeout
                 self.db = firestore.Client(project=self.project_id)
-                self.collection_name = "bucket_list_cache"
+                self.collection_name = "parser_cache"
                 self.cache_collection = self.db.collection(self.collection_name)
                 
                 # Test connection with a very simple operation and short timeout

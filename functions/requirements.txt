@@ -1,0 +1,11 @@
+# Cloud Functions dependencies for search sync
+
+# Algolia (optional - use if you choose Algolia)
+algoliasearch>=3.0.0
+
+# Typesense (optional - use if you choose Typesense)
+typesense>=0.15.0
+
+# Google Cloud
+google-cloud-firestore>=2.11.0
+

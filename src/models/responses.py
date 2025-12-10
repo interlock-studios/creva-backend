@@ -1,41 +1,60 @@
 """
-Response models for API endpoints
+Response models for Creva API endpoints
 """
 
 from pydantic import BaseModel, Field
-from typing import Optional, List, Dict, Any, Union
+from typing import Optional, List, Dict, Any
 from datetime import datetime
 
 
-class RecipeContent(BaseModel):
-    """Complete recipe content extracted from social media videos"""
+class CreatorContent(BaseModel):
+    """Complete creator content extracted from social media videos"""
 
     # Core fields
-    title: str = Field(..., description="Recipe name")
-    description: Optional[str] = Field(None, description="Brief recipe summary (1-2 sentences)")
-    image: Optional[str] = Field(None, description="Main recipe image URL or base64-encoded JPEG")
-    location: Optional[str] = Field(None, description="Cuisine origin or region (e.g., 'Italy', 'Thailand')")
-    tags: Optional[List[str]] = Field(None, description="Hashtags from the post (e.g., ['#recipe', '#dinner'])")
-    creator: Optional[str] = Field(None, description="Content creator username (e.g., '@chef')")
-
-    # Recipe metadata
-    prepTimeMinutes: Optional[int] = Field(None, description="Preparation time in minutes")
-    cookTimeMinutes: Optional[int] = Field(None, description="Cooking/baking time in minutes")
-    baseServings: Optional[int] = Field(None, description="Number of servings this recipe makes")
-
-    # Structured recipe data
-    structuredIngredients: Optional[List[Dict[str, Any]]] = Field(
-        None,
-        description="""Array of ingredient objects with name, amount, unit, preparation, emoji, notes"""
+    title: str = Field(..., description="Video title")
+    description: Optional[str] = Field(None, description="Video description/caption")
+    image: Optional[str] = Field(None, description="Thumbnail image URL or base64-encoded JPEG")
+    
+    # Creator content - Priority #1 and #2
+    transcript: Optional[str] = Field(
+        None, 
+        description="Full transcript of everything said in the video"
     )
-    instructions: Optional[List[Dict[str, Any]]] = Field(
-        None,
-        description="""Array of cooking step objects with stepNumber, text, durationMinutes, highlightedIngredients"""
+    hook: Optional[str] = Field(
+        None, 
+        description="Attention-grabbing opening line (first 10-30 seconds)"
     )
+    
+    # Content classification - Format and Niche
+    format: Optional[str] = Field(
+        None,
+        description="Video format/style (e.g., 'talking_head', 'voiceover', 'reaction', 'green_screen')"
+    )
+    niche: Optional[str] = Field(
+        None,
+        description="Primary content niche/category (e.g., 'fitness', 'business', 'food')"
+    )
+    niche_detail: Optional[str] = Field(
+        None,
+        description="Specific subcategory or topic detail (e.g., 'meal prep for bodybuilders')"
+    )
+    secondary_niches: Optional[List[str]] = Field(
+        None,
+        description="Secondary topic categories if video spans multiple niches"
+    )
+    
+    # Metadata
+    creator: Optional[str] = Field(None, description="Content creator username (e.g., '@creator')")
+    platform: Optional[str] = Field(None, description="Source platform: 'tiktok' or 'instagram'")
+    tags: Optional[List[str]] = Field(None, description="Hashtags from the post")
+    
+    # Cache indicator
+    cached: Optional[bool] = Field(None, description="Whether result was served from cache")
 
 
-# Legacy alias for backward compatibility (if needed)
-RelationshipContent = RecipeContent
+# Legacy alias for backward compatibility during transition
+RecipeContent = CreatorContent
+RelationshipContent = CreatorContent
 
 
 class QueuedResponse(BaseModel):
@@ -45,10 +64,6 @@ class QueuedResponse(BaseModel):
     job_id: str = Field(..., description="Job identifier")
     message: str = Field(..., description="Status message")
     check_url: str = Field(..., description="URL to check job status")
-
-
-# ProcessResponse is handled as Union type directly in route handlers
-# No need for a separate model class since FastAPI handles Union types well
 
 
 class HealthResponse(BaseModel):
@@ -84,7 +99,7 @@ class JobStatusResponse(BaseModel):
     completed_at: Optional[datetime] = Field(None, description="Job completion time")
     attempts: Optional[int] = Field(None, description="Number of attempts")
     last_error: Optional[str] = Field(None, description="Last error message")
-    result: Optional[RelationshipContent] = Field(
+    result: Optional[CreatorContent] = Field(
         None, description="Processing result if completed"
     )
 

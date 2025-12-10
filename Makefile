@@ -1,10 +1,10 @@
-# Dishly - Recipe Parser - Makefile
+# Creva - Creator Video Parser - Makefile
 # Standardized commands for development and deployment
 
 # Variables
-# Project where Cloud Run service will be deployed (Zest's project)
-PROJECT_ID := zest-45e51
-SERVICE_NAME := dishly-parser
+# Creva project for Cloud Run and Firebase
+PROJECT_ID := creva-e6435
+SERVICE_NAME := creva-parser
 PRIMARY_REGION := us-central1
 SECONDARY_REGIONS :=
 PYTHON := python3.11
@@ -20,7 +20,7 @@ NC := \033[0m # No Color
 
 .PHONY: help
 help: ## Display this help message
-	@echo "$(GREEN)Dishly - Recipe Parser - Available Commands$(NC)"
+	@echo "$(GREEN)Creva - Creator Video Parser - Available Commands$(NC)"
 	@echo ""
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "$(YELLOW)%-20s$(NC) %s\n", $$1, $$2}'
 
@@ -153,7 +153,7 @@ deploy: ## Deploy to production (multi-region) - PARALLEL deployment for speed!
 	@echo "$(YELLOW)Primary region: $(PRIMARY_REGION)$(NC)"
 	@echo "$(YELLOW)Secondary regions: $(SECONDARY_REGIONS)$(NC)"
 	@chmod +x scripts/deployment/deploy-parallel.sh
-	@PROJECT_ID=$(PROJECT_ID) SERVICE_NAME=$(SERVICE_NAME) FIREBASE_PROJECT_ID=dishly-prod-fafd3 SERVICE_ACCOUNT=dishly-parser@zest-45e51.iam.gserviceaccount.com ENVIRONMENT=production PRIMARY_REGION=$(PRIMARY_REGION) SECONDARY_REGIONS=$(SECONDARY_REGIONS) ./scripts/deployment/deploy-parallel.sh
+	@PROJECT_ID=$(PROJECT_ID) SERVICE_NAME=$(SERVICE_NAME) FIREBASE_PROJECT_ID=creva-e6435 SERVICE_ACCOUNT=creva-parser@creva-e6435.iam.gserviceaccount.com ENVIRONMENT=production PRIMARY_REGION=$(PRIMARY_REGION) SECONDARY_REGIONS=$(SECONDARY_REGIONS) ./scripts/deployment/deploy-parallel.sh
 
 .PHONY: deploy-staging
 deploy-staging: ## Deploy to staging
@@ -173,7 +173,7 @@ deploy-sequential: ## Deploy to production (multi-region) - OLD sequential metho
 .PHONY: deploy-single-region
 deploy-single-region: ## Deploy to single region only
 	@echo "$(GREEN)Deploying to single region: $(PRIMARY_REGION)...$(NC)"
-	@PROJECT_ID=$(PROJECT_ID) SERVICE_NAME=$(SERVICE_NAME) FIREBASE_PROJECT_ID=dishly-prod-fafd3 SERVICE_ACCOUNT=dishly-parser@zest-45e51.iam.gserviceaccount.com ENVIRONMENT=production SINGLE_REGION=true PRIMARY_REGION=$(PRIMARY_REGION) ./scripts/deployment/deploy.sh
+	@PROJECT_ID=$(PROJECT_ID) SERVICE_NAME=$(SERVICE_NAME) FIREBASE_PROJECT_ID=creva-e6435 SERVICE_ACCOUNT=creva-parser@creva-e6435.iam.gserviceaccount.com ENVIRONMENT=production SINGLE_REGION=true PRIMARY_REGION=$(PRIMARY_REGION) ./scripts/deployment/deploy.sh
 
 .PHONY: setup-security
 setup-security: ## Setup Cloud Armor security policies with edge bot blocking
@@ -408,27 +408,27 @@ setup-firestore: ## Setup Firestore database and indexes
 	@echo "$(GREEN)Firestore setup complete$(NC)"
 
 .PHONY: setup-load-balancer
-setup-load-balancer: ## Setup Global HTTPS Load Balancer with zestai.app domain
-	@echo "$(GREEN)Setting up Global HTTPS Load Balancer with zestai.app domain...$(NC)"
+setup-load-balancer: ## Setup Global HTTPS Load Balancer with creva.app domain
+	@echo "$(GREEN)Setting up Global HTTPS Load Balancer with creva.app domain...$(NC)"
 	@chmod +x scripts/setup/setup-global-lb-custom-domain.sh
 	@./scripts/setup/setup-global-lb-custom-domain.sh
 	@echo "$(GREEN)Global Load Balancer setup complete$(NC)"
 
 .PHONY: add-custom-domain
-add-custom-domain: ## Add zestai.app domain to existing load balancer
-	@echo "$(GREEN)Adding zestai.app domain to load balancer...$(NC)"
+add-custom-domain: ## Add creva.app domain to existing load balancer
+	@echo "$(GREEN)Adding creva.app domain to load balancer...$(NC)"
 	@chmod +x scripts/setup/add-domain-later.sh
-	@./scripts/setup/add-domain-later.sh api.zestai.app
+	@./scripts/setup/add-domain-later.sh api.creva.app
 
 .PHONY: deploy-full
-deploy-full: ## Deploy to all regions AND setup global load balancer with zestai.app
-	@echo "$(GREEN)Full deployment: Multi-region + Global Load Balancer + zestai.app...$(NC)"
+deploy-full: ## Deploy to all regions AND setup global load balancer with creva.app
+	@echo "$(GREEN)Full deployment: Multi-region + Global Load Balancer + creva.app...$(NC)"
 	@echo "$(YELLOW)Step 1: Deploying to all regions...$(NC)"
 	@$(MAKE) deploy
-	@echo "$(YELLOW)Step 2: Setting up Global Load Balancer with zestai.app...$(NC)"
+	@echo "$(YELLOW)Step 2: Setting up Global Load Balancer with creva.app...$(NC)"
 	@$(MAKE) setup-load-balancer
 	@echo "$(GREEN)✅ Full deployment complete!$(NC)"
-	@echo "$(BLUE)🌐 Your API is now available at: https://api.zestai.app$(NC)"
+	@echo "$(BLUE)🌐 Your API is now available at: https://api.creva.app$(NC)"
 	@echo "$(BLUE)🔒 HTTPS load balancing across all regions$(NC)"
 
 .PHONY: deploy-global
@@ -443,22 +443,22 @@ deploy-global: ## Deploy to MAXIMUM global regions (11 regions total!)
 	@echo "$(BLUE)🌐 Your API is now deployed in 11 regions worldwide!$(NC)"
 
 .PHONY: status-lb
-status-lb: ## Show Global Load Balancer status and zestai.app domain info
+status-lb: ## Show Global Load Balancer status and creva.app domain info
 	@echo "$(GREEN)Global Load Balancer Status:$(NC)"
 	@echo "$(YELLOW)Backend Service:$(NC)"
-	@gcloud compute backend-services describe zest-parser-backend --global --format="table(name,backends[].group:label=BACKENDS,protocol,loadBalancingScheme)" 2>/dev/null || echo "Backend service not found"
+	@gcloud compute backend-services describe creva-parser-backend --global --format="table(name,backends[].group:label=BACKENDS,protocol,loadBalancingScheme)" 2>/dev/null || echo "Backend service not found"
 	@echo "$(YELLOW)URL Map:$(NC)"
-	@gcloud compute url-maps describe zest-parser-url-map --global --format="table(name,defaultService)" 2>/dev/null || echo "URL map not found"
+	@gcloud compute url-maps describe creva-parser-url-map --global --format="table(name,defaultService)" 2>/dev/null || echo "URL map not found"
 	@echo "$(YELLOW)Global IP:$(NC)"
-	@gcloud compute forwarding-rules describe zest-parser-forwarding-rule --global --format="value(IPAddress)" 2>/dev/null || echo "Forwarding rule not found"
-	@echo "$(YELLOW)SSL Certificates (zestai.app):$(NC)"
-	@gcloud compute ssl-certificates list --filter="name~zestai" --format="table(name,domains,managed.status)" 2>/dev/null || echo "No SSL certificates found"
+	@gcloud compute forwarding-rules describe creva-parser-forwarding-rule --global --format="value(IPAddress)" 2>/dev/null || echo "Forwarding rule not found"
+	@echo "$(YELLOW)SSL Certificates (creva.app):$(NC)"
+	@gcloud compute ssl-certificates list --filter="name~creva" --format="table(name,domains,managed.status)" 2>/dev/null || echo "No SSL certificates found"
 	@echo "$(YELLOW)Domain Status:$(NC)"
-	@echo "Expected domain: api.zestai.app"
-	@GLOBAL_IP=$$(gcloud compute forwarding-rules describe zest-parser-forwarding-rule --global --format="value(IPAddress)" 2>/dev/null); \
+	@echo "Expected domain: api.creva.app"
+	@GLOBAL_IP=$$(gcloud compute forwarding-rules describe creva-parser-forwarding-rule --global --format="value(IPAddress)" 2>/dev/null); \
 	if [ ! -z "$$GLOBAL_IP" ]; then \
 		echo "Load balancer IP: $$GLOBAL_IP"; \
-		RESOLVED_IP=$$(dig +short api.zestai.app | tail -n1); \
+		RESOLVED_IP=$$(dig +short api.creva.app | tail -n1); \
 		if [ "$$RESOLVED_IP" = "$$GLOBAL_IP" ]; then \
 			echo "✅ DNS correctly configured"; \
 		else \

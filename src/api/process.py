@@ -238,6 +238,8 @@ async def process_video(
             logger.info(
                 f"Returning cached result - Request ID: {request_id}, URL: {request.url}"
             )
+            # Mark as cached when returning from cache
+            cached_bucket_list["cached"] = True
             return RelationshipContent(**cached_bucket_list)
 
         logger.info(

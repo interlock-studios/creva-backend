@@ -1,0 +1,492 @@
+---
+description: Creva Cursor IDE Configuration - AI-Assisted Flutter Development
+applies_to:
+  - "**/*.dart"
+  - "**/*.yaml"
+  - ".cursor/**"
+---
+
+# Cursor IDE Configuration for Creva
+
+## 🎯 Overview
+
+This guide configures Cursor IDE for optimal Flutter development on Creva. Cursor's AI assistance accelerates development while maintaining code quality and architectural consistency.
+
+**Important**: When generating code, use generic naming (video, topic, creator) - avoid app name "Creva" in code.
+
+## 🚀 Initial Setup
+
+### 1. Install Required Extensions
+
+**Essential**:
+- Dart
+- Flutter
+- Flutter Widget Snippets
+- Pubspec Assist
+- Error Lens
+- GitLens
+
+**Recommended**:
+- Better Comments
+- Bracket Pair Colorizer
+- Material Icon Theme
+- TODO Highlight
+
+### 2. Cursor Settings
+
+Create `.cursor/settings.json`:
+```json
+{
+  "editor.formatOnSave": true,
+  "editor.codeActionsOnSave": {
+    "source.fixAll": true,
+    "source.organizeImports": true
+  },
+  "dart.lineLength": 80,
+  "dart.previewFlutterUiGuides": true,
+  "dart.previewFlutterUiGuidesCustomTracking": true,
+  "dart.openDevTools": "flutter",
+  "[dart]": {
+    "editor.defaultFormatter": "Dart-Code.dart-code",
+    "editor.tabSize": 2,
+    "editor.rulers": [80]
+  },
+  "files.exclude": {
+    "**/.dart_tool": true,
+    "**/.flutter-plugins": true,
+    "**/.flutter-plugins-dependencies": true,
+    "**/build": true
+  }
+}
+```
+
+### 3. Launch Configuration
+
+Create `.vscode/launch.json`:
+```json
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Creva (Debug)",
+      "request": "launch",
+      "type": "dart",
+      "program": "lib/main.dart",
+      "args": ["--dart-define=ENV=dev"]
+    },
+    {
+      "name": "Creva (Profile)",
+      "request": "launch",
+      "type": "dart",
+      "flutterMode": "profile",
+      "program": "lib/main.dart"
+    },
+    {
+      "name": "Creva (Release)",
+      "request": "launch",
+      "type": "dart",
+      "flutterMode": "release",
+      "program": "lib/main.dart"
+    }
+  ]
+}
+```
+
+## 🤖 Cursor AI Assistant Configuration
+
+### Rule Loading
+
+Cursor automatically loads rules from this directory:
+- `rules/*.mdc` files provide context to AI
+- Rules apply based on `applies_to` globs in frontmatter
+- `alwaysApply: true` ensures rules load for all files
+
+### AI Context Priority
+
+When asking Cursor AI for help:
+1. **Project-specific** rules take precedence
+2. **Language/framework** conventions (Dart/Flutter)
+3. **General** best practices
+
+### Effective Prompts
+
+**Good Prompts**:
+```
+"Create a Cubit for managing videos with loading/error states"
+"Add Firebase integration to VideoRepository following our patterns"
+"Write a freezed model for Topic with JSON serialization"
+```
+
+**Bad Prompts**:
+```
+"Create a video card widget"
+"Add database stuff"
+"Create UI"
+```
+
+## 📝 Code Generation Guidelines
+
+### Using Cursor for Flutter
+
+**Widgets**:
+```
+Prompt: "Create a StatelessWidget VideoCard that displays video title, image, and topic chips"
+
+AI generates:
+```dart
+class VideoCard extends StatelessWidget {
+  const RecipeCard({
+    super.key,
+    required this.recipe,
+  });
+
+  final Recipe recipe;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Column(
+        children: [
+          // ... implementation
+        ],
+      ),
+    );
+  }
+}
+```
+
+**Cubits**:
+```
+Prompt: "Create a RecipeCubit that loads recipes from RecipeRepository with loading, success, and error states"
+
+AI generates cubit + state following flutter_bloc patterns
+```
+
+**Models**:
+```
+Prompt: "Create a freezed Recipe model with id, title, imageUrl, categoryIds, createdAt, and JSON serialization"
+
+AI generates freezed class with proper annotations
+```
+
+### Code Generation Commands
+
+**Freezed**:
+```bash
+flutter pub run build_runner build --delete-conflicting-outputs
+```
+
+**Watch Mode** (during development):
+```bash
+flutter pub run build_runner watch --delete-conflicting-outputs
+```
+
+## 🎨 Snippets and Shortcuts
+
+### Custom Snippets
+
+Create `.cursor/snippets/dart.json`:
+```json
+{
+  "Freezed Model": {
+    "prefix": "freezed",
+    "body": [
+      "@freezed",
+      "class ${1:ModelName} with _$${1:ModelName} {",
+      "  const factory ${1:ModelName}({",
+      "    required String id,",
+      "    $0",
+      "  }) = _${1:ModelName};",
+      "",
+      "  factory ${1:ModelName}.fromJson(Map<String, dynamic> json) =>",
+      "      _$${1:ModelName}FromJson(json);",
+      "}"
+    ]
+  },
+  "Cubit": {
+    "prefix": "cubit",
+    "body": [
+      "class ${1:Feature}Cubit extends Cubit<${1:Feature}State> {",
+      "  ${1:Feature}Cubit({",
+      "    required ${2:Repository} ${3:repository},",
+      "  })  : _${3:repository} = ${3:repository},",
+      "        super(const ${1:Feature}State.initial());",
+      "",
+      "  final ${2:Repository} _${3:repository};",
+      "",
+      "  $0",
+      "}"
+    ]
+  },
+  "BlocBuilder": {
+    "prefix": "blocbuilder",
+    "body": [
+      "BlocBuilder<${1:Cubit}, ${2:State}>(",
+      "  builder: (context, state) {",
+      "    $0",
+      "    return Container();",
+      "  },",
+      ")"
+    ]
+  }
+}
+```
+
+### Keyboard Shortcuts
+
+**Flutter**:
+- `Cmd+Shift+P` → "Flutter: New Project"
+- `Cmd+Shift+R` → Refactor widget
+- `Cmd+.` → Quick fix / Show code actions
+
+**Cursor AI**:
+- `Cmd+K` → Open AI chat
+- `Cmd+L` → Generate code with AI
+- `Cmd+Shift+K` → Edit selection with AI
+
+## 🔍 Code Navigation
+
+### Quick File Access
+
+**Pattern Matching**:
+- `Cmd+P` → Type `recipe_card` → Finds `recipe_card_widget.dart`
+- `Cmd+Shift+O` → Symbol search within file
+- `Cmd+T` → Search all symbols in project
+
+**Workspace Symbols**:
+```
+@RecipeCard       → Find class
+#loadRecipes      → Find method
+:recipe.dart      → Find file
+```
+
+### Go to Definition
+
+- `F12` → Go to definition
+- `Alt+F12` → Peek definition
+- `Shift+F12` → Find all references
+
+## 🧪 Testing Integration
+
+### Run Tests in Cursor
+
+**Single Test**:
+```dart
+// Click play button next to test
+test('Recipe model serialization', () {
+  // ...
+});
+```
+
+**Test File**:
+```
+Cmd+Shift+P → "Flutter: Run Tests in Current File"
+```
+
+**All Tests**:
+```bash
+flutter test
+```
+
+### Test Coverage
+
+```bash
+flutter test --coverage
+genhtml coverage/lcov.info -o coverage/html
+open coverage/html/index.html
+```
+
+## 🛠️ AI-Assisted Refactoring
+
+### Common Refactorings with Cursor
+
+**Extract Widget**:
+```
+1. Select widget code
+2. Cmd+Shift+K
+3. Prompt: "Extract this into a reusable StatelessWidget called CategoryChip"
+```
+
+**Add Error Handling**:
+```
+1. Select async method
+2. Cmd+K
+3. Prompt: "Add try-catch with FirebaseException and generic error handling following our patterns"
+```
+
+**Convert to Cubit**:
+```
+1. Select StatefulWidget
+2. Cmd+K
+3. Prompt: "Convert this to use flutter_bloc Cubit pattern with separate state class"
+```
+
+## 📚 Using Project Rules
+
+### Rule Application
+
+Cursor automatically applies rules when:
+- Creating new Dart files → Applies code-style.mdc
+- Working in repositories/ → Applies api-integration.mdc
+- Any file → Applies project-overview.mdc (if alwaysApply: true)
+
+### Verifying Rules
+
+Check active rules:
+1. Open Cursor AI chat (`Cmd+K`)
+2. Type: "What rules are currently active?"
+3. Cursor shows loaded .mdc files
+
+### Override Rules
+
+For one-off exceptions:
+```dart
+// cursor-ignore: Use direct Firebase query for admin operation
+final allRecipes = await FirebaseFirestore.instance
+    .collection('recipes')
+    .get();
+```
+
+## 🚫 AI Limitations
+
+### When NOT to Use AI
+
+**Don't use Cursor AI for**:
+- Committing Firebase credentials
+- Generating API keys
+- Security rule modifications (review manually)
+- Production database queries
+- Sensitive user data operations
+
+**Always manually review**:
+- Authentication logic
+- Payment processing
+- Data privacy code
+- Security-sensitive operations
+
+## ✅ AI Best Practices
+
+### 1. Provide Context
+
+**Bad**:
+```
+"Add error handling"
+```
+
+**Good**:
+```
+"Add error handling to this repository method following our patterns in api-integration.mdc: catch FirebaseException, log with our logger, and rethrow with user-friendly message"
+```
+
+### 2. Reference Rules
+
+```
+"Create a recipe detail page following folder-structure.mdc organization and code-style.mdc widget patterns"
+```
+
+### 3. Specify Architecture
+
+```
+"Create a Cubit (not Provider or Riverpod) for recipe search with debounced input and pagination"
+```
+
+### 4. Include Test Cases
+
+```
+"Generate this Cubit along with unit tests using mockito for the repository"
+```
+
+## 🔗 Integration with Flutter DevTools
+
+### Launch DevTools from Cursor
+
+```
+1. Run app in debug mode
+2. Cmd+Shift+P → "Dart: Open DevTools"
+3. Select: Widget Inspector, Performance, Network
+```
+
+### Useful DevTools Features
+
+- **Widget Inspector**: Debug layout issues
+- **Performance**: Profile frame rendering
+- **Network**: Monitor Firebase calls
+- **Logging**: View print/log statements
+
+## 🎯 Workflow Example
+
+### Complete Feature Development
+
+**1. Plan** (with AI):
+```
+Prompt: "Outline the files I need to create for a recipe favorites feature following our architecture"
+
+AI response:
+- domain/models/recipe/recipe.dart (update)
+- domain/repositories/recipe/recipe_repository.dart (update)
+- presentation/pages/recipes/cubit/recipes_cubit.dart (update)
+- presentation/pages/recipes/view/widgets/favorite_button_widget.dart (new)
+```
+
+**2. Generate Models**:
+```
+Prompt: "Add isFavorite boolean field to Recipe model"
+```
+
+**3. Update Repository**:
+```
+Prompt: "Add toggleFavorite(String recipeId) method to RecipeRepository following Firebase patterns"
+```
+
+**4. Update Cubit**:
+```
+Prompt: "Add toggleFavorite(String recipeId) method to RecipesCubit"
+```
+
+**5. Create Widget**:
+```
+Prompt: "Create FavoriteButton widget that calls cubit.toggleFavorite and shows animated heart icon"
+```
+
+**6. Test**:
+```
+Prompt: "Generate unit tests for RecipesCubit.toggleFavorite method"
+```
+
+## 🔧 Troubleshooting
+
+### Cursor Not Finding Rules
+
+**Fix**:
+1. Ensure rules have `.mdc` extension
+2. Check frontmatter is valid YAML
+3. Reload window: `Cmd+Shift+P` → "Reload Window"
+
+### AI Generating Wrong Patterns
+
+**Fix**:
+1. Add more specific prompt
+2. Reference specific .mdc file
+3. Provide example from codebase
+4. Use "following our pattern in [file]" phrase
+
+### Dart Analysis Issues
+
+**Fix**:
+```bash
+flutter clean
+flutter pub get
+dart fix --apply
+flutter analyze
+```
+
+## 🔗 Related
+
+- [code-style.mdc](./code-style.mdc) - Coding standards Cursor should follow
+- [api-integration.mdc](./api-integration.mdc) - Firebase patterns for AI generation
+- [folder-structure.mdc](./folder-structure.mdc) - Where Cursor should create files
+- [../AGENTS.md](../AGENTS.md) - Development workflow with AI tools
+
+---
+
+Last Updated: October 2025

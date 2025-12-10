@@ -1,28 +1,28 @@
 # Project Structure
 
-**Quick guide to understanding and working with the codebase.**
+**Quick guide to understanding and working with the Creva backend codebase.**
 
 ## 📁 What's Where
 
 ```
-sets-ai-backend/
+creva-backend/
 ├── main.py                    # 🚀 Main API server - start here
 ├── src/
 │   ├── services/              # 🔧 All the business logic
-│   │   ├── tiktok_scraper.py        #   TikTok videos & PhotoMode slideshows
+│   │   ├── tiktok_scraper.py        #   TikTok video downloading & metadata
 │   │   ├── instagram_scraper.py     #   Instagram reels via ScrapeCreators
 │   │   ├── url_router.py            #   Platform detection and URL validation
-│   │   ├── genai_service.py         #   Google GenAI (single service)
+│   │   ├── genai_service.py         #   Gemini AI transcription
 │   │   ├── genai_service_pool.py    #   GenAI pool for workers
-│   │   ├── cache_service.py         #   Firestore caching
+│   │   ├── cache_service.py         #   Firestore caching (365+ days)
 │   │   ├── queue_service.py         #   Firestore job queue
-│   │   └── config_validator.py      #   Env validation & rates
+│   │   └── config_validator.py      #   Env validation
 │   ├── worker/                # 🏭 Background processing
 │   │   ├── worker_service.py  #   Main worker process
-│   │   └── video_processor.py #   Video manipulation
+│   │   └── video_processor.py #   Video processing pipeline
 │   └── models/                # 📋 Data structures
-│       └── parser_result.py   #   Workout JSON format
-├── Makefile                   # 🛠️ Commands (dev, deploy, security, preview)
+│       └── responses.py       #   Response JSON format
+├── Makefile                   # 🛠️ Commands (dev, deploy, etc.)
 ├── requirements.txt           # 📦 Python dependencies
 └── .env.example              # ⚙️ Environment variables template
 ```
@@ -36,7 +36,14 @@ sets-ai-backend/
 ### Key Components
 - **Services** - Each handles one thing (scraping, AI, cache, queue)
 - **Worker** - Runs separately, processes videos from queue
-- **Models** - Defines what the workout JSON looks like
+- **Models** - Defines what the response JSON looks like
+
+## 🎯 Core Purpose
+
+Creva Backend extracts creator content from TikTok and Instagram videos:
+- **Transcripts** - Full text of what's said in the video
+- **Hooks** - Attention-grabbing opening lines (first 30 seconds)
+- **Metadata** - Title, description, creator, platform
 
 ## 🛠️ Development Workflow
 
@@ -87,7 +94,7 @@ make test
 ## 🔧 Adding New Features
 
 ### Adding a New API Endpoint
-1. Edit `main.py`
+1. Edit `main.py` or create new file in `src/api/`
 2. Add your endpoint function
 3. Test with curl
 
@@ -101,35 +108,10 @@ make test
 2. Worker will auto-reload
 3. Test with a real video
 
-### Changing Data Format
-1. Edit `src/models/parser_result.py`
+### Changing Response Format
+1. Edit `src/models/responses.py`
 2. Update both API and Worker code
 3. Test end-to-end
-
-## 🧪 Testing Strategy
-
-### Manual Testing
-```bash
-# Start services
-make dev
-
-# Test happy path
-curl -X POST http://localhost:8080/process \
-  -H "Content-Type: application/json" \
-  -d '{"url": "https://www.tiktok.com/@lastairbender222/video/7518493301046119710"}'
-
-# Test error cases
-curl -X POST http://localhost:8080/process \
-  -H "Content-Type: application/json" \
-  -d '{"url": "invalid-url"}'
-```
-
-### Code Quality
-```bash
-make lint      # Check code style
-make format    # Auto-format code
-make security  # Security checks
-```
 
 ## 🚀 Deployment
 
@@ -142,11 +124,8 @@ make docker-run
 
 ### Deploy to Production
 ```bash
-# Multi-region deploy (parallel)
+# Deploy to creva-e6435
 make deploy
-
-# Sequential deploy
-make deploy-sequential
 
 # Preview (single region)
 make deploy-preview
@@ -161,7 +140,6 @@ make dev  # Shows logs from both services
 
 # Production logs
 make logs
-make logs-tail
 ```
 
 ### Common Issues
@@ -189,25 +167,12 @@ class TikTokScraper:
         # Do the work
 ```
 
-### Error Handling
-```python
-# Use custom exceptions
-from src.services.tiktok_scraper import APIError, NetworkError
-
-try:
-    result = await scraper.scrape_video(url)
-except APIError as e:
-    # Handle API errors
-except NetworkError as e:
-    # Handle network errors
-```
-
 ### Async Everything
 ```python
 # All I/O operations are async
 async def process_video(url: str):
     result = await scraper.scrape_video(url)
-    analysis = await ai_service.analyze(result)
+    analysis = await ai_service.transcribe(result)
     await cache.store(url, analysis)
 ```
 
@@ -218,6 +183,7 @@ async def process_video(url: str):
 3. **Async for I/O** - Network calls, file operations, database
 4. **Error handling** - Catch specific exceptions, log with context
 5. **Configuration** - Use environment variables, validate on startup
+6. **Cache aggressively** - 365+ day cache for video content
 
 ## 💡 Quick Tips
 

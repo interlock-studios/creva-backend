@@ -1,0 +1,243 @@
+---
+description: Creva API Integration - Firebase and AI Backend Patterns
+applies_to:
+  - "**/repositories/**"
+  - "**/services/**"
+---
+
+# Creva API Integration Guide
+
+## 🚨 CRITICAL: Backend Infrastructure
+
+### **Creva Backend (Fresh Project)**
+
+**Note**: Creva uses a brand new Firebase project and backend infrastructure.
+
+**Backend Details** (TBD - to be configured):
+- Firebase Project: New Creva project (to be created)
+- AI Backend API: TBD (video parser and transcription service)
+- Backend Repository: TBD
+
+**Why this matters:**
+- Creva is a **dedicated creator workflow application**
+- Fresh Firebase/Firestore project (no migration needed)
+- Separate backend infrastructure
+- New API endpoints for video parsing and transcription
+
+---
+
+## 🔥 Firebase Integration
+
+### Authentication
+```dart
+final user = FirebaseAuth.instance.currentUser;
+if (user == null) return; // Not authenticated
+
+final userId = user.uid;
+```
+
+### Firestore Operations
+
+**User-Scoped Queries**:
+```dart
+// ✅ GOOD - User-scoped queries
+final userId = FirebaseAuth.instance.currentUser!.uid;
+final videosRef = FirebaseFirestore.instance
+    .collection('videos')
+    .doc(userId)
+    .collection('items');
+
+// ❌ BAD - Cross-user query!
+final all = await FirebaseFirestore.instance
+    .collection('all_videos').get();
+```
+
+**CRUD**:
+```dart
+// Create
+await videosRef.doc(video.id).set(video.toJson());
+
+// Read
+final doc = await videosRef.doc(video.id).get();
+
+// Update
+await videosRef.doc(video.id).update({
+  'title': newTitle,
+  'status': 'inProgress',
+  'updatedAt': FieldValue.serverTimestamp(),
+});
+
+// Delete
+await videosRef.doc(video.id).delete();
+```
+
+**Query by Status**:
+```dart
+// Filter by status
+final plannedVideos = await videosRef
+    .where('status', isEqualTo: 'planned')
+    .get();
+
+// Query by scheduled date
+final scheduledVideos = await videosRef
+    .where('scheduledDate', isGreaterThanOrEqualTo: DateTime.now())
+    .orderBy('scheduledDate')
+    .get();
+```
+
+### Firebase Storage
+
+**Upload Image**:
+```dart
+Future<String> uploadImage(File file, String userId) async {
+  final fileName = 'video_${userId}_${Uuid().v4()}.jpg';
+  final ref = FirebaseStorage.instance
+      .ref('video_images/$userId/$fileName');
+
+  await ref.putFile(file);
+  return await ref.getDownloadURL();
+}
+```
+
+## 🤖 AI Backend
+
+**Parse TikTok/Instagram & Generate Transcript**:
+```dart
+class AIBackendService {
+  // Creva Backend on creva-e6435
+  static const _url = 'https://creva-parser-{hash}.run.app/process';
+
+  Future<VideoData> parseVideo(String url) async {
+    final response = await http
+        .post(
+          Uri.parse(_url),
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode({'url': url}),
+        )
+        .timeout(const Duration(seconds: 30));
+
+    if (response.statusCode != 200) {
+      throw Exception('API error: ${response.statusCode}');
+    }
+
+    final data = jsonDecode(response.body);
+    return VideoData(
+      title: data['title'],
+      description: data['description'],
+      imageUrl: data['image'],
+      transcript: data['transcript'], // Full transcript
+      hook: data['hook'], // Extracted hook text
+    );
+  }
+}
+```
+
+**Expected API Response**:
+```json
+{
+  "title": "Video Title",
+  "description": "Video description...",
+  "image": "https://..." or "data:image/jpeg;base64,...",
+  "transcript": "Full transcript text...",
+  "hook": "Extracted hook text..."
+}
+```
+
+**Priority**: Transcript support is the #1 backend priority
+
+## 🛡️ Error Handling
+
+```dart
+try {
+  await _repository.deleteVideo(id);
+} on FirebaseException catch (e) {
+  log.e('Firebase error', error: e);
+  if (e.code == 'permission-denied') {
+    throw Exception('Permission denied');
+  }
+} on SocketException {
+  throw Exception('No internet');
+} catch (e) {
+  log.e('Error', error: e);
+  rethrow;
+}
+```
+
+## 🚀 Performance
+
+**Pagination**:
+```dart
+Future<List<VideoItem>> getVideos({DocumentSnapshot? startAfter}) async {
+  Query query = _firestore
+      .collection('videos/$userId/items')
+      .orderBy('createdAt', descending: true)
+      .limit(50);
+
+  if (startAfter != null) {
+    query = query.startAfterDocument(startAfter);
+  }
+
+  final snapshot = await query.get();
+  return snapshot.docs.map((d) => VideoItem.fromJson(d.data())).toList();
+}
+```
+
+**Filter by Status**:
+```dart
+Future<List<VideoItem>> getVideosByStatus(VideoStatus status) async {
+  final snapshot = await _firestore
+      .collection('videos/$userId/items')
+      .where('status', isEqualTo: status.name)
+      .orderBy('createdAt', descending: true)
+      .get();
+  
+  return snapshot.docs.map((d) => VideoItem.fromJson(d.data())).toList();
+}
+```
+
+**Batch Operations**:
+```dart
+final batch = _firestore.batch();
+for (final id in videoIds) {
+  batch.delete(_firestore.doc('videos/$userId/items/$id'));
+}
+await batch.commit();
+```
+
+## 💰 Monetization Keys
+
+Creva uses third-party SDKs that require API keys passed at build time via `--dart-define` or `--dart-define-from-file`.
+
+### Required Environment Variables
+
+**RevenueCat** (Subscription management):
+- `REVENUECAT_IOS_KEY` - iOS API key
+- `REVENUECAT_ANDROID_KEY` - Android API key
+- Used in: `lib/domain/purchases/rc_purchase_controller.dart`
+
+**Superwall** (Paywall optimization):
+- `SUPERWALL_IOS_KEY` - iOS API key
+- `SUPERWALL_ANDROID_KEY` - Android API key
+- Used in: `lib/bootstrap.dart`
+
+**Mixpanel** (Analytics):
+- `MIXPANEL_TOKEN` - Analytics token
+- Used in: Analytics service initialization
+
+### Key Management
+
+**Important**:
+- Keys are read via `String.fromEnvironment(...)` and must be supplied at **compile time**
+- Keys are **NEVER** committed to Git (protected by `.gitignore`)
+- Use `.env` files for local development: `flutter run --dart-define-from-file=.env`
+- For production builds, pass keys directly: `flutter build ios --release --dart-define=REVENUECAT_IOS_KEY=...`
+
+**See**: `PRODUCTION_BUILDS.md` for complete key management guide, CI/CD examples, and troubleshooting.
+
+## 🔗 Related
+
+- [Firebase Docs](https://firebase.google.com/docs)
+- [project-overview.mdc](./project-overview.mdc)
+- [../firestore.rules](../firestore.rules)
+- [../docs/BACKEND_INTEGRATION.md](../docs/BACKEND_INTEGRATION.md) - Backend integration details
+- [../PRODUCTION_BUILDS.md](../PRODUCTION_BUILDS.md) - API key management and build configuration

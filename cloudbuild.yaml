@@ -1,7 +1,7 @@
 # Cloud Build configuration with multi-region deployment and performance optimizations
-# Dishly Recipe Parser Backend
+# Creva Creator Video Parser Backend
 substitutions:
-  _SERVICE_NAME: dishly-parser
+  _SERVICE_NAME: creva-parser
   _PRIMARY_REGION: us-central1
   _SECONDARY_REGIONS: us-east1,europe-west1,asia-southeast1
   _ENVIRONMENT: production
@@ -201,11 +201,11 @@ steps:
         echo "Deploying worker service..."
         
         # Create worker service account if needed
-        WORKER_SA="dishly-parser@${PROJECT_ID}.iam.gserviceaccount.com"
+        WORKER_SA="creva-parser@${PROJECT_ID}.iam.gserviceaccount.com"
         if ! gcloud iam service-accounts describe "$${WORKER_SA}" 2>/dev/null; then
           echo "Creating worker service account..."
-          gcloud iam service-accounts create dishly-parser \
-            --display-name="Dishly Parser Service Account"
+          gcloud iam service-accounts create creva-parser \
+            --display-name="Creva Parser Service Account"
         else
           echo "Worker service account already exists: $${WORKER_SA}"
         fi
@@ -231,7 +231,7 @@ steps:
           --role="roles/aiplatform.serviceAgent" || true
         
         # Deploy worker service to primary region
-        gcloud run deploy dishly-parser-worker \
+        gcloud run deploy creva-parser-worker \
           --image ${_PRIMARY_REGION}-docker.pkg.dev/${PROJECT_ID}/${_SERVICE_NAME}/${_SERVICE_NAME}:${SHORT_SHA} \
           --region ${_PRIMARY_REGION} \
           --platform managed \

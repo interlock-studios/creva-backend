@@ -19,6 +19,7 @@ from src.api.process import cleanup_processing_resources
 
 # Import API routers
 from src.api import health_router, process_router, admin_router
+from src.api.search import router as search_router, video_router
 from src.services.config_validator import validate_required_env_vars, AppConfig
 from src.auth import get_appcheck_service
 from src.utils.logging import StructuredLogger, RequestLoggingMiddleware
@@ -66,9 +67,9 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="Zest - Relationship Content Parser",
-    version="2.0.0",
-    description="Extract relationship and lifestyle content from TikTok and Instagram posts with AI-powered analysis",
+    title="Creva - Creator Video Parser",
+    version="3.0.0",
+    description="Extract transcripts, hooks, and metadata from TikTok and Instagram videos for content creators",
     docs_url="/docs" if environment != "production" else None,
     redoc_url="/redoc" if environment != "production" else None,
     lifespan=lifespan,
@@ -78,6 +79,8 @@ app = FastAPI(
 app.include_router(health_router)
 app.include_router(process_router)
 app.include_router(admin_router)
+app.include_router(search_router)
+app.include_router(video_router)
 
 # Register error handlers
 register_error_handlers(app)

@@ -1,0 +1,185 @@
+---
+description: Creva - Creator Workflow Tool Project Rules Index
+globs:
+  - "**/*"
+---
+
+# Creva Development Rules
+
+This directory contains comprehensive development guidelines for the Creva Flutter mobile application - a creator workflow tool for saving, organizing, and planning content from TikTok and Instagram.
+
+## 📋 Active Rules
+
+### Core Rules (Always Relevant)
+
+#### 1. [Project Overview](./project-overview.mdc)
+- Project goals and vision
+- Flutter architecture patterns
+- Firebase backend structure
+- AI backend integration
+- Third-party service configuration
+- Security and data privacy
+
+#### 2. [Folder Structure](./folder-structure.mdc)
+- Clean architecture organization
+- Domain/presentation/data layers
+- File naming conventions
+- Import patterns
+- Asset management
+- Platform-specific configurations
+
+### Development Rules
+
+#### 3. [Code Style](./code-style.mdc)
+- Dart style guide compliance
+- Flutter widget patterns
+- State management with flutter_bloc
+- Async/await best practices
+- Error handling standards
+- Testing requirements
+
+#### 4. [API Integration](./api-integration.mdc)
+- Firebase integration patterns
+- AI backend video parsing API
+- Third-party SDK usage (RevenueCat, Superwall, Mixpanel)
+- Image upload and storage
+- Authentication flows
+- Offline data handling
+
+### Documentation & Process Rules
+
+#### 5. [Cursor Rules](./cursor-rules.mdc)
+- IDE configuration for Flutter development
+- Cursor AI assistant setup
+- Rule management best practices
+- Code generation guidelines
+
+#### 6. [PRD Creation](./prd-creation.mdc)
+- Feature specification templates
+- User story format
+- Acceptance criteria definition
+- Technical requirements
+- Success metrics
+
+## 🎯 Quick Reference
+
+### Technology Stack
+- **Framework**: Flutter 3.x
+- **Language**: Dart 3.8+
+- **State Management**: flutter_bloc (Cubit pattern)
+- **Navigation**: go_router
+- **Backend**: Firebase (Auth, Firestore, Storage)
+- **AI Backend**: Cloud Run video parser API
+
+### Key Services
+1. **Firebase**: Authentication, Firestore database, Storage (fresh project for Creva)
+2. **AI Backend**: TikTok/Instagram video parsing and transcription
+3. **RevenueCat**: Subscription management
+4. **Superwall**: Paywall optimization
+5. **Mixpanel**: Product analytics
+6. **AppsFlyer**: Attribution tracking
+
+### Key Principles
+- Clean architecture (domain/presentation separation)
+- Immutable data models with freezed
+- Repository pattern for data access
+- Cubit for state management
+- Never commit Firebase credentials
+- Test on real devices
+- User data isolation (Firestore security rules)
+- **Code Quality**: Max 500 lines per file, modular structure, KISS principle
+- **Generic Naming**: Use "video", "topic", "creator" terminology (avoid app name in code)
+
+### Development Workflow
+1. Read relevant rules before starting
+2. Follow folder structure guidelines
+3. Use Cubit for state management
+4. Write clean, testable code
+5. Test on both iOS and Android
+6. Run `flutter analyze` before committing
+7. Never commit secrets
+
+## 🚀 Rule Application Order
+
+1. **project-overview.mdc** - Read first for project context
+2. **folder-structure.mdc** - Understand codebase organization
+3. **code-style.mdc** - Apply to all Dart files
+4. **api-integration.mdc** - Reference for Firebase/API work
+5. **cursor-rules.mdc** - Set up development environment
+6. **prd-creation.mdc** - Use when planning new features
+
+## 📖 Getting Started
+
+### For New Developers
+1. **Read `../CLAUDE.md`** for complete project context
+2. **Read `../AGENTS.md`** for Flutter development guidelines
+3. **Read `../AI_CONTEXT.md`** for quick reference
+4. Read `project-overview.mdc` for architecture details
+5. Review `folder-structure.mdc` to understand organization
+6. Follow `code-style.mdc` when writing code
+7. Reference `api-integration.mdc` for Firebase operations
+
+### For AI Assistants
+1. Read `../AI_CONTEXT.md` first
+2. Review `cursor-rules.mdc` for AI-specific guidelines
+3. Follow `code-style.mdc` for code generation
+4. Use `api-integration.mdc` for backend integration
+5. Reference `prd-creation.mdc` when creating specs
+
+## 🔑 Critical Rules
+
+**NEVER**:
+- Commit Firebase credentials (google-services.json, GoogleService-Info.plist)
+- Use production API keys in development
+- Skip Firestore security rules
+- Import from wrong package names (use `package:creva/`)
+- Create files over 500 lines (split into modules)
+- Use app name "Creva" in code (use generic terms: video, topic, creator)
+
+**ALWAYS**:
+- Test on physical devices (iOS and Android)
+- Run `flutter analyze` before commits
+- Use Cubit for state management
+- Follow clean architecture principles
+- Validate user authentication before data access
+
+## 📦 Project Context
+
+**Creva** is a Flutter mobile app for creators to save, organize, and plan content from TikTok and Instagram. It helps creators capture ideas, review transcripts, organize by topics, schedule content, and track progress from idea to execution.
+
+**Purpose**: Creator workflow tool for saving inspiration and turning it into action
+**Status**: Active Development
+**Platforms**: iOS & Android
+**Package Name**: `creva` (lowercase)
+**Package IDs**:
+- iOS: `com.interlock.creva` (TBD - update when Firebase project created)
+- Android: `com.interlock.creva` (TBD - update when Firebase project created)
+
+**Key Features**:
+- Save videos from TikTok/Instagram with source links
+- Automatic transcription for hooks and scripts
+- Organization by topics/projects
+- Calendar scheduling
+- Status tracking (Planned, In Progress, Completed)
+
+## 🔗 External Resources
+
+- **Firebase Console**: https://console.firebase.google.com/ (new Creva project)
+- **Flutter Docs**: https://docs.flutter.dev/
+- **Dart Style Guide**: https://dart.dev/effective-dart/style
+- **Firebase for Flutter**: https://firebase.flutter.dev/
+- **flutter_bloc**: https://bloclibrary.dev/
+
+## 🔄 Rule Updates
+
+When updating rules:
+- Keep rules specific to Creva Flutter app
+- Update this index when adding/removing rules
+- Version significant changes in commit messages
+- Ensure consistency across all rule files
+- Test rule changes with actual code
+- Enforce code quality standards (500-line limit, modular, KISS)
+
+---
+
+Last Updated: November 2024

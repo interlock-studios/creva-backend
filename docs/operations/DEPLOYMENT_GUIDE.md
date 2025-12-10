@@ -19,7 +19,7 @@ If you prefer to deploy in stages:
 # 1. Deploy to all regions first
 make deploy
 
-# 2. (Optional) Setup global load balancer with zestai.app
+# 2. (Optional) Setup global load balancer with creva.app
 make setup-load-balancer
 
 # 3. Check status
@@ -52,7 +52,7 @@ make status-lb
 # View all regional deployments
 make status
 
-# Check load balancer and zestai.app domain
+# Check load balancer and creva.app domain
 make status-lb
 
 # Test API in all regions
@@ -67,20 +67,20 @@ make logs-all-regions
 Global Load Balancer Status:
 Backend Service:
 NAME                    BACKENDS                PROTOCOL  LOAD_BALANCING_SCHEME
-zest-parser-backend  us-central1,us-east1... HTTPS     EXTERNAL
+creva-parser-backend  us-central1,us-east1... HTTPS     EXTERNAL
 
 URL Map:
 NAME                   DEFAULT_SERVICE
-zest-parser-url-map zest-parser-backend
+creva-parser-url-map creva-parser-backend
 
 Global IP: 34.102.136.180
 
-SSL Certificates (zestai.app):
+SSL Certificates (creva.app):
 NAME           DOMAINS         MANAGED_STATUS
-zestai-ssl-cert api.zestai.app ACTIVE
+creva-ssl-cert api.creva.app ACTIVE
 
 Domain Status:
-Expected domain: api.zestai.app
+Expected domain: api.creva.app
 Load balancer IP: 34.102.136.180
 ✅ DNS correctly configured
 ```
@@ -88,7 +88,7 @@ Load balancer IP: 34.102.136.180
 ## 🌍 Global Architecture After Deployment
 
 ```
-                    🌐 api.zestai.app
+                    🌐 api.creva.app
                            |
                     [Global Load Balancer]
                            |
@@ -118,7 +118,7 @@ Load balancer IP: 34.102.136.180
 - **Optimized latency**: 50-150ms from any region
 - **High availability**: Automatic failover between regions
 - **Unlimited scaling**: Each region scales independently
-- **Professional domain**: `api.zestai.app` instead of long Google URLs
+- **Professional domain**: `api.creva.app` instead of long Google URLs
 
 ## 🔧 Troubleshooting
 
@@ -127,7 +127,7 @@ Load balancer IP: 34.102.136.180
 **DNS not resolving:**
 ```bash
 # Check DNS propagation
-dig api.zestai.app
+dig api.creva.app
 
 # Expected: Should return the load balancer IP
 # If not, wait up to 24 hours for DNS propagation
@@ -154,7 +154,7 @@ make deploy-single-region
 **Load balancer not routing traffic:**
 ```bash
 # Check backend service configuration
-gcloud compute backend-services describe zest-parser-backend --global
+gcloud compute backend-services describe creva-parser-backend --global
 
 # Verify all regions are listed as backends
 ```
@@ -175,7 +175,7 @@ gcloud compute backend-services describe zest-parser-backend --global
 
 ## 🎯 Next Steps After Deployment
 
-1. **Update frontend applications** to use `https://api.zestai.app`
+1. **Update frontend applications** to use `https://api.creva.app`
 2. **Monitor performance** across regions using the monitoring dashboard
 3. **Test failover** by temporarily disabling one region
 4. **Set up alerts** for load balancer health and SSL certificate expiration

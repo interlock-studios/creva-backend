@@ -1,0 +1,419 @@
+---
+description: Creva Folder Structure - Clean Architecture Organization
+applies_to:
+  - "**/*.dart"
+  - "lib/**"
+---
+
+# Creva Folder Structure
+
+## 🏗️ Clean Architecture Overview
+
+Creva follows **Clean Architecture** principles with clear separation between presentation, domain, and data layers.
+
+```
+Creva/
+├── lib/                      # Flutter application code
+│   ├── domain/              # Business logic (platform-agnostic)
+│   ├── presentation/        # UI layer
+│   ├── routing/             # Navigation
+│   └── main.dart            # App entry point
+├── android/                 # Android platform code
+├── ios/                     # iOS platform code
+├── assets/                  # Images, fonts, etc.
+├── test/                    # Unit & widget tests
+└── integration_test/        # Integration tests
+```
+
+## 📁 Detailed Structure
+
+### `/lib` - Main Application Code
+
+```
+lib/
+├── domain/                         # Business Logic Layer
+│   ├── models/                    # Data models
+│   │   └── firestore/
+│   │       └── video/
+│   │           ├── video.dart                    # Main video model
+│   │           ├── video.freezed.dart            # Generated code
+│   │           ├── video.g.dart                  # JSON serialization
+│   │           ├── video_item.dart               # Video item model
+│   │           ├── topic.dart                    # Topic model
+│   │           ├── topic.freezed.dart
+│   │           ├── topic.g.dart
+│   │           ├── video_source_type.dart        # Enum: tiktok|instagram
+│   │           └── video_status.dart             # Enum: planned|inProgress|completed
+│   │
+│   ├── repositories/              # Data access interfaces
+│   │   └── video/
+│   │       ├── video_repository.dart         # Video CRUD interface
+│   │       └── topic_repository.dart          # Topic interface
+│   │
+│   ├── services/                  # Business services
+│   │   ├── analytics_service.dart               # Analytics wrapper
+│   │   ├── remote_config_service.dart           # Firebase Remote Config
+│   │   ├── app_groups_service.dart              # App Groups (iOS share extension)
+│   │   └── share_extension_service.dart         # Share extension integration
+│   │
+│   ├── logger/                    # Logging utility
+│   │   └── logger.dart
+│   │
+│   └── exceptions/                # Custom exceptions
+│       └── request_exception.dart
+│
+├── presentation/                   # UI Layer
+│   ├── pages/                     # Full-screen pages
+│   │   ├── videos/
+│   │   │   ├── view/
+│   │   │   │   ├── videos_page.dart            # Main video list
+│   │   │   │   ├── video_detail_page/          # Video details (directory)
+│   │   │   │   ├── edit_video_page/            # Edit video (directory)
+│   │   │   │   ├── topics_home_page.dart       # Topics home
+│   │   │   │   ├── topic_videos_page.dart      # Topic videos list
+│   │   │   │   ├── calendar_page.dart          # Calendar view
+│   │   │   │   └── widgets/                    # Video-specific widgets
+│   │   │   │       ├── bottom_sheets/
+│   │   │   │       ├── topic/
+│   │   │   │       └── video/
+│   │   │   │
+│   │   │   └── cubit/              # Videos state management
+│   │   │
+│   │   ├── onboarding/
+│   │   │   ├── view/
+│   │   │   │   ├── onboarding_page.dart
+│   │   │   │   ├── screens/                    # Onboarding screen components
+│   │   │   │   └── widgets/                    # Onboarding widgets
+│   │   │   ├── cubit/
+│   │   │   ├── models/
+│   │   │   └── config/
+│   │   │
+│   │   ├── auth/                   # Authentication pages
+│   │   │   ├── view/
+│   │   │   │   ├── sign_in_page.dart
+│   │   │   │   ├── sign_up_page.dart
+│   │   │   │   └── forgot_password_page.dart
+│   │   │   └── cubit/              # Auth state management
+│   │   │
+│   │   ├── settings/
+│   │   │   ├── view/
+│   │   │   │   └── settings_page.dart
+│   │   │   └── cubit/              # Settings state management
+│   │   │
+│   │   └── splash/
+│   │       ├── view/
+│   │       │   └── splash_page.dart
+│   │       └── cubit/              # Splash state management
+│   │
+│   ├── widgets/                   # Shared widgets
+│   │   ├── loading_indicator.dart
+│   │   ├── error_view.dart
+│   │   └── empty_state.dart
+│   │
+│   ├── theme/                     # App theming
+│   │   └── creva_input_decoration.dart  # Input decoration theme
+│   │
+│   ├── app/                       # App-level configuration
+│   │   └── app.dart                       # MaterialApp with theme (ColorScheme)
+│   │
+│   └── modules/                   # Cross-cutting concerns
+│       └── current_user_data/
+│           ├── current_user_data_cubit.dart
+│           └── current_user_data_state.dart
+│
+├── routing/                        # Navigation
+│   └── router.dart                # go_router configuration
+│
+└── main.dart                      # Application entry point
+```
+
+### `/android` - Android Platform Code
+
+```
+android/
+├── app/
+│   ├── build.gradle                       # App-level Gradle config
+│   ├── google-services.json               # Firebase config (DO NOT COMMIT)
+│   └── src/
+│       └── main/
+│           ├── AndroidManifest.xml        # App permissions & config
+│           ├── kotlin/
+│           │   └── com/interlock/creva/
+│           │       └── MainActivity.kt    # Main activity
+│           └── res/                       # Android resources
+│               ├── mipmap-*/              # App icons
+│               └── values/                # Strings, colors
+│
+└── build.gradle                           # Project-level Gradle
+```
+
+**Key Files**:
+- `build.gradle`: Package ID (`com.interlock.creva`), SDK versions
+- `AndroidManifest.xml`: Permissions (camera, storage, internet)
+- `google-services.json`: Firebase configuration (excluded from git)
+
+### `/ios` - iOS Platform Code
+
+```
+ios/
+├── Runner/
+│   ├── Info.plist                         # App configuration
+│   ├── GoogleService-Info.plist           # Firebase config (DO NOT COMMIT)
+│   ├── Assets.xcassets/                   # App icons & images
+│   │   └── AppIcon.appiconset/
+│   ├── Base.lproj/                        # Storyboards
+│   │   └── LaunchScreen.storyboard
+│   └── Runner-Bridging-Header.h           # Objective-C bridging
+│
+├── Runner.xcodeproj/                      # Xcode project
+└── Runner.xcworkspace/                    # Xcode workspace
+```
+
+**Key Files**:
+- `Info.plist`: Bundle ID (`com.interlock.creva`), permissions
+- `GoogleService-Info.plist`: Firebase configuration (excluded from git)
+
+### `/assets` - Application Assets
+
+```
+assets/
+├── images/
+│   ├── logo.png
+│   ├── placeholder.png
+│   └── onboarding/
+│
+└── icons/
+    ├── recipe_icon.svg
+    └── category_icon.svg
+```
+
+**Configuration** in `pubspec.yaml`:
+```yaml
+flutter:
+  assets:
+    - assets/images/
+    - assets/icons/
+```
+
+### `/test` - Unit & Widget Tests
+
+```
+test/
+├── domain/
+│   ├── models/
+│   │   └── recipe/
+│   │       ├── recipe_test.dart
+│   │       └── recipe_category_test.dart
+│   │
+│   └── repositories/
+│       └── recipe/
+│           └── recipe_repository_test.dart
+│
+└── presentation/
+    └── pages/
+        └── recipes/
+            ├── recipes_page_test.dart
+            └── cubit/
+                └── recipes_cubit_test.dart
+```
+
+**Note**: Integration tests (`integration_test/`) are planned for future implementation.
+
+## 📋 File Naming Conventions
+
+### Dart Files
+
+**Files**:
+- Snake case: `recipe_card_widget.dart`
+- Match class name: `RecipeCardWidget` → `recipe_card_widget.dart`
+
+**Classes**:
+```dart
+// ✅ GOOD
+class RecipeCard extends StatelessWidget { }     // recipe_card.dart
+class RecipesCubit extends Cubit<RecipesState> { } // recipes_cubit.dart
+
+// ❌ BAD
+class recipeCard { }                             // Wrong casing
+class RC extends StatelessWidget { }             // Unclear abbreviation
+```
+
+**Models with freezed**:
+```dart
+// recipe.dart
+@freezed
+class Recipe with _$Recipe { }
+
+// Generates:
+// - recipe.freezed.dart (freezed code)
+// - recipe.g.dart (JSON serialization)
+```
+
+### Directories
+
+- Lowercase with underscores: `recipe_detail/`
+- Feature-based organization: `pages/recipes/`
+- Layer-based grouping: `domain/models/`
+
+## 🎯 Layer-Specific Rules
+
+### Domain Layer (`lib/domain/`)
+
+**Purpose**: Business logic, platform-agnostic
+
+**Rules**:
+- ✅ **CAN** import: Other domain files, Dart core libraries
+- ❌ **CANNOT** import: Flutter widgets, Firebase, presentation code
+
+**Example**:
+```dart
+// ✅ GOOD - recipe.dart
+import 'package:freezed_annotation/freezed_annotation.dart';
+import 'package:creva/domain/models/recipe/recipe_source.dart';
+
+// ❌ BAD - recipe.dart
+import 'package:flutter/material.dart';           // NO Flutter in domain!
+import 'package:firebase_firestore/firebase_firestore.dart'; // NO Firebase!
+import 'package:creva/presentation/pages/recipes_page.dart'; // NO UI!
+```
+
+### Presentation Layer (`lib/presentation/`)
+
+**Purpose**: UI components, state management
+
+**Rules**:
+- ✅ **CAN** import: Flutter widgets, domain models, Cubits
+- ✅ **CAN** import: Presentation layer files
+- ❌ **CANNOT** import: Data layer implementations
+
+**Example**:
+```dart
+// ✅ GOOD - recipes_page.dart
+import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:creva/domain/models/recipe/recipe.dart';
+import 'package:creva/presentation/pages/recipes/cubit/recipes_cubit.dart';
+
+// ❌ BAD - recipes_page.dart
+import 'package:firebase_firestore/firebase_firestore.dart'; // NO direct Firebase!
+```
+
+### Repository Implementations
+
+**Location**: Inside repository files
+
+**Rules**:
+- ✅ **CAN** import: Firebase, domain interfaces, models
+- ❌ **CANNOT** import: UI code, widgets
+
+**Example**:
+```dart
+// ✅ GOOD - recipe_repository.dart
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:creva/domain/models/recipe/recipe.dart';
+
+class RecipeRepository {
+  final FirebaseFirestore _firestore;
+  final FirebaseAuth _auth;
+
+  // Implementation...
+}
+```
+
+## 📦 Import Organization
+
+### Import Order
+
+```dart
+// 1. Dart SDK imports
+import 'dart:async';
+import 'dart:convert';
+
+// 2. Flutter imports
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+
+// 3. Package imports (alphabetical)
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:freezed_annotation/freezed_annotation.dart';
+
+// 4. Project imports (alphabetical)
+import 'package:creva/domain/models/recipe/recipe.dart';
+import 'package:creva/presentation/pages/recipes/cubit/recipes_cubit.dart';
+
+// 5. Part files (generated code)
+part 'recipe.freezed.dart';
+part 'recipe.g.dart';
+```
+
+### Relative vs Absolute Imports
+
+**Always use package imports** (absolute):
+```dart
+// ✅ GOOD
+import 'package:creva/domain/models/recipe/recipe.dart';
+
+// ❌ BAD
+import '../../domain/models/recipe/recipe.dart';
+```
+
+## 🔧 Generated Files
+
+### Freezed Models
+
+**Source**: `recipe.dart`
+**Generates**:
+- `recipe.freezed.dart` - Immutable class implementation
+- `recipe.g.dart` - JSON serialization
+
+**Command**: `flutter pub run build_runner build`
+
+**Gitignore**: Commit generated files for easier collaboration
+
+### JSON Serialization
+
+**Annotation**: `@JsonSerializable()`
+**Generates**: `*.g.dart` files
+**Command**: `flutter pub run build_runner build`
+
+## 🚫 Do NOT Commit
+
+**Firebase Credentials**:
+- `android/app/google-services.json`
+- `ios/Runner/GoogleService-Info.plist`
+
+**Environment Files**:
+- `.env`
+- `.env.local`
+- `.env.production`
+
+**Build Outputs**:
+- `build/`
+- `.dart_tool/`
+- `.flutter-plugins`
+- `.flutter-plugins-dependencies`
+
+**IDE Files**:
+- `.idea/`
+- `.vscode/settings.json` (personal settings)
+- `*.iml`
+
+## ✅ Checklist Before Creating New Files
+
+1. **Check if similar file exists**: Search codebase first
+2. **Choose correct layer**: domain / presentation / routing
+3. **Follow naming convention**: snake_case, descriptive name
+4. **Use correct imports**: Package imports, proper order
+5. **Add to version control**: `git add <file>`
+
+## 🔗 Related Documentation
+
+- **[code-style.mdc](./code-style.mdc)** - Dart/Flutter coding standards
+- **[project-overview.mdc](./project-overview.mdc)** - Architecture overview
+- **[api-integration.mdc](./api-integration.mdc)** - Firebase integration patterns
+
+---
+
+Last Updated: October 2025

@@ -10,9 +10,9 @@ RED='\033[0;31m'
 NC='\033[0m'
 
 # Config
-PROJECT_ID="${PROJECT_ID:-sets-ai}"
+PROJECT_ID="${PROJECT_ID:-creva-e6435}"
 REGION="${REGION:-us-central1}"
-SERVICE_NAME="${SERVICE_NAME:-workout-parser-preview}"
+SERVICE_NAME="${SERVICE_NAME:-creva-parser-preview}"
 IMAGE_TAG="${IMAGE_TAG:-preview}"
 
 echo -e "${BLUE}🚀 Deploying Preview Service: ${SERVICE_NAME}${NC}"

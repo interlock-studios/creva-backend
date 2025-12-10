@@ -1,5 +1,5 @@
 # Product Mission (Lite)
 
-Sets AI is a fitness companion app that helps fitness enthusiasts seamlessly convert social media workout content into personalized, actionable workout guides by providing AI-powered exercise analysis and custom workout creation directly from TikTok and Instagram videos.
+Creva is a creator workflow app that helps content creators seamlessly save, organize, and plan content from TikTok and Instagram by providing AI-powered video transcription and hook extraction.
 
-Sets AI serves fitness enthusiasts and social media users who discover workout content on TikTok and Instagram but struggle to convert it into structured, actionable fitness routines. Unlike traditional fitness apps that require manual workout entry, Sets AI uses advanced AI to automatically analyze shared workout videos and generate comprehensive workout guides with proper form instruction, progression tracking, and personalized modifications.
+Creva serves content creators who discover inspiring videos on social media but struggle to organize and learn from them. Unlike generic bookmark tools, Creva automatically extracts full transcripts and hooks from saved videos, enabling creators to study successful content, organize ideas by topic, schedule content on a calendar, and track progress from inspiration to execution.

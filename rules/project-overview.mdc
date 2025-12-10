@@ -1,0 +1,462 @@
+---
+description: Creva Project Overview - Architecture, Goals, and Technical Context
+applies_to:
+  - "**/*.dart"
+  - "**/*.yaml"
+  - "**/android/**"
+  - "**/ios/**"
+alwaysApply: true
+---
+
+# Creva Project Overview
+
+## 🎯 What This Project Is
+
+**Creva** is a Flutter mobile application that helps creators save, organize, and plan content from TikTok and Instagram. It serves as a central hub where creators store inspiration, review transcripts, organize ideas by topics, schedule content, and track progress from idea to execution.
+
+**CRITICAL**: This app handles:
+- User authentication and personal data
+- Video collections with source links
+- TikTok/Instagram video URL processing and transcription
+- Firebase credentials (NEVER commit)
+- Third-party API integrations
+- Content scheduling and status tracking
+
+## 📚 Essential Documentation
+
+**MUST READ** before making changes:
+- **[../CLAUDE.md](../CLAUDE.md)** - Comprehensive project context and critical rules
+- **[../AGENTS.md](../AGENTS.md)** - Flutter development guidelines and workflows
+- **[../AI_CONTEXT.md](../AI_CONTEXT.md)** - Quick start guide for AI assistants
+
+## 🔗 Source of Truth
+
+- **Firebase Project**: New Creva project (to be created)
+- **Package Name**: `creva` (lowercase)
+- **Package IDs**: `com.interlock.creva` (iOS & Android - TBD when Firebase project created)
+- **Note**: Fresh Firebase project `creva-e6435` with dedicated Firestore database.
+
+## 🛠️ Tech Stack
+
+### Framework & Language
+- **Framework**: Flutter 3.x
+- **Language**: Dart 3.8+
+- **Platforms**: iOS & Android
+
+### State Management
+- **Pattern**: flutter_bloc (Cubit)
+- **Why**: Predictable, testable, great DevTools support
+
+### Navigation
+- **Package**: go_router ^15.1.2
+- **Pattern**: Declarative routing
+
+### Backend Services
+- **Firebase Authentication**: Email, Google, Apple Sign-In
+- **Cloud Firestore**: NoSQL database for videos and topics (fresh project)
+- **Firebase Storage**: Image uploads (video thumbnails)
+- **Firebase Analytics**: Event tracking
+- **Firebase Crashlytics**: Error reporting
+
+### AI Backend
+- **Service**: Cloud Run video parser and transcription API
+- **Purpose**: Extract video metadata and generate transcripts from TikTok/Instagram videos
+- **Key Features**:
+  - Video metadata extraction (title, description, thumbnail)
+  - Automatic transcription (hooks, scripts, dialogue)
+  - Hook extraction for quick reference
+- **Note**: Backend API details TBD (new backend project required)
+
+### Third-Party SDKs
+- **RevenueCat**: Subscription management
+- **Superwall**: Paywall optimization
+- **Mixpanel**: Product analytics
+- **AppsFlyer**: Attribution tracking
+
+### Development Tools
+- **Build System**: Flutter DevTools
+- **Code Generation**: freezed, json_serializable
+- **Testing**: flutter_test, mockito
+- **Linting**: flutter_lints
+
+## 🏗️ Architecture
+
+### Clean Architecture Pattern
+
+```
+┌─────────────────────────────────────────────┐
+│         Presentation Layer                  │
+│  ┌──────────┐  ┌─────────┐  ┌──────────┐  │
+│  │  Pages   │  │ Widgets │  │  Cubits  │  │
+│  │ (Views)  │  │  (UI)   │  │ (State)  │  │
+│  └──────────┘  └─────────┘  └──────────┘  │
+└─────────────────────────────────────────────┘
+                    ↓ ↑
+┌─────────────────────────────────────────────┐
+│            Domain Layer                     │
+│  ┌──────────┐  ┌──────────┐  ┌─────────┐  │
+│  │  Models  │  │   Repos  │  │Services │  │
+│  │(Entities)│  │(Abstract)│  │(Logic)  │  │
+│  └──────────┘  └──────────┘  └─────────┘  │
+└─────────────────────────────────────────────┘
+                    ↓ ↑
+┌─────────────────────────────────────────────┐
+│             Data Layer                      │
+│  ┌──────────┐  ┌──────────┐  ┌─────────┐  │
+│  │ Firebase │  │AI Backend│  │3rd Party│  │
+│  │(Impl)    │  │ (Parser) │  │  SDKs   │  │
+│  └──────────┘  └──────────┘  └─────────┘  │
+└─────────────────────────────────────────────┘
+```
+
+### Layer Responsibilities
+
+**Presentation** (`lib/presentation/`):
+- UI components (pages, widgets)
+- State management (Cubits)
+- User input handling
+- Navigation
+- **NO** business logic
+- **NO** direct Firebase calls
+
+**Domain** (`lib/domain/`):
+- Business logic
+- Data models (freezed classes)
+- Repository interfaces
+- Service interfaces
+- Platform-agnostic
+- **NO** UI code
+- **NO** implementation details
+
+**Data** (implementation in repositories):
+- Firebase operations
+- API integrations
+- Local storage
+- Implements domain interfaces
+- **NO** UI dependencies
+
+## 🔥 Firebase Backend Structure
+
+### Firestore Collections
+
+```
+videos/ (collection)
+  {userId}/ (document - user's collection)
+    items/ (subcollection)
+      {videoId}/ (document)
+        ├─ id: string
+        ├─ title: string
+        ├─ description: string (optional)
+        ├─ imageUrl: string (optional)
+        ├─ imagesUrls: array<string>
+        ├─ links: array<string> (TikTok/Instagram URLs)
+        ├─ sourceType: enum (tiktok|instagram)
+        ├─ topicIds: array<string>
+        ├─ status: enum (planned|inProgress|completed)
+        ├─ scheduledDate: timestamp (optional)
+        ├─ transcript: string (optional)
+        ├─ hookText: string (optional)
+        ├─ tags: array<string>
+        ├─ projectId: string (optional)
+        ├─ notes: string (optional)
+        ├─ createdAt: timestamp
+        └─ updatedAt: timestamp
+
+    topics/ (subcollection)
+      {topicId}/ (document)
+        ├─ id: string
+        ├─ title: string
+        ├─ createdAt: timestamp
+        └─ updatedAt: timestamp
+
+users/ (collection)
+  {userId}/ (document)
+    ├─ name: string
+    ├─ email: string
+    ├─ photoUrl: string (optional)
+    ├─ createdAt: timestamp
+    └─ updatedAt: timestamp
+```
+
+### Firebase Storage Structure
+
+```
+video_images/
+  {userId}/
+    video_{userId}_{uuid}.jpg
+```
+
+### Security Rules
+
+All data is user-scoped:
+- Users can only access their own videos
+- Authentication required for all operations
+- Security rules enforce isolation
+
+Deploy: `firebase deploy --only firestore:rules`
+
+## 🤖 AI Backend Integration
+
+### Video Parser & Transcription API
+
+**Purpose**: Extract video metadata and generate transcripts from TikTok/Instagram videos
+
+**Priority**: Transcript support is the #1 backend priority
+
+**Flow**:
+1. User pastes video link
+2. App sends URL to parser API
+3. API analyzes video content
+4. Returns: title, description, thumbnail, transcript
+5. App creates video in Firestore
+6. Images uploaded to Firebase Storage
+7. Transcript stored for quick reference
+
+**Request**:
+```json
+POST /process
+Content-Type: application/json
+
+{
+  "url": "https://www.tiktok.com/@user/video/123"
+}
+```
+
+**Expected Response**:
+```json
+{
+  "title": "Video Title",
+  "description": "Video description...",
+  "image": "https://..." or "data:image/jpeg;base64,...",
+  "transcript": "Full transcript text...",
+  "hook": "Extracted hook text..."
+}
+```
+
+**Error Handling**:
+- 30-second timeout
+- Retry with exponential backoff
+- Fallback to manual entry
+- User-friendly error messages
+
+**Note**: Backend API endpoint TBD (new backend project required)
+
+## 📊 Data Models
+
+### Core Entities
+
+**VideoItem** (Primary Entity):
+```dart
+@freezed
+class VideoItem with _$VideoItem {
+  const factory VideoItem({
+    required String id,
+    required String title,
+    required DateTime createdAt,
+    required DateTime updatedAt,
+    String? imageUrl,
+    String? description,
+    @Default([]) List<String> topicIds,
+    @Default([]) List<String> links,
+    @Default([]) List<String> imagesUrls,
+    VideoSourceType? sourceType,
+    @Default(VideoStatus.planned) VideoStatus status,
+    DateTime? scheduledDate,
+    String? transcript,
+    String? hookText,
+    @Default([]) List<String> tags,
+    String? projectId,
+    String? notes,
+  }) = _VideoItem;
+
+  factory VideoItem.fromJson(Map<String, dynamic> json)
+    => _$VideoItemFromJson(json);
+}
+```
+
+**Topic**:
+```dart
+@freezed
+class Topic with _$Topic {
+  const factory Topic({
+    required String id,
+    required String title,
+    required DateTime createdAt,
+    required DateTime updatedAt,
+  }) = _Topic;
+
+  factory Topic.fromJson(Map<String, dynamic> json)
+    => _$TopicFromJson(json);
+}
+```
+
+**Enums**:
+```dart
+enum VideoSourceType { tiktok, instagram }
+enum VideoStatus { planned, inProgress, completed }
+```
+
+## 🎯 Key Features
+
+### 1. Video Import
+- Paste TikTok/Instagram link
+- AI extracts title, description, thumbnail
+- Automatic transcription (hooks, scripts)
+- Save to personal collection
+- Organize by topics
+
+### 2. Content Organization
+- Custom topics (niches, projects, themes)
+- Multi-topic support
+- Tags for flexible categorization
+- Status tracking (Planned/In Progress/Completed)
+
+### 3. Calendar & Scheduling
+- Assign videos to specific dates
+- Calendar view (monthly/weekly)
+- Filter by date range
+- Track content planning
+
+### 4. Transcript Review
+- Read hooks and scripts without watching
+- Search transcript text
+- Copy hook functionality
+- Quick reference for inspiration
+
+### 5. Status Workflow
+- Track idea progress (Planned → In Progress → Completed)
+- Filter by status
+- Status-based sorting
+- Visual status indicators
+
+### 6. Manual Entry
+- Add videos manually
+- Upload thumbnails
+- Multiple images per video
+- Rich text notes
+
+## 🔐 Security & Privacy
+
+### Critical Security Rules
+
+**NEVER**:
+- Commit Firebase credentials
+- Store API keys in code
+- Allow cross-user data access
+- Skip authentication checks
+- Log sensitive user data
+
+**ALWAYS**:
+- Validate user authentication
+- Enforce user-scoped queries
+- Use Firestore security rules
+- Encrypt sensitive data
+- Audit Firebase usage
+
+### Data Privacy
+- User data isolated by user ID
+- Partner sharing opt-in only
+- Security rules server-side enforced
+- GDPR/CCPA compliant
+- User data deletion available
+
+## 🚀 Performance Targets
+
+### App Performance
+- Cold start: < 3 seconds
+- Recipe list: 60 FPS scrolling
+- Image load: < 2 seconds (cached)
+- AI parse: < 30 seconds
+
+### Firebase Quotas (Free Tier)
+- Reads: 50,000/day
+- Writes: 20,000/day
+- Storage: 5GB total
+- Auth: 10,000 verifications/month
+
+### Optimization
+- Image compression (max 1MB)
+- Pagination (50 items/page)
+- Lazy loading
+- Cached images
+- Firestore indexes
+
+## 📦 Package IDs
+
+- **Package Name**: `creva` (lowercase)
+- **iOS**: `com.interlock.creva` (TBD - update when Firebase project created)
+- **Android**: `com.interlock.creva` (TBD - update when Firebase project created)
+- **Firebase Project**: New Creva project (to be created)
+
+## 🎨 Design System
+
+### Theme
+- Material Design 3
+- Custom color palette
+- Dark mode support
+- 8px spacing grid
+- Consistent typography
+
+### Key Components
+- VideoCard
+- TopicWidget
+- StatusBadge
+- CalendarView
+- TranscriptViewer
+- Bottom sheets (add/edit)
+- Loading states (shimmer)
+- Error states
+
+## 📋 Development Phases
+
+### Phase 1: Foundation (Current)
+- Core infrastructure setup
+- Update all documentation and rules
+- Rename core files (recipe → video)
+- Create new data models
+- Set up fresh Firebase project
+
+### Phase 2: Core Features
+- Video import and saving
+- Topic organization
+- Status workflow
+- Calendar scheduling
+- Transcript integration
+
+### Phase 3: Polish & Launch
+- UI refinement
+- Performance optimization
+- User testing
+- App Store submission
+
+## 🔗 Related Files
+
+- **[folder-structure.mdc](./folder-structure.mdc)** - Code organization
+- **[code-style.mdc](./code-style.mdc)** - Dart/Flutter standards
+- **[api-integration.mdc](./api-integration.mdc)** - Firebase patterns
+- **[../README.md](../README.md)** - Setup and installation
+- **[../firestore.rules](../firestore.rules)** - Security rules
+
+## 🎯 Success Metrics
+
+### Technical
+- Crashes < 0.1%
+- App size < 50MB
+- 4.5+ stars
+- Load time < 3s
+
+### Product
+- Import success > 90%
+- D7 retention > 40%
+- Videos/user > 20
+- Transcript usage > 60%
+- Calendar scheduling usage > 30%
+
+---
+
+**Origin**: Creva creator workflow backend
+**Status**: Active Development
+**Platforms**: iOS & Android
+**Purpose**: Creator workflow tool for saving inspiration and planning content
+
+Last Updated: November 2024

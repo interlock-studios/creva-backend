@@ -1,0 +1,294 @@
+---
+description: Creva Code Style Guide - Dart and Flutter Standards
+applies_to:
+  - "**/*.dart"
+---
+
+# Creva Code Style Guide
+
+## 🎯 Overview
+
+This guide defines coding standards for Creva. Follow these rules to maintain consistency, readability, and quality.
+
+**Base**: [Effective Dart](https://dart.dev/effective-dart/style)
+
+## 📝 General Principles
+
+1. **Write clear, readable code**
+2. **Favor composition over inheritance**
+3. **Keep functions small** (< 50 lines)
+4. **Use descriptive names**
+5. **Document public APIs**
+6. **Test your code**
+7. **Keep files under 500 lines** (split into modules if needed)
+8. **Follow KISS principle** (Keep It Simple, Stupid)
+9. **Use modular structure** (single responsibility per file)
+
+## 🔤 Naming Conventions
+
+### Classes
+```dart
+// ✅ GOOD - UpperCamelCase, generic naming
+class VideoCard extends StatelessWidget { }
+class VideosCubit extends Cubit<VideosState> { }
+class TopicSelector extends StatelessWidget { }
+
+// ❌ BAD - app name in code, wrong casing
+class CrevaVideoCard { }
+class recipeCard { }
+class recipe_card { }
+```
+
+### Variables
+```dart
+// ✅ GOOD - lowerCamelCase, generic naming
+final String userId;
+final VideoItem currentVideo;
+final Topic selectedTopic;
+
+// ❌ BAD - app name, wrong casing
+final VideoItem crevaVideo;
+final String UserID;
+final Recipe current_recipe;
+```
+
+### Files
+```dart
+// ✅ GOOD - snake_case, generic naming
+video_card_widget.dart
+videos_cubit.dart
+topic_selector_widget.dart
+
+// ❌ BAD - app name, wrong casing
+creva_video_card.dart
+RecipeCard.dart
+recipeCard.dart
+```
+
+## 🎨 Widget Patterns
+
+### StatelessWidget
+```dart
+// ✅ GOOD - Const constructor, generic naming
+class VideoCard extends StatelessWidget {
+  const VideoCard({
+    super.key,
+    required this.video,
+  });
+
+  final VideoItem video;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(child: Text(video.title));
+  }
+}
+```
+
+### Use Const
+```dart
+// ✅ GOOD
+const SizedBox(height: 16)
+const Text('Hello')
+
+// ❌ BAD
+SizedBox(height: 16)
+Text('Hello')
+```
+
+## 🔄 State Management (Cubit)
+
+```dart
+// ✅ GOOD - Clean Cubit, generic naming
+class VideosCubit extends Cubit<VideosState> {
+  VideosCubit({
+    required VideoRepository videoRepository,
+  })  : _videoRepository = videoRepository,
+        super(const VideosState.initial());
+
+  final VideoRepository _videoRepository;
+
+  Future<void> loadVideos() async {
+    emit(state.copyWith(status: LoadStatus.loading));
+
+    try {
+      final videos = await _videoRepository.getVideos();
+      emit(state.copyWith(
+        status: LoadStatus.success,
+        videos: videos,
+      ));
+    } catch (e) {
+      log.e('Failed to load videos', error: e);
+      emit(state.copyWith(
+        status: LoadStatus.error,
+        errorMessage: e.toString(),
+      ));
+    }
+  }
+}
+```
+
+## ⚡ Async/Await
+
+```dart
+// ✅ GOOD - Proper error handling, generic naming
+Future<void> importVideo(String url) async {
+  try {
+    final data = await _aiBackendService
+        .parseVideoUrl(url)
+        .timeout(const Duration(seconds: 30));
+
+    await _repository.addVideo(data);
+  } on TimeoutException {
+    _showError('Request timed out');
+  } catch (e, stackTrace) {
+    log.e('Import failed', error: e, stackTrace: stackTrace);
+    _showError('Failed to import video');
+  }
+}
+```
+
+## 🛡️ Error Handling
+
+```dart
+// ✅ GOOD - Specific exceptions, generic naming
+try {
+  await _repository.deleteVideo(id);
+} on FirebaseException catch (e) {
+  if (e.code == 'permission-denied') {
+    _showError('Permission denied');
+  }
+} catch (e, stackTrace) {
+  log.e('Error', error: e, stackTrace: stackTrace);
+}
+```
+
+## 📦 Data Models (Freezed)
+
+```dart
+// ✅ GOOD - Immutable with freezed, generic naming
+@freezed
+class VideoItem with _$VideoItem {
+  const factory VideoItem({
+    required String id,
+    required String title,
+    required DateTime createdAt,
+    required DateTime updatedAt,
+    @Default([]) List<String> topicIds,
+    @Default(VideoStatus.planned) VideoStatus status,
+    DateTime? scheduledDate,
+    String? transcript,
+  }) = _VideoItem;
+
+  factory VideoItem.fromJson(Map<String, dynamic> json) =>
+      _$VideoItemFromJson(json);
+}
+```
+
+## 📚 Documentation
+
+```dart
+/// A repository for managing video data.
+///
+/// Handles CRUD operations for videos in Firestore.
+class VideoRepository {
+  /// Creates a new video.
+  ///
+  /// Throws [FirebaseException] if operation fails.
+  Future<void> addVideo(VideoItem video) async {
+    // Implementation
+  }
+}
+```
+
+## 🚫 Common Mistakes
+
+### 1. Direct Firebase in UI
+```dart
+// ❌ BAD
+StreamBuilder(
+  stream: FirebaseFirestore.instance.collection('videos').snapshots(),
+)
+
+// ✅ GOOD
+BlocBuilder<VideosCubit, VideosState>(
+  builder: (context, state) { },
+)
+```
+
+### 2. Missing Const
+```dart
+// ❌ BAD
+SizedBox(height: 16)
+
+// ✅ GOOD
+const SizedBox(height: 16)
+```
+
+### 3. No Error Handling
+```dart
+// ❌ BAD
+await _repository.delete(id);
+
+// ✅ GOOD
+try {
+  await _repository.delete(id);
+} catch (e) {
+  log.e('Delete failed', error: e);
+}
+```
+
+## 📏 Code Quality Standards
+
+### File Size Limit
+- **Maximum 500 lines per file**
+- If file exceeds limit, split into smaller modules
+- Extract reusable logic into separate files
+- Use composition over large classes
+
+### Modular Structure
+- Each file should have single responsibility
+- Group related functionality in directories
+- Prefer many small files over few large files
+- Keep widget files focused (one widget per file when possible)
+
+### KISS Principle
+- Prefer simple solutions over complex ones
+- Avoid over-engineering
+- Use standard Flutter patterns
+- Don't create abstractions until needed
+- If code is hard to understand, simplify it
+
+### Example: Splitting Large Files
+```dart
+// ❌ BAD - 800 lines in one file
+video_detail_page.dart (800 lines)
+
+// ✅ GOOD - Split into modules
+video_detail_page.dart (200 lines)
+video_detail_header_widget.dart (150 lines)
+video_detail_transcript_widget.dart (200 lines)
+video_detail_status_widget.dart (150 lines)
+video_detail_actions_widget.dart (100 lines)
+```
+
+## ✅ Before Committing
+
+- [ ] `flutter analyze` passes
+- [ ] `flutter format lib/` applied
+- [ ] File is under 500 lines (if not, split it)
+- [ ] Absolute imports used (`package:creva/...`)
+- [ ] Const where possible
+- [ ] Error handling added
+- [ ] No print() statements
+- [ ] Generic naming (no app name in code)
+
+## 🔗 Related
+
+- [Effective Dart](https://dart.dev/effective-dart)
+- [folder-structure.mdc](./folder-structure.mdc)
+- [api-integration.mdc](./api-integration.mdc)
+
+---
+
+Last Updated: November 2024

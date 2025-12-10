@@ -7,14 +7,14 @@ BLUE='\033[0;34m'
 RED='\033[0;31m'
 NC='\033[0m'
 
-PROJECT_ID="zest-45e51"
-DOMAIN="api.zestai.app"
-LB_NAME="zest-parser-global-lb"
-BACKEND_SERVICE_NAME="zest-parser-backend"
-URL_MAP_NAME="zest-parser-url-map"
-TARGET_PROXY_NAME="zest-parser-target-proxy"
-FORWARDING_RULE_NAME="zest-parser-forwarding-rule"
-SSL_CERT_NAME="zestai-ssl-cert"
+PROJECT_ID="creva-e6435"
+DOMAIN="api.creva.app"
+LB_NAME="creva-parser-global-lb"
+BACKEND_SERVICE_NAME="creva-parser-backend"
+URL_MAP_NAME="creva-parser-url-map"
+TARGET_PROXY_NAME="creva-parser-target-proxy"
+FORWARDING_RULE_NAME="creva-parser-forwarding-rule"
+SSL_CERT_NAME="creva-ssl-cert"
 
 echo -e "${BLUE}🌍 Setting up Global Load Balancer with Custom Domain${NC}"
 echo -e "${BLUE}Domain: ${DOMAIN}${NC}"
@@ -43,16 +43,16 @@ for region in "${REGIONS[@]}"; do
     echo -e "${BLUE}Adding backend for $region...${NC}"
     
     # Create serverless NEG for Cloud Run service
-    gcloud compute network-endpoint-groups create zest-parser-neg-$region \
+    gcloud compute network-endpoint-groups create creva-parser-neg-$region \
         --region=$region \
         --network-endpoint-type=serverless \
-        --cloud-run-service=zest-parser \
+        --cloud-run-service=creva-parser \
         --project=$PROJECT_ID || echo "NEG already exists for $region"
     
     # Add backend to backend service
     gcloud compute backend-services add-backend $BACKEND_SERVICE_NAME \
         --global \
-        --network-endpoint-group=zest-parser-neg-$region \
+        --network-endpoint-group=creva-parser-neg-$region \
         --network-endpoint-group-region=$region \
         --project=$PROJECT_ID
 done

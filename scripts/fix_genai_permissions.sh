@@ -16,8 +16,8 @@ fi
 echo "Fixing GenAI permissions for project: $PROJECT_ID"
 
 # Service account names
-MAIN_SA="dishly-parser@${PROJECT_ID}.iam.gserviceaccount.com"
-WORKER_SA="dishly-parser@${PROJECT_ID}.iam.gserviceaccount.com"
+MAIN_SA="creva-parser@${PROJECT_ID}.iam.gserviceaccount.com"
+WORKER_SA="creva-parser@${PROJECT_ID}.iam.gserviceaccount.com"
 
 # Function to grant IAM roles
 grant_genai_permissions() {
