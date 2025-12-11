@@ -31,15 +31,17 @@ async def generate_script(
     request_id = getattr(req.state, "request_id", "unknown")
 
     logger.info(
-        f"Script generation request - Request ID: {request_id}, Topic: {request.topic}, Template: {request.template[:50]}..."
+        f"Script generation request - Request ID: {request_id}, Topic: {request.topic}, Creator: {request.creator_role}, Template: {request.template[:50]}..."
     )
 
     try:
-        # Generate script using GenAI service
+        # Generate script using GenAI service with simplified context
         result = await genai_service.generate_script(
             template=request.template,
             topic=request.topic,
-            niche=request.niche or "general",
+            creator_role=request.creator_role,
+            main_message=request.main_message,
+            niche=request.niche,
             style=request.style or "conversational",
             length=request.length or "short",
         )

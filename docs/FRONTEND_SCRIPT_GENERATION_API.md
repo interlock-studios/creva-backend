@@ -141,10 +141,9 @@ if (content.analysis?.replicable_pattern) {
   // 2. Use the replicable pattern as a template
   const script = await generateScript({
     template: content.analysis.replicable_pattern,
-    topic: "your topic here",
-    niche: content.niche || "general",
-    style: "conversational",
-    length: "short",
+    topic: "classroom management",
+    creator_role: "school teacher",
+    main_message: "Focus on building relationships, not controlling behavior",
   });
   
   // 3. Use the generated script
@@ -202,11 +201,16 @@ POST /generate-script
 
 ```typescript
 interface GenerateScriptRequest {
-  template: string;              // Required: Madlib template with [placeholders]
-  topic: string;                 // Required: User's topic/subject
-  niche?: string;                // Optional: Content niche (default: "general")
-  style?: string;                // Optional: Script style (default: "conversational")
-  length?: string;               // Optional: Target length (default: "short")
+  // Required fields
+  template: string;       // Vault template with [placeholders]
+  topic: string;          // User's specific topic/subject
+  creator_role: string;   // Who is creating this content (e.g., "food chef", "school teacher")
+  main_message: string;   // Single text describing the creator's goal/message for this script
+  
+  // Optional fields
+  niche?: string;         // Content niche (AI infers from creator_role + topic if not provided)
+  style?: string;         // Script style: "conversational" | "professional" | "humorous"
+  length?: string;        // Target length: "short" | "medium" | "long"
 }
 ```
 
@@ -215,17 +219,29 @@ interface GenerateScriptRequest {
 #### `template` (Required)
 - Must be a non-empty string
 - Should contain `[placeholders]` in square brackets
-- Example: `"I can't believe I'm sharing this [SECRET] about [TOPIC]"`
+- Example: `"Stop doing [MISTAKE] if you want [GOAL]. Here's what works: [SOLUTION]"`
 
 #### `topic` (Required)
 - Must be a non-empty string
 - User's specific topic/subject for the script
-- Example: `"growing a TikTok following"`
+- Example: `"classroom management"`, `"meal prep"`, `"workout routines"`
+
+#### `creator_role` (Required)
+- Must be a non-empty string
+- Describes who is creating this content
+- Examples: `"school teacher"`, `"food chef"`, `"fitness coach"`, `"college student"`, `"entrepreneur"`
+- **This is critical** - it determines voice, terminology, and expertise level
+
+#### `main_message` (Required)
+- Must be a non-empty string
+- Single text describing what the creator wants to communicate
+- The AI uses this to fill user-intent placeholders like `[MISTAKE]`, `[GOAL]`, `[SECRET]`
+- Example: `"Stop trying to control every student behavior. Focus on building relationships and clear expectations."`
 
 #### `niche` (Optional)
-- Default: `"general"`
-- Content category/niche
-- Common values: `"fitness"`, `"business"`, `"food"`, `"tech"`, `"beauty"`, etc.
+- Default: AI infers from `creator_role` + `topic`
+- If you want to override the inferred niche, provide explicitly
+- Common values: `"fitness"`, `"business"`, `"food"`, `"education"`, `"tech"`, `"beauty"`, etc.
 
 #### `style` (Optional)
 - Default: `"conversational"`
@@ -250,6 +266,7 @@ interface GeneratedScript {
   full_script: string;           // Complete script as one readable string
   variations: ScriptParts[];     // Alternative script variations (1-2 variations)
   estimated_duration: string;    // Estimated video duration (e.g., "30 seconds")
+  inferred_niche?: string;       // The niche AI inferred from creator_role + topic
 }
 
 interface ScriptParts {
@@ -263,11 +280,10 @@ interface ScriptParts {
 
 ```json
 {
-  "template": "I can't believe I'm sharing this [SECRET] about [TOPIC]",
-  "topic": "growing a TikTok following",
-  "niche": "business",
-  "style": "conversational",
-  "length": "short"
+  "template": "Stop doing [MISTAKE] if you want [GOAL]. Here's what actually works: [SOLUTION].",
+  "topic": "classroom management",
+  "creator_role": "school teacher",
+  "main_message": "Stop trying to control every student behavior. Focus on building relationships and setting clear expectations from day one."
 }
 ```
 
@@ -277,21 +293,32 @@ interface ScriptParts {
 {
   "success": true,
   "script": {
-    "hook": "I can't believe I'm sharing this secret about growing a TikTok following.",
-    "body": "Most creators think you need thousands of followers to go viral. But here's the thing - I went from 0 to 100k in 3 months using one simple strategy. Post at the same time every day. The algorithm loves consistency. Engage with every comment in the first hour. And use trending sounds - but add your own twist. The key? Be authentic. People can tell when you're being fake.",
-    "call_to_action": "Try this strategy and let me know how it works for you!"
+    "hook": "Stop trying to control every student behavior if you want effective classroom management.",
+    "body": "I spent my first year as a teacher constantly policing every little thing. It was exhausting and it didn't work. Here's what actually works: building genuine relationships with your students. When kids feel respected and connected, they want to behave. Set clear expectations on day one, be consistent, and focus on the positive. I went from dreading every class to actually enjoying my job.",
+    "call_to_action": "What classroom management tip works for you? Drop it in the comments!"
   },
-  "full_script": "I can't believe I'm sharing this secret about growing a TikTok following. Most creators think you need thousands of followers to go viral. But here's the thing - I went from 0 to 100k in 3 months using one simple strategy. Post at the same time every day. The algorithm loves consistency. Engage with every comment in the first hour. And use trending sounds - but add your own twist. The key? Be authentic. People can tell when you're being fake. Try this strategy and let me know how it works for you!",
+  "full_script": "Stop trying to control every student behavior if you want effective classroom management. I spent my first year as a teacher constantly policing every little thing. It was exhausting and it didn't work. Here's what actually works: building genuine relationships with your students. When kids feel respected and connected, they want to behave. Set clear expectations on day one, be consistent, and focus on the positive. I went from dreading every class to actually enjoying my job. What classroom management tip works for you? Drop it in the comments!",
   "variations": [
     {
-      "hook": "Stop doing this if you want to grow your TikTok.",
-      "body": "I see so many creators making the same mistake. They post randomly, ignore comments, and copy trends exactly. Here's what actually works: consistency beats everything. Pick a time slot and stick to it. Your audience will learn when to expect you. Next, engage authentically. Don't just reply with emojis - have real conversations. And finally, put your spin on trends. Don't copy - remix. That's how you stand out.",
-      "call_to_action": "What's your biggest TikTok growth challenge? Drop it below!"
+      "hook": "The biggest mistake new teachers make? Trying to control everything.",
+      "body": "I know because I made it too. My first year, I was the behavior police. Every whisper, every movement - I was on it. And guess what? It made everything worse. What changed everything was focusing on relationships first. Get to know your students. Respect them. Set clear expectations together. When students feel seen and valued, classroom management becomes natural. Trust me, it's a game-changer.",
+      "call_to_action": "Tag a new teacher who needs to hear this!"
     }
   ],
-  "estimated_duration": "30 seconds"
+  "estimated_duration": "30 seconds",
+  "inferred_niche": "education"
 }
 ```
+
+### How the AI Processes Your Request
+
+1. **Infers Niche**: From `creator_role` ("school teacher") + `topic` ("classroom management") → "education"
+2. **Maps Main Message to Placeholders**:
+   - `[MISTAKE]` → "trying to control every student behavior"
+   - `[GOAL]` → "effective classroom management"
+   - `[SOLUTION]` → "building relationships and setting clear expectations"
+3. **Adapts Voice**: Uses teacher terminology, classroom examples, education context
+4. **Maintains Niche Consistency**: All content stays relevant to education (no marketing, business, etc.)
 
 ---
 
@@ -318,12 +345,12 @@ interface ErrorResponse {
 
 ```json
 {
-  "detail": "template must be a non-empty string"
+  "detail": "creator_role must be a non-empty string"
 }
 ```
 
 **Possible causes:**
-- Empty `template` or `topic` fields
+- Empty `template`, `topic`, `creator_role`, or `main_message` fields
 - Invalid `style` value (not one of: conversational, professional, humorous)
 - Invalid `length` value (not one of: short, medium, long)
 
@@ -401,6 +428,8 @@ X-RateLimit-Reset: 1640995200
 interface GenerateScriptRequest {
   template: string;
   topic: string;
+  creator_role: string;
+  main_message: string;
   niche?: string;
   style?: "conversational" | "professional" | "humorous";
   length?: "short" | "medium" | "long";
@@ -420,6 +449,7 @@ interface GeneratedScript {
     call_to_action: string;
   }>;
   estimated_duration: string;
+  inferred_niche?: string;
 }
 
 // API Client
@@ -457,20 +487,25 @@ function ScriptGenerator() {
   const [loading, setLoading] = useState(false);
   const [script, setScript] = useState<GeneratedScript | null>(null);
   const [error, setError] = useState<string | null>(null);
+  
+  // Form state
+  const [template, setTemplate] = useState("");
+  const [topic, setTopic] = useState("");
+  const [creatorRole, setCreatorRole] = useState("");
+  const [mainMessage, setMainMessage] = useState("");
 
   const handleGenerate = async () => {
     setLoading(true);
     setError(null);
 
     try {
-      const appCheckToken = await getAppCheckToken(); // Your Firebase App Check token getter
+      const appCheckToken = await getAppCheckToken();
       
       const result = await generateScript({
-        template: "I can't believe I'm sharing this [SECRET] about [TOPIC]",
-        topic: "growing a TikTok following",
-        niche: "business",
-        style: "conversational",
-        length: "short",
+        template,
+        topic,
+        creator_role: creatorRole,
+        main_message: mainMessage,
       }, appCheckToken);
 
       setScript(result);
@@ -483,6 +518,27 @@ function ScriptGenerator() {
 
   return (
     <div>
+      <input 
+        placeholder="Template (from vault)"
+        value={template}
+        onChange={(e) => setTemplate(e.target.value)}
+      />
+      <input 
+        placeholder="Topic (e.g., classroom management)"
+        value={topic}
+        onChange={(e) => setTopic(e.target.value)}
+      />
+      <input 
+        placeholder="Who are you? (e.g., school teacher)"
+        value={creatorRole}
+        onChange={(e) => setCreatorRole(e.target.value)}
+      />
+      <textarea 
+        placeholder="What's your main message?"
+        value={mainMessage}
+        onChange={(e) => setMainMessage(e.target.value)}
+      />
+      
       <button onClick={handleGenerate} disabled={loading}>
         {loading ? "Generating..." : "Generate Script"}
       </button>
@@ -532,16 +588,16 @@ async function generateScript(request) {
 
 // Usage
 generateScript({
-  template: "I can't believe I'm sharing this [SECRET] about [TOPIC]",
-  topic: "growing a TikTok following",
-  niche: "business",
-  style: "conversational",
-  length: "short",
+  template: "Stop doing [MISTAKE] if you want [GOAL]. Here's what works: [SOLUTION].",
+  topic: "meal prep",
+  creator_role: "food chef",
+  main_message: "Stop prepping everything on Monday morning. Prep on Sunday evening when you have more time and energy."
 })
   .then((script) => {
     console.log("Generated script:", script);
     console.log("Hook:", script.script.hook);
     console.log("Full script:", script.full_script);
+    console.log("Inferred niche:", script.inferred_niche);
   })
   .catch((error) => {
     console.error("Error:", error.message);
@@ -578,6 +634,54 @@ async function processVideo(url: string) {
 
 ---
 
+## UI Form Recommendations
+
+### Minimal Form Fields
+
+```
+┌─────────────────────────────────────────────────────┐
+│ Generate Script                                      │
+├─────────────────────────────────────────────────────┤
+│                                                     │
+│ Template (from vault):                              │
+│ ┌─────────────────────────────────────────────────┐ │
+│ │ Stop doing [MISTAKE] if you want [GOAL]...      │ │
+│ └─────────────────────────────────────────────────┘ │
+│                                                     │
+│ Topic: *                                            │
+│ ┌─────────────────────────────────────────────────┐ │
+│ │ classroom management                            │ │
+│ └─────────────────────────────────────────────────┘ │
+│                                                     │
+│ Who are you? *                                      │
+│ ┌─────────────────────────────────────────────────┐ │
+│ │ school teacher                                  │ │
+│ └─────────────────────────────────────────────────┘ │
+│                                                     │
+│ What's your main message? *                         │
+│ ┌─────────────────────────────────────────────────┐ │
+│ │ Stop trying to control every student behavior.  │ │
+│ │ Focus on building relationships and setting     │ │
+│ │ clear expectations from day one.                │ │
+│ └─────────────────────────────────────────────────┘ │
+│                                                     │
+│ [Optional: Advanced Settings]                       │
+│   Style: [Conversational ▼]                         │
+│   Length: [Short (30s) ▼]                           │
+│                                                     │
+│ [Generate Script]                                   │
+└─────────────────────────────────────────────────────┘
+```
+
+### Field Labels
+
+- **Template**: Auto-populated from vault item
+- **Topic**: "What are you talking about?"
+- **Creator Role**: "Who are you?" or "What's your role?"
+- **Main Message**: "What's your main point?" or "What do you want viewers to know?"
+
+---
+
 ## Field Name Handling
 
 The API handles both `snake_case` and `camelCase` field names from the GenAI service. The response will always be in `snake_case` format for consistency.
@@ -586,6 +690,7 @@ The API handles both `snake_case` and `camelCase` field names from the GenAI ser
 - `call_to_action` (not `callToAction`)
 - `full_script` (not `fullScript`)
 - `estimated_duration` (not `estimatedDuration`)
+- `inferred_niche` (not `inferredNiche`)
 
 ---
 
@@ -594,13 +699,14 @@ The API handles both `snake_case` and `camelCase` field names from the GenAI ser
 ### Test Cases
 
 1. **Valid Request**
-   - All required fields provided
-   - Valid optional field values
+   - All required fields provided (`template`, `topic`, `creator_role`, `main_message`)
    - Should return 200 with script
 
 2. **Missing Required Fields**
    - Missing `template` → 400 error
    - Missing `topic` → 400 error
+   - Missing `creator_role` → 400 error
+   - Missing `main_message` → 400 error
 
 3. **Invalid Field Values**
    - Invalid `style` → 400 error
@@ -609,8 +715,11 @@ The API handles both `snake_case` and `camelCase` field names from the GenAI ser
 4. **Rate Limiting**
    - Send 6 requests in 1 minute → 429 error on 6th request
 
-5. **Empty Template/Topic**
-   - Empty string → 400 error
+5. **Empty Fields**
+   - Empty string for required field → 400 error
+
+6. **Niche Inference**
+   - Send without `niche`, verify `inferred_niche` in response matches creator_role + topic
 
 ---
 
@@ -618,11 +727,11 @@ The API handles both `snake_case` and `camelCase` field names from the GenAI ser
 
 ### Key Points
 
-1. **Hook Analysis**: Automatically included in `/process` endpoint responses for new videos
-2. **Script Generation**: New `/generate-script` endpoint for generating scripts from templates
-3. **Rate Limits**: 5 requests/minute per user, 10 per IP (auth), 5 per IP (unauth)
-4. **Error Handling**: Proper validation and error responses
-5. **Field Names**: All responses use `snake_case` format
+1. **Four Required Fields**: `template`, `topic`, `creator_role`, `main_message`
+2. **Smart Niche Inference**: AI infers niche from creator_role + topic (no need to ask user)
+3. **Single Message Input**: One `main_message` field replaces complex placeholder mapping
+4. **Voice Adaptation**: `creator_role` determines terminology, examples, and expertise level
+5. **Hook Analysis**: Automatically included in `/process` endpoint responses for new videos
 
 ### Quick Reference
 
@@ -631,7 +740,15 @@ The API handles both `snake_case` and `camelCase` field names from the GenAI ser
 | `/process` | POST | Process video (includes hook analysis) |
 | `/generate-script` | POST | Generate script from template |
 
+### Required Fields Summary
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `template` | string | Vault template with [placeholders] |
+| `topic` | string | What the script is about |
+| `creator_role` | string | Who is creating (affects voice) |
+| `main_message` | string | Core message to communicate |
+
 ### Support
 
 For questions or issues, contact the backend team or refer to the main API documentation.
-

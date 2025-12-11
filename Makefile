@@ -366,6 +366,20 @@ clean: ## Clean up temporary files
 	@rm -rf .coverage .pytest_cache .mypy_cache
 	@echo "$(GREEN)Cleanup complete$(NC)"
 
+.PHONY: cleanup-regions
+cleanup-regions: ## Delete unused Cloud Run services from old regions
+	@echo "$(GREEN)🧹 Cleaning up unused Cloud Run services...$(NC)"
+	@echo "$(YELLOW)This will delete services from:$(NC)"
+	@echo "$(YELLOW)  - europe-north1$(NC)"
+	@echo "$(YELLOW)  - asia-southeast1$(NC)"
+	@echo "$(YELLOW)  - asia-northeast1$(NC)"
+	@echo "$(YELLOW)  - asia-south1$(NC)"
+	@echo "$(YELLOW)  - australia-southeast1$(NC)"
+	@echo "$(YELLOW)  - southamerica-east1$(NC)"
+	@echo "$(YELLOW)Keeping: us-central1, us-east1, us-west1, europe-west1, europe-west4$(NC)"
+	@chmod +x scripts/cleanup-unused-regions.sh
+	@PROJECT_ID=$(PROJECT_ID) SERVICE_NAME=$(SERVICE_NAME) ./scripts/cleanup-unused-regions.sh
+
 .PHONY: setup-gcp
 setup-gcp: ## Setup Google Cloud project and services for multi-region deployment
 	@echo "$(GREEN)Setting up Google Cloud project for multi-region deployment...$(NC)"

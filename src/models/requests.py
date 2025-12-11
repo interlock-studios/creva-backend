@@ -80,9 +80,14 @@ class CacheInvalidationRequest(BaseModel):
 class GenerateScriptRequest(BaseModel):
     """Request model for script generation"""
 
+    # Required fields
     template: str = Field(..., description="Madlib template with [placeholders]")
     topic: str = Field(..., description="User's topic/subject")
-    niche: Optional[str] = Field("general", description="Content niche")
+    creator_role: str = Field(..., description="Creator's role/identity (e.g., 'food chef', 'school teacher', 'fitness coach')")
+    main_message: str = Field(..., description="Single text describing the creator's main message/goal for this script")
+    
+    # Optional fields
+    niche: Optional[str] = Field(None, description="Content niche (optional, AI will infer from creator_role + topic)")
     style: Optional[str] = Field("conversational", description="Script style: conversational, professional, humorous")
     length: Optional[str] = Field("short", description="Target length: short (30s), medium (60s), long (90s+)")
 
@@ -100,6 +105,22 @@ class GenerateScriptRequest(BaseModel):
         """Validate topic is not empty"""
         if not v or not isinstance(v, str) or not v.strip():
             raise ValueError("topic must be a non-empty string")
+        return v.strip()
+
+    @field_validator("creator_role")
+    @classmethod
+    def validate_creator_role(cls, v):
+        """Validate creator_role is not empty"""
+        if not v or not isinstance(v, str) or not v.strip():
+            raise ValueError("creator_role must be a non-empty string")
+        return v.strip()
+
+    @field_validator("main_message")
+    @classmethod
+    def validate_main_message(cls, v):
+        """Validate main_message is not empty"""
+        if not v or not isinstance(v, str) or not v.strip():
+            raise ValueError("main_message must be a non-empty string")
         return v.strip()
 
     @field_validator("style")
