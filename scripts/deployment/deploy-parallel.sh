@@ -86,7 +86,7 @@ else
         --execution-environment gen2 \
         --set-env-vars "GOOGLE_CLOUD_PROJECT_ID=${FIREBASE_PROJECT_ID},ENVIRONMENT=${ENVIRONMENT},MAX_CONCURRENT_PROCESSING=60,RATE_LIMIT_REQUESTS=40,MAX_DIRECT_PROCESSING=15,GEMINI_REGIONS=${GEMINI_REGIONS_FORMATTED},CLOUD_RUN_REGION=${PRIMARY_REGION},APPCHECK_REQUIRED=false" \
         --service-account="${SERVICE_ACCOUNT}" \
-        --set-secrets "SCRAPECREATORS_API_KEY=scrapecreators-api-key:latest" \
+        --set-secrets "SCRAPECREATORS_API_KEY=scrapecreators-api-key:latest,OPENAI_API_KEY=OPENAI_API_KEY:latest" \
         --quiet
 
     # Deploy Worker service to primary
@@ -106,7 +106,7 @@ else
         --execution-environment gen2 \
         --set-env-vars "GOOGLE_CLOUD_PROJECT_ID=${FIREBASE_PROJECT_ID},ENVIRONMENT=${ENVIRONMENT},CLOUD_RUN_REGION=${PRIMARY_REGION}" \
         --service-account="${SERVICE_ACCOUNT}" \
-        --set-secrets "SCRAPECREATORS_API_KEY=scrapecreators-api-key:latest" \
+        --set-secrets "SCRAPECREATORS_API_KEY=scrapecreators-api-key:latest,OPENAI_API_KEY=OPENAI_API_KEY:latest" \
         --command "uvicorn" \
         --args "src.worker.worker_service:app,--host,0.0.0.0,--port,8080,--workers,1" \
         --quiet
@@ -135,7 +135,7 @@ else
             --execution-environment gen2 \
             --set-env-vars "GOOGLE_CLOUD_PROJECT_ID=${FIREBASE_PROJECT_ID},ENVIRONMENT=${ENVIRONMENT},MAX_CONCURRENT_PROCESSING=60,RATE_LIMIT_REQUESTS=40,MAX_DIRECT_PROCESSING=15,GEMINI_REGIONS=${GEMINI_REGIONS_FORMATTED},CLOUD_RUN_REGION=$region,APPCHECK_REQUIRED=false" \
             --service-account="${SERVICE_ACCOUNT}" \
-            --set-secrets "SCRAPECREATORS_API_KEY=scrapecreators-api-key:latest" \
+            --set-secrets "SCRAPECREATORS_API_KEY=scrapecreators-api-key:latest,OPENAI_API_KEY=OPENAI_API_KEY:latest" \
             --quiet >> "$log_file" 2>&1; then
             echo -e "${GREEN}[${region}] ✅ API service deployed successfully${NC}"
         else
@@ -159,7 +159,7 @@ else
             --execution-environment gen2 \
             --set-env-vars "GOOGLE_CLOUD_PROJECT_ID=${FIREBASE_PROJECT_ID},ENVIRONMENT=${ENVIRONMENT},CLOUD_RUN_REGION=$region" \
             --service-account="${SERVICE_ACCOUNT}" \
-            --set-secrets "SCRAPECREATORS_API_KEY=scrapecreators-api-key:latest" \
+            --set-secrets "SCRAPECREATORS_API_KEY=scrapecreators-api-key:latest,OPENAI_API_KEY=OPENAI_API_KEY:latest" \
             --command "uvicorn" \
             --args "src.worker.worker_service:app,--host,0.0.0.0,--port,8080,--workers,1" \
             --quiet >> "$log_file" 2>&1; then

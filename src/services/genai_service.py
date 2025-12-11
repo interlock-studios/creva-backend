@@ -516,6 +516,179 @@ IMPORTANT: Your response must be ONLY the JSON object, with no markdown formatti
             logger.error(f"Failed to parse slideshow response: {e}")
             return None
 
+    async def analyze_hook(
+        self,
+        hook_text: str,
+        transcript: Optional[str] = None,
+        format: Optional[str] = None,
+        niche: Optional[str] = None,
+    ) -> Optional[Dict[str, Any]]:
+        """Analyze a hook and explain why it works"""
+
+        if not hook_text or not hook_text.strip():
+            return None
+
+        # Apply rate limiting
+        await self._rate_limit()
+
+        # Build prompt for hook analysis
+        prompt = f"""You are an expert content strategist analyzing viral video hooks.
+
+Analyze this hook and explain WHY it works:
+
+HOOK: "{hook_text}"
+
+FORMAT: {format or "unknown"}
+
+NICHE: {niche or "general"}
+
+TRANSCRIPT (for context): {transcript[:1000] if transcript else "Not available"}
+
+Respond with JSON only:
+
+{{
+  "hook_formula": "one of: curiosity_gap, controversy, transformation, list, story, question, challenge, secret, comparison, myth_busting",
+  "hook_formula_name": "Human readable name",
+  "explanation": "2-3 sentences explaining the psychological triggers",
+  "why_it_works": ["bullet 1", "bullet 2", "bullet 3", "bullet 4"],
+  "replicable_pattern": "Template with [placeholders] that can be reused"
+}}
+
+Be specific and actionable. Focus on what psychological trigger makes viewers watch."""
+
+        # Generate content using Gemini with retry logic
+        def make_request():
+            return self.client.models.generate_content(
+                model=self.model,
+                contents=[prompt],
+                config=GenerateContentConfig(
+                    max_output_tokens=2048,
+                    temperature=0.3,
+                    top_p=0.8,
+                    response_mime_type="application/json",
+                ),
+            )
+
+        try:
+            response = await self._retry_with_backoff(make_request, max_retries=5, base_delay=2)
+
+            # Parse response
+            response_text = response.text.strip()
+            logger.debug(f"Raw hook analysis response: {response_text[:500]}...")
+
+            # Clean up response if needed
+            if "```json" in response_text:
+                json_start = response_text.find("```json") + 7
+                json_end = response_text.find("```", json_start)
+                response_text = response_text[json_start:json_end].strip()
+            elif "```" in response_text:
+                json_start = response_text.find("```") + 3
+                json_end = response_text.find("```", json_start)
+                response_text = response_text[json_start:json_end].strip()
+
+            parsed_json = json.loads(response_text)
+            return parsed_json
+
+        except Exception as e:
+            logger.error(f"Failed to analyze hook: {e}")
+            return None
+
+    async def generate_script(
+        self,
+        template: str,
+        topic: str,
+        niche: str = "general",
+        style: str = "conversational",
+        length: str = "short",
+    ) -> Optional[Dict[str, Any]]:
+        """Generate a script from a template and topic"""
+
+        # Apply rate limiting
+        await self._rate_limit()
+
+        # Length guide mapping
+        length_guide = {
+            "short": "30 seconds, ~75 words",
+            "medium": "60 seconds, ~150 words",
+            "long": "90+ seconds, ~225 words",
+        }
+
+        target_length = length_guide.get(length, length_guide["short"])
+
+        # Build prompt for script generation
+        prompt = f"""You are a viral content writer creating short-form video scripts.
+
+Create a script using this template and topic:
+
+TEMPLATE: "{template}"
+
+TOPIC: "{topic}"
+
+NICHE: {niche}
+
+STYLE: {style}
+
+TARGET LENGTH: {target_length}
+
+Respond with JSON only:
+
+{{
+  "script": {{
+    "hook": "Opening hook (first 3 seconds, grabs attention)",
+    "body": "Main content (match the target length)",
+    "call_to_action": "Ending CTA"
+  }},
+  "full_script": "Complete script as one readable string",
+  "variations": [
+    {{"hook": "...", "body": "...", "call_to_action": "..."}}
+  ],
+  "estimated_duration": "X seconds"
+}}
+
+Guidelines:
+1. Hook MUST grab attention in first 3 seconds
+2. Use the template pattern but make it sound natural
+3. Keep sentences short - this is for SPEAKING not reading
+4. Match the style (conversational = casual, first person)
+5. Provide 1-2 variations with different angles on same topic"""
+
+        # Generate content using Gemini with retry logic
+        def make_request():
+            return self.client.models.generate_content(
+                model=self.model,
+                contents=[prompt],
+                config=GenerateContentConfig(
+                    max_output_tokens=2048,
+                    temperature=0.7,
+                    top_p=0.9,
+                    response_mime_type="application/json",
+                ),
+            )
+
+        try:
+            response = await self._retry_with_backoff(make_request, max_retries=5, base_delay=2)
+
+            # Parse response
+            response_text = response.text.strip()
+            logger.debug(f"Raw script generation response: {response_text[:500]}...")
+
+            # Clean up response if needed
+            if "```json" in response_text:
+                json_start = response_text.find("```json") + 7
+                json_end = response_text.find("```", json_start)
+                response_text = response_text[json_start:json_end].strip()
+            elif "```" in response_text:
+                json_start = response_text.find("```") + 3
+                json_end = response_text.find("```", json_start)
+                response_text = response_text[json_start:json_end].strip()
+
+            parsed_json = json.loads(response_text)
+            return parsed_json
+
+        except Exception as e:
+            logger.error(f"Failed to generate script: {e}")
+            return None
+
     def _apply_emoji_mapping(self, recipe_data: Dict[str, Any]) -> Dict[str, Any]:
         """
         Apply predefined emoji mapping to ingredients that don't have emojis.

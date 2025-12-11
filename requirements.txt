@@ -5,6 +5,9 @@ uvicorn[standard]==0.35.0
 # Google Gen AI SDK (replaces deprecated vertexai package)
 google-genai
 
+# OpenAI for transcript templatization
+openai>=1.0.0
+
 # Video Processing
 ffmpeg-python==0.2.0
 

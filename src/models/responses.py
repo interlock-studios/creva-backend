@@ -50,6 +50,9 @@ class CreatorContent(BaseModel):
     
     # Cache indicator
     cached: Optional[bool] = Field(None, description="Whether result was served from cache")
+    
+    # Hook analysis
+    analysis: Optional["HookAnalysis"] = Field(None, description="Hook analysis explaining why it works")
 
 
 # Legacy alias for backward compatibility during transition
@@ -137,3 +140,46 @@ class AppCheckStatusResponse(BaseModel):
     skip_paths: List[str] = Field(..., description="Paths that skip App Check")
     service_stats: Dict[str, Any] = Field(..., description="Service statistics")
     service_healthy: bool = Field(..., description="Service health status")
+
+
+class HookAnalysis(BaseModel):
+    """Analysis of why a hook works"""
+
+    hook_formula: str = Field(..., description="Machine-readable formula type")
+    hook_formula_name: str = Field(..., description="Human-readable formula name")
+    explanation: str = Field(..., description="2-3 sentence explanation of psychological triggers")
+    why_it_works: List[str] = Field(..., description="Bullet points of psychological triggers")
+    replicable_pattern: str = Field(..., description="Template with [placeholders] for vault")
+
+
+class ScriptParts(BaseModel):
+    """Parts of a generated script"""
+
+    hook: str = Field(..., description="Opening hook (first 3 seconds)")
+    body: str = Field(..., description="Main content body")
+    call_to_action: str = Field(..., description="Ending call to action")
+
+
+class GeneratedScript(BaseModel):
+    """Generated script response"""
+
+    success: bool = Field(True, description="Whether generation was successful")
+    script: ScriptParts = Field(..., description="Primary generated script")
+    full_script: str = Field(..., description="Complete script as one readable string")
+    variations: List[ScriptParts] = Field(..., description="Alternative script variations")
+    estimated_duration: str = Field(..., description="Estimated video duration")
+
+
+class TemplatizeTranscriptResponse(BaseModel):
+    """Successful templatize transcript response"""
+
+    success: bool = Field(True, description="Whether templatization was successful")
+    template: str = Field(..., description="Templatized version with [placeholder] format")
+
+
+class TemplatizeErrorResponse(BaseModel):
+    """Error response for templatize transcript endpoint"""
+
+    success: bool = Field(False, description="Whether templatization was successful")
+    error: str = Field(..., description="Error code")
+    message: str = Field(..., description="Error message")

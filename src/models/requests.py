@@ -75,3 +75,67 @@ class CacheInvalidationRequest(BaseModel):
         if not v or not isinstance(v, str):
             raise ValueError("URL must be a non-empty string")
         return v.strip()
+
+
+class GenerateScriptRequest(BaseModel):
+    """Request model for script generation"""
+
+    template: str = Field(..., description="Madlib template with [placeholders]")
+    topic: str = Field(..., description="User's topic/subject")
+    niche: Optional[str] = Field("general", description="Content niche")
+    style: Optional[str] = Field("conversational", description="Script style: conversational, professional, humorous")
+    length: Optional[str] = Field("short", description="Target length: short (30s), medium (60s), long (90s+)")
+
+    @field_validator("template")
+    @classmethod
+    def validate_template(cls, v):
+        """Validate template is not empty"""
+        if not v or not isinstance(v, str) or not v.strip():
+            raise ValueError("template must be a non-empty string")
+        return v.strip()
+
+    @field_validator("topic")
+    @classmethod
+    def validate_topic(cls, v):
+        """Validate topic is not empty"""
+        if not v or not isinstance(v, str) or not v.strip():
+            raise ValueError("topic must be a non-empty string")
+        return v.strip()
+
+    @field_validator("style")
+    @classmethod
+    def validate_style(cls, v):
+        """Validate style is one of allowed values"""
+        if v and v not in ["conversational", "professional", "humorous"]:
+            raise ValueError("style must be one of: conversational, professional, humorous")
+        return v
+
+    @field_validator("length")
+    @classmethod
+    def validate_length(cls, v):
+        """Validate length is one of allowed values"""
+        if v and v not in ["short", "medium", "long"]:
+            raise ValueError("length must be one of: short, medium, long")
+        return v
+
+
+class TemplatizeTranscriptRequest(BaseModel):
+    """Request model for transcript templatization"""
+
+    transcript: str = Field(..., description="Full transcript text from the video")
+
+    @field_validator("transcript")
+    @classmethod
+    def validate_transcript(cls, v):
+        """Validate transcript is not empty and within length limit"""
+        if not v or not isinstance(v, str):
+            raise ValueError("transcript must be a non-empty string")
+
+        v = v.strip()
+        if not v:
+            raise ValueError("transcript cannot be empty")
+
+        if len(v) > 10000:
+            raise ValueError("transcript exceeds maximum length of 10,000 characters")
+
+        return v

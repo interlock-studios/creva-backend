@@ -60,6 +60,12 @@ class SecurityConfig:
                 "ip_limit_unauth": 100,
                 "window": 60
             },
+            "/generate-script": {
+                "user_limit": 5,        # 5 per minute per user
+                "ip_limit_auth": 10,    # 10 per minute per IP for authenticated
+                "ip_limit_unauth": 5,   # 5 per minute per IP for unauthenticated
+                "window": 60
+            },
             "default": {
                 "user_limit": 150,     # 150 requests per user for other endpoints
                 "ip_limit_auth": 500,   # 500 requests per IP (matches Cloud Armor DDoS protection)

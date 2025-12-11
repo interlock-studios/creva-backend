@@ -18,7 +18,7 @@ from google.cloud import monitoring_v3
 from src.api.process import cleanup_processing_resources
 
 # Import API routers
-from src.api import health_router, process_router, admin_router
+from src.api import health_router, process_router, admin_router, script_router, templatize_router
 from src.api.search import router as search_router, video_router
 from src.services.config_validator import validate_required_env_vars, AppConfig
 from src.auth import get_appcheck_service
@@ -79,6 +79,8 @@ app = FastAPI(
 app.include_router(health_router)
 app.include_router(process_router)
 app.include_router(admin_router)
+app.include_router(script_router)
+app.include_router(templatize_router)
 app.include_router(search_router)
 app.include_router(video_router)
 

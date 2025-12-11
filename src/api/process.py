@@ -199,6 +199,24 @@ async def process_video_direct(url: str, request_id: str, localization: str = No
             f"Final image field value (first 100 chars): {str(content_json.get('image', 'NULL'))[:100]} - Request ID: {request_id}"
         )
 
+        # Analyze hook for NEW videos (not cached)
+        if content_json.get("hook"):
+            try:
+                logger.info(f"Analyzing hook for video - Request ID: {request_id}")
+                analysis = await genai_service.analyze_hook(
+                    content_json["hook"],
+                    content_json.get("transcript", "")[:1000],
+                    content_json.get("format"),
+                    content_json.get("niche"),
+                )
+                content_json["analysis"] = analysis
+                logger.info(f"Hook analysis completed - Request ID: {request_id}")
+            except Exception as e:
+                logger.error(f"Failed to analyze hook - Request ID: {request_id}, Error: {str(e)}")
+                content_json["analysis"] = None
+        else:
+            content_json["analysis"] = None
+
         # Cache the result
         await cache_service.cache_bucket_list(url, content_json, localization=localization)
 
