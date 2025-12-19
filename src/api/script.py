@@ -9,7 +9,7 @@ import logging
 from src.utils.logging import StructuredLogger, set_request_context
 from src.models.requests import GenerateScriptRequest
 from src.models.responses import GeneratedScript, ScriptParts
-from src.services.genai_service import GenAIService
+from src.services.openai_service import OpenAIService
 from src.auth import optional_appcheck_token
 from src.exceptions import ProcessingError
 
@@ -17,7 +17,7 @@ logger = StructuredLogger(__name__)
 router = APIRouter(prefix="", tags=["script"])
 
 # Initialize service
-genai_service = GenAIService()
+openai_service = OpenAIService()
 
 
 @router.post("/generate-script", response_model=GeneratedScript)
@@ -35,8 +35,8 @@ async def generate_script(
     )
 
     try:
-        # Generate script using GenAI service with simplified context
-        result = await genai_service.generate_script(
+        # Generate script using OpenAI service
+        result = await openai_service.generate_script(
             template=request.template,
             topic=request.topic,
             creator_role=request.creator_role,

@@ -3,7 +3,7 @@
 substitutions:
   _SERVICE_NAME: creva-parser
   _PRIMARY_REGION: us-central1
-  _SECONDARY_REGIONS: us-east1,europe-west1,asia-southeast1
+  _SECONDARY_REGIONS: us-east1,us-west1,europe-west1,europe-west4
   _ENVIRONMENT: production
 
 options:

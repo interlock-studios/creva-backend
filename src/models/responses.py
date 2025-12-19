@@ -48,6 +48,10 @@ class CreatorContent(BaseModel):
     platform: Optional[str] = Field(None, description="Source platform: 'tiktok' or 'instagram'")
     tags: Optional[List[str]] = Field(None, description="Hashtags from the post")
     
+    # Original content from platform (for caption/hashtag display)
+    original_caption: Optional[str] = Field(None, description="Original caption text from TikTok/Instagram")
+    original_hashtags: Optional[List[str]] = Field(None, description="Original hashtags extracted from the post")
+    
     # Cache indicator
     cached: Optional[bool] = Field(None, description="Whether result was served from cache")
     

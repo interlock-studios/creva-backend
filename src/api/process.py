@@ -217,6 +217,10 @@ async def process_video_direct(url: str, request_id: str, localization: str = No
         else:
             content_json["analysis"] = None
 
+        # Add original caption and hashtags from the platform
+        content_json["original_caption"] = caption if caption else None
+        content_json["original_hashtags"] = metadata.get("tags") if metadata.get("tags") else None
+
         # Cache the result
         await cache_service.cache_bucket_list(url, content_json, localization=localization)
 

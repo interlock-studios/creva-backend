@@ -9,7 +9,7 @@ make deploy
 ```
 
 This command deploys API and Worker services to:
-- us-central1 (primary) and secondary regions: us-east1, us-west1, europe-west1, europe-west4, europe-north1, asia-southeast1, asia-northeast1, asia-south1, australia-southeast1, southamerica-east1
+- us-central1 (primary) and secondary regions: us-east1, us-west1, europe-west1, europe-west4
 
 ### Step-by-Step Deployment
 

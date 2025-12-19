@@ -197,6 +197,10 @@ class VideoWorker:
             if extracted_image_base64:
                 workout_json["image"] = extracted_image_base64
 
+            # Add original caption and hashtags from the platform
+            workout_json["original_caption"] = caption if caption else None
+            workout_json["original_hashtags"] = metadata_dict.get("tags") if metadata_dict.get("tags") else None
+
             # 5. Cache the result
             cache_metadata = {
                 "title": metadata_dict.get("title", "Unknown"),

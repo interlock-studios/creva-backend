@@ -15,7 +15,7 @@ PROJECT_ID="${PROJECT_ID:-creva-e6435}"  # Creva GCP project for Cloud Run
 FIREBASE_PROJECT_ID="${FIREBASE_PROJECT_ID:-creva-e6435}"  # Creva Firebase project
 SERVICE_ACCOUNT="${SERVICE_ACCOUNT:-creva-parser@creva-e6435.iam.gserviceaccount.com}"  # Service account
 PRIMARY_REGION="${PRIMARY_REGION:-us-central1}"
-SECONDARY_REGIONS="${SECONDARY_REGIONS:-us-east1,us-west1,europe-west1,europe-west4,europe-north1,asia-southeast1,asia-northeast1,asia-south1,australia-southeast1,southamerica-east1}"
+SECONDARY_REGIONS="${SECONDARY_REGIONS:-us-east1,us-west1,europe-west1,europe-west4}"
 ENVIRONMENT="${ENVIRONMENT:-production}"
 SINGLE_REGION="${SINGLE_REGION:-false}"
 
