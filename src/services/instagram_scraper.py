@@ -202,17 +202,24 @@ class InstagramScraper:
             raise NetworkError(f"Request failed after {max_retries + 1} attempts")
 
     async def scrape_instagram_complete(
-        self, url: str, options: Optional[ScrapingOptions] = None
+        self, url: str, options: Optional[ScrapingOptions] = None, api_data: Optional[Dict[str, Any]] = None
     ) -> Tuple[bytes, VideoMetadata, Optional[str]]:
-        """Complete Instagram scraping - video, metadata, and caption"""
+        """Complete Instagram scraping - video, metadata, and caption
+        
+        Args:
+            url: Instagram post or reel URL
+            options: Scraping options
+            api_data: Optional pre-fetched API data to avoid duplicate API calls
+        """
         if options is None:
             options = ScrapingOptions()
 
         logger.info(f"Starting complete Instagram scraping for URL: {url}")
 
         try:
-            # Get post/reel metadata
-            api_data = await self.fetch_instagram_data(url, options)
+            # Use pre-fetched data if available, otherwise fetch from API
+            if api_data is None:
+                api_data = await self.fetch_instagram_data(url, options)
             metadata = self.extract_metadata(api_data)
 
             # Download video
@@ -285,9 +292,10 @@ class InstagramScraper:
                             error_msg = data.get("message", "Unknown API error")
                             raise APIError(f"API returned error: {error_msg}", response.status_code)
 
-                        # Validate required fields
-                        if "xdt_shortcode_media" not in data:
-                            raise APIError("Missing 'xdt_shortcode_media' in response")
+                        # Validate required fields - check both key existence AND null value
+                        # The API sometimes returns {"xdt_shortcode_media": null} on transient failures
+                        if "xdt_shortcode_media" not in data or data["xdt_shortcode_media"] is None:
+                            raise APIError("Missing or null 'xdt_shortcode_media' in response - content may be temporarily unavailable")
 
                         logger.info(
                             f"Successfully fetched Instagram data. Response size: {len(response.content)} bytes"

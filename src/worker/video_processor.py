@@ -108,7 +108,8 @@ class VideoProcessor:
                     return b"", metadata
                 else:
                     # It's a regular video, proceed with normal video download
-                    video_content, metadata_obj, caption_text = await self.instagram_scraper.scrape_instagram_complete(url)
+                    # Pass api_data to avoid duplicate API call
+                    video_content, metadata_obj, caption_text = await self.instagram_scraper.scrape_instagram_complete(url, api_data=api_data)
                     transcript_text = caption_text
                     
             except Exception as e:

@@ -294,7 +294,11 @@ class TikTokScraper:
         logger.info(f"Fetching TikTok data for URL: {validated_url}")
 
         # Prepare request parameters
-        params = {"url": validated_url, "trim": str(options.trim_response).lower()}
+        params = {
+            "url": validated_url,
+            "trim": str(options.trim_response).lower(),
+            "get_transcript": str(options.get_transcript).lower(),
+        }
 
         try:
             async with httpx.AsyncClient(timeout=options.timeout) as client:
@@ -517,8 +521,12 @@ class TikTokScraper:
         hashtags = re.findall(r"#\w+", description)
 
         # Check if this is a slideshow (image post)
+        # NOTE: ScrapeCreators API returns image_post_info even for regular videos,
+        # but with an empty images array. We must check for actual images, not just
+        # the presence of image_post_info.
         image_post_info = aweme.get("image_post_info")
-        is_slideshow = image_post_info is not None
+        images_list = image_post_info.get("images", []) if image_post_info else []
+        is_slideshow = bool(images_list and len(images_list) > 0)
 
         slideshow_images = None
         slideshow_duration = None
@@ -647,10 +655,15 @@ class TikTokScraper:
         """Get no-watermark video URL (for regular videos only)"""
         aweme = api_data["aweme_detail"]
 
-        # Check if this is a slideshow
-        if aweme.get("image_post_info"):
+        # Check if this is a slideshow by looking for actual images
+        # NOTE: ScrapeCreators API returns image_post_info even for regular videos,
+        # but with an empty images array. We must check for actual images.
+        image_post_info = aweme.get("image_post_info")
+        images_list = image_post_info.get("images", []) if image_post_info else []
+        
+        if images_list and len(images_list) > 0:
             # For slideshows, return the slideshow video URL if available
-            slideshow_video = aweme.get("image_post_info", {}).get("video", {})
+            slideshow_video = image_post_info.get("video", {})
             if slideshow_video and slideshow_video.get("play_addr", {}).get("url_list"):
                 return slideshow_video["play_addr"]["url_list"][0]
             else:

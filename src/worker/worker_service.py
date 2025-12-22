@@ -57,7 +57,7 @@ class VideoWorker:
         
         # Exponential backoff for polling
         self._consecutive_empty_polls = 0
-        self._max_backoff = 30.0  # Max 30 seconds between polls
+        self._max_backoff = 5.0  # Reduced from 30 seconds for faster job pickup
         self._base_polling_interval = POLLING_INTERVAL
 
         # Queue cleanup tracking

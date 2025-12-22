@@ -80,8 +80,8 @@ class CacheConfig:
 class WorkerConfig:
     """Worker service configuration"""
 
-    polling_interval: float = 5.0
-    batch_size: int = 1
+    polling_interval: float = 1.0  # Reduced from 5.0 for faster job pickup
+    batch_size: int = 5  # Increased from 1 for better throughput
     shutdown_timeout: int = 30
 
 
