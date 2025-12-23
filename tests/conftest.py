@@ -175,16 +175,13 @@ def mock_instagram_scraper():
 def mock_cache_service():
     """Mock cache service for testing"""
     mock = AsyncMock(spec=CacheService)
-    mock.get_cached_bucket_list.return_value = None  # No cache hit by default
-    mock.cache_bucket_list.return_value = True
-    # Backward compatibility
-    mock.get_cached_workout.return_value = None
-    mock.cache_workout.return_value = True
+    mock.get_cached_video.return_value = None  # No cache hit by default
+    mock.cache_video.return_value = True
     mock.invalidate_cache.return_value = True
     mock.is_healthy.return_value = True
     mock.get_cache_stats.return_value = {
         "status": "active",
-        "bucket_list_cache": {"total_cached_bucket_lists": 0}
+        "video_cache": {"total_cached_videos": 0}
     }
     return mock
 

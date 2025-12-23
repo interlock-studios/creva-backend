@@ -83,12 +83,12 @@ class VideoWorker:
             logger.info(f"Processing job {job_id} - URL: {url[:50]}...")
 
             # Check cache first (in case it was processed by another worker)
-            cached_bucket_list = await self.cache_service.get_cached_bucket_list(url, localization)
-            if cached_bucket_list:
+            cached_video = await self.cache_service.get_cached_video(url, localization)
+            if cached_video:
                 logger.info(f"Job {job_id} - Found in cache, marking complete")
                 # Mark as cached when returning from cache
-                cached_bucket_list["cached"] = True
-                await self.queue_service.mark_job_complete(job_id, cached_bucket_list)
+                cached_video["cached"] = True
+                await self.queue_service.mark_job_complete(job_id, cached_video)
                 return
 
             # 1. Download content using video processor (handles both TikTok and Instagram)
@@ -210,7 +210,7 @@ class VideoWorker:
                 "worker_id": WORKER_ID,
                 "platform": metadata_dict.get("platform", "unknown"),
             }
-            await self.cache_service.cache_bucket_list(url, workout_json, cache_metadata, localization)
+            await self.cache_service.cache_video(url, workout_json, cache_metadata, localization)
 
             # 6. Mark job complete
             await self.queue_service.mark_job_complete(job_id, workout_json)

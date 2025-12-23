@@ -138,18 +138,18 @@ class CacheService:
         url_hash = hashlib.sha256(cache_input.encode()).hexdigest()[:16]
         return url_hash  # Just the hash, no prefix needed for Firestore
 
-    async def get_cached_bucket_list(
+    async def get_cached_video(
         self, tiktok_url: str, localization: Optional[str] = None
     ) -> Optional[Dict[str, Any]]:
         """
-        Retrieve cached bucket list data for a TikTok URL and localization.
+        Retrieve cached video data for a TikTok URL and localization.
 
         Args:
             tiktok_url: The TikTok video URL
             localization: Optional localization parameter (e.g., "Spanish", "es")
 
         Returns:
-            Cached bucket list JSON if found, None otherwise
+            Cached video JSON if found, None otherwise
         """
         if not self.db:
             return None
@@ -195,7 +195,7 @@ class CacheService:
                     f"Cache HIT{localization_info} for URL: {tiktok_url[:50]}... (cached at: {created_at})"
                 )
 
-                return cached_data.get("bucket_list_json")
+                return cached_data.get("video_data")
             else:
                 localization_info = f" [{localization}]" if localization else ""
                 logger.info(f"Cache MISS{localization_info} for URL: {tiktok_url[:50]}...")
@@ -211,19 +211,19 @@ class CacheService:
             logger.error(f"Error retrieving from cache: {e}")
             return None
 
-    async def cache_bucket_list(
+    async def cache_video(
         self,
         tiktok_url: str,
-        bucket_list_json: Dict[str, Any],
+        video_data: Dict[str, Any],
         metadata: Optional[Dict[str, Any]] = None,
         localization: Optional[str] = None,
     ) -> bool:
         """
-        Cache bucket list data for a TikTok URL and localization.
+        Cache video data for a TikTok URL and localization.
 
         Args:
             tiktok_url: The TikTok video URL
-            bucket_list_json: The processed bucket list JSON
+            video_data: The processed video JSON
             metadata: Optional metadata about the video
             localization: Optional localization parameter (e.g., "Spanish", "es")
 
@@ -240,7 +240,7 @@ class CacheService:
             expires_at = now + timedelta(hours=self.default_ttl_hours)
 
             cache_data = {
-                "bucket_list_json": bucket_list_json,
+                "video_data": video_data,
                 "metadata": metadata or {},
                 "created_at": now,
                 "expires_at": expires_at,
@@ -271,7 +271,7 @@ class CacheService:
 
     def invalidate_cache(self, tiktok_url: str, localization: Optional[str] = None) -> bool:
         """
-        Invalidate cached bucket list for a specific TikTok URL and localization.
+        Invalidate cached video for a specific TikTok URL and localization.
 
         Args:
             tiktok_url: The TikTok video URL
@@ -349,8 +349,8 @@ class CacheService:
                     "project_id": self.project_id,
                     "collection": self.collection_name,
                 },
-                "bucket_list_cache": {
-                    "total_cached_bucket_lists": total_docs,
+                "video_cache": {
+                    "total_cached_videos": total_docs,
                     "recent_sample_size": recent_count,
                     "expired_in_sample": expired_count,
                     "default_ttl_hours": self.default_ttl_hours,
@@ -361,9 +361,9 @@ class CacheService:
             logger.error(f"Error getting cache stats: {e}")
             return {"status": "error", "error": str(e)}
 
-    def clear_all_bucket_list_cache(self) -> int:
+    def clear_all_video_cache(self) -> int:
         """
-        Clear all cached bucket list data. Use with caution!
+        Clear all cached video data. Use with caution!
 
         Returns:
             Number of documents deleted
@@ -395,11 +395,11 @@ class CacheService:
             if batch_size > 0:
                 batch.commit()
 
-            logger.warning(f"CLEARED {deleted_count} bucket list cache entries")
+            logger.warning(f"CLEARED {deleted_count} video cache entries")
             return deleted_count
 
         except Exception as e:
-            logger.error(f"Error clearing bucket list cache: {e}")
+            logger.error(f"Error clearing video cache: {e}")
             return 0
 
     def is_healthy(self) -> bool:
@@ -414,21 +414,8 @@ class CacheService:
         except Exception:
             return False
     
-    # Backward compatibility methods
-    async def get_cached_workout(self, tiktok_url: str, localization: Optional[str] = None) -> Optional[Dict[str, Any]]:
-        """Backward compatibility method - use get_cached_bucket_list instead"""
-        return await self.get_cached_bucket_list(tiktok_url, localization)
-    
-    async def cache_workout(self, tiktok_url: str, workout_json: Dict[str, Any], metadata: Optional[Dict[str, Any]] = None, localization: Optional[str] = None) -> bool:
-        """Backward compatibility method - use cache_bucket_list instead"""
-        return await self.cache_bucket_list(tiktok_url, workout_json, metadata, localization)
-    
-    def clear_all_workout_cache(self) -> int:
-        """Backward compatibility method - use clear_all_bucket_list_cache instead"""
-        return self.clear_all_bucket_list_cache()
-    
     def get_cache_stats_sync(self) -> Dict[str, Any]:
-        """Synchronous version of get_cache_stats for backward compatibility"""
+        """Synchronous version of get_cache_stats"""
         try:
             loop = asyncio.get_event_loop()
             return loop.run_until_complete(self.get_cache_stats())

@@ -222,7 +222,7 @@ async def process_video_direct(url: str, request_id: str, localization: str = No
         content_json["original_hashtags"] = metadata.get("tags") if metadata.get("tags") else None
 
         # Cache the result
-        await cache_service.cache_bucket_list(url, content_json, localization=localization)
+        await cache_service.cache_video(url, content_json, localization=localization)
 
         logger.info(f"Direct processing completed - Request ID: {request_id}")
         return content_json
@@ -252,17 +252,17 @@ async def process_video(
         logger.debug(f"App Check not provided (optional) - Request ID: {request_id}")
 
     # Check cache first
-    cached_bucket_list = await cache_service.get_cached_bucket_list(
+    cached_video = await cache_service.get_cached_video(
         request.url, request.localization
     )
-    if cached_bucket_list:
-        if _has_structured_recipe_data(cached_bucket_list):
+    if cached_video:
+        if _has_structured_recipe_data(cached_video):
             logger.info(
                 f"Returning cached result - Request ID: {request_id}, URL: {request.url}"
             )
             # Mark as cached when returning from cache
-            cached_bucket_list["cached"] = True
-            return RelationshipContent(**cached_bucket_list)
+            cached_video["cached"] = True
+            return RelationshipContent(**cached_video)
 
         logger.info(
             "Cached result missing structured recipe data; invalidating and reprocessing",
