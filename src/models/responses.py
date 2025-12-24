@@ -187,3 +187,55 @@ class TemplatizeErrorResponse(BaseModel):
     success: bool = Field(False, description="Whether templatization was successful")
     error: str = Field(..., description="Error code")
     message: str = Field(..., description="Error message")
+
+
+# =============================================================================
+# Script Generation From Scratch Response Models
+# =============================================================================
+
+class ScriptBeats(BaseModel):
+    """4-beat script structure for from-scratch generation"""
+
+    hook: str = Field(..., description="Opening hook (3-5 seconds)")
+    context: str = Field(..., description="Problem setup (10-15 seconds)")
+    value: str = Field(..., description="Main content/insight (20-35 seconds)")
+    cta: str = Field(..., description="Call-to-action (5-10 seconds)")
+
+
+class ScriptOption(BaseModel):
+    """Single script option with metadata"""
+
+    option_id: str = Field(..., description="Unique identifier (opt_1, opt_2, opt_3)")
+    beats: ScriptBeats = Field(..., description="The 4 beats of the script")
+    full_text: str = Field(..., description="Complete script joined with newlines")
+    estimated_seconds: int = Field(..., description="Estimated speaking time in seconds")
+    word_count: int = Field(..., description="Total word count")
+    tags: Dict[str, str] = Field(..., description="Style metadata (hook_style, tone, format)")
+
+
+class GenerateScriptsFromScratchResponse(BaseModel):
+    """Response with 3 script options from scratch generation"""
+
+    success: bool = Field(True, description="Whether generation was successful")
+    options: List[ScriptOption] = Field(..., description="Exactly 3 script options")
+    meta: Optional[Dict[str, Any]] = Field(None, description="Generation metadata")
+
+
+class RefineBeatResponse(BaseModel):
+    """Response for beat refinement"""
+
+    success: bool = Field(True, description="Whether refinement was successful")
+    refined_text: str = Field(..., description="Refined beat text")
+    estimated_seconds: int = Field(..., description="Estimated speaking time in seconds")
+    word_count: int = Field(..., description="Word count of refined text")
+    action_applied: str = Field(..., description="Action that was applied")
+
+
+class ScriptFromScratchErrorResponse(BaseModel):
+    """Error response for script from scratch endpoints"""
+
+    success: bool = Field(False, description="Always false for errors")
+    error: Dict[str, Any] = Field(
+        ..., 
+        description="Error details with code, message, and optional field"
+    )

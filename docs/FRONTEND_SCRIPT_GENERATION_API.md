@@ -11,11 +11,13 @@ This document provides complete API documentation for the new script generation 
 ## Table of Contents
 
 1. [Hook Analysis](#hook-analysis)
-2. [Script Generation Endpoint](#script-generation-endpoint)
-3. [Request/Response Models](#requestresponse-models)
-4. [Error Handling](#error-handling)
-5. [Rate Limiting](#rate-limiting)
-6. [Integration Examples](#integration-examples)
+2. [Script Generation Endpoint](#script-generation-endpoint) (template-based)
+3. [Script Generation From Scratch](#script-generation-from-scratch) (NEW)
+4. [Refine Beat Endpoint](#refine-beat-endpoint) (NEW)
+5. [Request/Response Models](#requestresponse-models)
+6. [Error Handling](#error-handling)
+7. [Rate Limiting](#rate-limiting)
+8. [Integration Examples](#integration-examples)
 
 ---
 
@@ -319,6 +321,268 @@ interface ScriptParts {
    - `[SOLUTION]` → "building relationships and setting clear expectations"
 3. **Adapts Voice**: Uses teacher terminology, classroom examples, education context
 4. **Maintains Niche Consistency**: All content stays relevant to education (no marketing, business, etc.)
+
+---
+
+## Script Generation From Scratch
+
+> **NEW ENDPOINT** - Generate scripts without requiring a vault template
+
+### Endpoint
+
+```
+POST /generate-scripts-from-scratch
+```
+
+### Overview
+
+Generate 3 meaningfully different script options based on user inputs. No template required - the AI creates complete scripts from scratch with a 4-beat structure: Hook → Context → Value → CTA.
+
+### Request Body
+
+```typescript
+interface GenerateScriptsFromScratchRequest {
+  topic: string;              // Required, max 120 chars
+  audience?: string;          // Optional, max 80 chars
+  hook_style: HookStyle;      // Required enum
+  proof?: string;             // Optional, max 500 chars
+  cta_type: CTAType;          // Required enum
+  cta_keyword?: string;       // Required if cta_type is "comment_keyword"
+  tone: Tone;                 // Required enum
+  format: VideoFormat;        // Required enum
+  length_seconds: number;     // Required: 30, 45, or 60
+  reading_speed: ReadingSpeed; // Required enum
+}
+```
+
+### Enums
+
+#### `hook_style`
+| Value | Description |
+|-------|-------------|
+| `question` | Opens with an intriguing question |
+| `hot_take` | Bold, potentially controversial statement |
+| `storytime` | Personal anecdote opener |
+| `ranking` | "Top 3...", "The #1 reason..." |
+| `tutorial` | "Here's how to...", instructional |
+| `myth_bust` | "Everyone thinks X but actually..." |
+
+#### `cta_type`
+| Value | Description |
+|-------|-------------|
+| `follow_for_more` | "Follow for more tips like this" |
+| `save_this` | "Save this for later" |
+| `comment_keyword` | "Comment [keyword] below" (requires `cta_keyword`) |
+| `try_this_today` | "Try this on your next video" |
+| `download_app` | "Link in bio to download" |
+| `dm_me` | "DM me for more details" |
+
+#### `tone`
+| Value | Description |
+|-------|-------------|
+| `casual` | Friendly, conversational, relatable |
+| `confident` | Authoritative, assertive, bold |
+| `funny` | Humorous, lighthearted, playful |
+| `calm` | Relaxed, soothing, measured |
+| `direct` | No fluff, straight to the point |
+| `educational` | Informative, teacher-like |
+
+#### `format`
+| Value | Description |
+|-------|-------------|
+| `talking_to_camera` | Standard talking head format |
+| `voiceover` | Voice narration over B-roll |
+| `faceless_text` | Text on screen with background |
+
+#### `reading_speed`
+| Value | Words Per Minute |
+|-------|------------------|
+| `normal` | 150 wpm |
+| `fast` | 175 wpm |
+
+### Example Request
+
+```json
+{
+  "topic": "How to get more views with better hooks",
+  "audience": "new creators on TikTok",
+  "hook_style": "question",
+  "proof": "I posted daily for 90 days and doubled my views",
+  "cta_type": "save_this",
+  "cta_keyword": null,
+  "tone": "casual",
+  "format": "talking_to_camera",
+  "length_seconds": 60,
+  "reading_speed": "normal"
+}
+```
+
+### Response
+
+```typescript
+interface GenerateScriptsFromScratchResponse {
+  success: boolean;
+  options: ScriptOption[];  // Exactly 3 options
+  meta?: {
+    generation_time_ms: number;
+    model: string;
+  };
+}
+
+interface ScriptOption {
+  option_id: string;        // "opt_1", "opt_2", "opt_3"
+  beats: {
+    hook: string;           // Opening hook (3-5 seconds)
+    context: string;        // Problem setup (10-15 seconds)
+    value: string;          // Main content (20-35 seconds)
+    cta: string;            // Call-to-action (5-10 seconds)
+  };
+  full_text: string;        // Complete script joined with newlines
+  estimated_seconds: number;
+  word_count: number;
+  tags: {
+    hook_style: string;
+    tone: string;
+    format: string;
+  };
+}
+```
+
+### Example Response
+
+```json
+{
+  "success": true,
+  "options": [
+    {
+      "option_id": "opt_1",
+      "beats": {
+        "hook": "Wait. You're losing views every single day because of this one mistake.",
+        "context": "I see creators making this error constantly. They spend hours on their content but completely ignore the first 3 seconds.",
+        "value": "Here's the fix: Your hook needs to create a pattern interrupt. Something unexpected. A bold claim. A question that makes them curious. I tested this for 90 days and my views doubled.",
+        "cta": "Save this so you don't forget. And follow for more creator tips."
+      },
+      "full_text": "Wait. You're losing views every single day...",
+      "estimated_seconds": 42,
+      "word_count": 89,
+      "tags": {
+        "hook_style": "question",
+        "tone": "casual",
+        "format": "talking_to_camera"
+      }
+    }
+  ],
+  "meta": {
+    "generation_time_ms": 4521,
+    "model": "gpt-4o"
+  }
+}
+```
+
+### Key Differences from `/generate-script`
+
+| Feature | `/generate-script` | `/generate-scripts-from-scratch` |
+|---------|-------------------|----------------------------------|
+| Template | Required (vault) | Not needed |
+| Output | 1 script + variations | 3 distinct scripts |
+| Structure | hook, body, cta | hook, context, value, cta |
+| Use Case | Template-based generation | Fresh script creation |
+
+---
+
+## Refine Beat Endpoint
+
+> **NEW ENDPOINT** - Refine individual beats with specific actions
+
+### Endpoint
+
+```
+POST /refine-beat
+```
+
+### Overview
+
+Refine a single beat of a script with a specific action like "make it punchier" or "add more curiosity". Useful for iterating on individual sections without regenerating the entire script.
+
+### Request Body
+
+```typescript
+interface RefineBeatRequest {
+  beat_type: BeatType;        // Which beat to refine
+  current_text: string;       // Current text of the beat
+  action: RefineAction;       // Action to apply
+  context?: {                 // Optional context for consistency
+    topic?: string;
+    audience?: string;
+    tone?: string;
+  };
+}
+```
+
+### Beat Types and Available Actions
+
+| Beat Type | Available Actions |
+|-----------|-------------------|
+| `hook` | `punchier`, `more_curiosity`, `shorter`, `new_hook` |
+| `context` | `shorter`, `clearer`, `add_one_line` |
+| `value` | `add_example`, `make_simpler`, `cut_fluff`, `add_pattern_interrupt` |
+| `cta` | `swap_cta`, `add_keyword_prompt`, `less_salesy` |
+
+### Action Descriptions
+
+| Action | Description |
+|--------|-------------|
+| `punchier` | Make it more impactful, bold, attention-grabbing |
+| `more_curiosity` | Add mystery, open loop, make viewer want to keep watching |
+| `shorter` | Reduce word count while keeping the essence |
+| `new_hook` | Generate a completely different hook angle |
+| `clearer` | Simplify language, remove jargon |
+| `add_one_line` | Add one more sentence of context/setup |
+| `add_example` | Include a specific example or case study |
+| `make_simpler` | Break down complex ideas into simpler terms |
+| `cut_fluff` | Remove filler words and unnecessary phrases |
+| `add_pattern_interrupt` | Add something unexpected to re-engage viewer |
+| `swap_cta` | Generate a different style of call-to-action |
+| `add_keyword_prompt` | Add "Comment [keyword] below" style prompt |
+| `less_salesy` | Make CTA feel more natural and less pushy |
+
+### Example Request
+
+```json
+{
+  "beat_type": "hook",
+  "current_text": "Here are some tips to help you grow on TikTok",
+  "action": "punchier",
+  "context": {
+    "topic": "TikTok growth",
+    "tone": "confident"
+  }
+}
+```
+
+### Response
+
+```typescript
+interface RefineBeatResponse {
+  success: boolean;
+  refined_text: string;
+  estimated_seconds: number;
+  word_count: number;
+  action_applied: string;
+}
+```
+
+### Example Response
+
+```json
+{
+  "success": true,
+  "refined_text": "You're killing your TikTok growth and you don't even know it.",
+  "estimated_seconds": 4,
+  "word_count": 12,
+  "action_applied": "punchier"
+}
+```
 
 ---
 

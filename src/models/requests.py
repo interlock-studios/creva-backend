@@ -2,9 +2,86 @@
 Request models for API endpoints
 """
 
-from pydantic import BaseModel, Field, field_validator
-from typing import Optional
+from pydantic import BaseModel, Field, field_validator, model_validator
+from typing import Optional, Dict
+from enum import Enum
 import re
+
+
+# =============================================================================
+# Enums for Script Generation From Scratch
+# =============================================================================
+
+class HookStyle(str, Enum):
+    """Style of the opening hook"""
+    QUESTION = "question"
+    HOT_TAKE = "hot_take"
+    STORYTIME = "storytime"
+    RANKING = "ranking"
+    TUTORIAL = "tutorial"
+    MYTH_BUST = "myth_bust"
+
+
+class CTAType(str, Enum):
+    """Type of call-to-action"""
+    FOLLOW_FOR_MORE = "follow_for_more"
+    SAVE_THIS = "save_this"
+    COMMENT_KEYWORD = "comment_keyword"
+    TRY_THIS_TODAY = "try_this_today"
+    DOWNLOAD_APP = "download_app"
+    DM_ME = "dm_me"
+
+
+class Tone(str, Enum):
+    """Voice/tone of the script"""
+    CASUAL = "casual"
+    CONFIDENT = "confident"
+    FUNNY = "funny"
+    CALM = "calm"
+    DIRECT = "direct"
+    EDUCATIONAL = "educational"
+
+
+class VideoFormat(str, Enum):
+    """Video production format"""
+    TALKING_TO_CAMERA = "talking_to_camera"
+    VOICEOVER = "voiceover"
+    FACELESS_TEXT = "faceless_text"
+
+
+class ReadingSpeed(str, Enum):
+    """Reading pace for time estimation"""
+    NORMAL = "normal"  # 150 wpm
+    FAST = "fast"      # 175 wpm
+
+
+class BeatType(str, Enum):
+    """Type of beat in a script"""
+    HOOK = "hook"
+    CONTEXT = "context"
+    VALUE = "value"
+    CTA = "cta"
+
+
+class RefineAction(str, Enum):
+    """Actions available for beat refinement"""
+    # Hook actions
+    PUNCHIER = "punchier"
+    MORE_CURIOSITY = "more_curiosity"
+    SHORTER = "shorter"
+    NEW_HOOK = "new_hook"
+    # Context actions
+    CLEARER = "clearer"
+    ADD_ONE_LINE = "add_one_line"
+    # Value actions
+    ADD_EXAMPLE = "add_example"
+    MAKE_SIMPLER = "make_simpler"
+    CUT_FLUFF = "cut_fluff"
+    ADD_PATTERN_INTERRUPT = "add_pattern_interrupt"
+    # CTA actions
+    SWAP_CTA = "swap_cta"
+    ADD_KEYWORD_PROMPT = "add_keyword_prompt"
+    LESS_SALESY = "less_salesy"
 
 
 class ProcessRequest(BaseModel):
@@ -160,3 +237,64 @@ class TemplatizeTranscriptRequest(BaseModel):
             raise ValueError("transcript exceeds maximum length of 10,000 characters")
 
         return v
+
+
+# =============================================================================
+# Script Generation From Scratch Request Models
+# =============================================================================
+
+class GenerateScriptsFromScratchRequest(BaseModel):
+    """Request for generating scripts from scratch (no template required)"""
+
+    topic: str = Field(..., max_length=120, description="Main topic/subject of the script")
+    audience: Optional[str] = Field(None, max_length=80, description="Target audience")
+    hook_style: HookStyle = Field(..., description="Style of the opening hook")
+    proof: Optional[str] = Field(None, max_length=500, description="Personal proof or credentials")
+    cta_type: CTAType = Field(..., description="Type of call-to-action")
+    cta_keyword: Optional[str] = Field(None, max_length=20, description="Keyword for comment CTA")
+    tone: Tone = Field(..., description="Voice/tone of the script")
+    format: VideoFormat = Field(..., description="Video production format")
+    length_seconds: int = Field(..., description="Target length: 30, 45, or 60 seconds")
+    reading_speed: ReadingSpeed = Field(..., description="Reading pace for time estimation")
+
+    @field_validator("topic")
+    @classmethod
+    def validate_topic_not_empty(cls, v):
+        """Validate topic is not empty"""
+        if not v or not v.strip():
+            raise ValueError("topic must be non-empty")
+        return v.strip()
+
+    @field_validator("length_seconds")
+    @classmethod
+    def validate_length_seconds(cls, v):
+        """Validate length_seconds is one of allowed values"""
+        if v not in [30, 45, 60]:
+            raise ValueError("length_seconds must be 30, 45, or 60")
+        return v
+
+    @model_validator(mode='after')
+    def validate_cta_keyword_required(self):
+        """Validate cta_keyword is provided when cta_type is comment_keyword"""
+        if self.cta_type == CTAType.COMMENT_KEYWORD and not self.cta_keyword:
+            raise ValueError("cta_keyword is required when cta_type is comment_keyword")
+        return self
+
+
+class RefineBeatRequest(BaseModel):
+    """Request for refining a single beat of a script"""
+
+    beat_type: BeatType = Field(..., description="Which beat to refine")
+    current_text: str = Field(..., description="Current text of the beat to refine")
+    action: RefineAction = Field(..., description="Refinement action to apply")
+    context: Optional[Dict[str, str]] = Field(
+        None, description="Optional context for consistency (topic, audience, tone)"
+    )
+
+    @field_validator("current_text")
+    @classmethod
+    def validate_current_text(cls, v):
+        """Validate current_text is not empty"""
+        if not v or not v.strip():
+            raise ValueError("current_text must be non-empty")
+        return v.strip()
