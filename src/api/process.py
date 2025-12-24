@@ -85,12 +85,16 @@ async def process_video_direct(url: str, request_id: str, localization: str = No
             # For TikTok slideshows, get all images and analyze directly
             platform = video_processor.url_router.detect_platform(url)
             if platform == "tiktok":
-                slideshow_images, slideshow_metadata, slideshow_transcript = (
+                slideshow_images, slideshow_metadata, slideshow_transcript_data = (
                     await video_processor.tiktok_scraper.scrape_tiktok_slideshow(url)
                 )
 
-                if slideshow_transcript:
-                    transcript = slideshow_transcript
+                # Extract transcript text from data dict if available
+                if slideshow_transcript_data:
+                    if isinstance(slideshow_transcript_data, dict):
+                        transcript = slideshow_transcript_data.get("text")
+                    else:
+                        transcript = slideshow_transcript_data
 
                 # Extract first image from slideshow
                 if slideshow_images:
@@ -117,12 +121,13 @@ async def process_video_direct(url: str, request_id: str, localization: str = No
                 )
             else:
                 # Handle Instagram slideshows - same pattern as TikTok
-                slideshow_images, slideshow_metadata, slideshow_transcript = (
+                slideshow_images, slideshow_metadata, slideshow_transcript_data = (
                     await video_processor.instagram_scraper.scrape_instagram_slideshow(url)
                 )
 
-                if slideshow_transcript:
-                    transcript = slideshow_transcript
+                # Instagram slideshows don't have transcripts, but handle for consistency
+                if slideshow_transcript_data:
+                    transcript = slideshow_transcript_data
 
                 # Extract first image from slideshow
                 if slideshow_images:
@@ -220,6 +225,11 @@ async def process_video_direct(url: str, request_id: str, localization: str = No
         # Add original caption and hashtags from the platform
         content_json["original_caption"] = caption if caption else None
         content_json["original_hashtags"] = metadata.get("tags") if metadata.get("tags") else None
+
+        # Add transcript segments for videos (from TikTok WebVTT data)
+        # For slideshows, Gemini already returns transcript_segments
+        if not is_slideshow and metadata.get("transcript_segments"):
+            content_json["transcript_segments"] = metadata["transcript_segments"]
 
         # Cache the result
         await cache_service.cache_video(url, content_json, localization=localization)

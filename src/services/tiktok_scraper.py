@@ -257,12 +257,12 @@ class TikTokScraper:
                 )
 
             # Get transcript if requested
-            transcript = None
+            transcript_data = None
             if options.get_transcript:
-                transcript = self._extract_transcript_from_response(api_data)
+                transcript_data = self._extract_transcript_from_response(api_data)
 
-            logger.info(f"Transcript: {'Yes' if transcript else 'No'}")
-            return video_content, metadata, transcript
+            logger.info(f"Transcript: {'Yes' if transcript_data else 'No'}")
+            return video_content, metadata, transcript_data
 
         except Exception as e:
             logger.error(f"Failed to scrape TikTok content: {e}")
@@ -379,7 +379,7 @@ class TikTokScraper:
         """Simplified method for backward compatibility"""
         return await self.fetch_tiktok_data(url, ScrapingOptions())
 
-    def _extract_transcript_from_response(self, api_data: Dict[str, Any]) -> Optional[str]:
+    def _extract_transcript_from_response(self, api_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """
         Extract and clean transcript from the video info API response.
 
@@ -387,7 +387,7 @@ class TikTokScraper:
             api_data: The API response data
 
         Returns:
-            Cleaned transcript text or None if not available
+            Dict with 'text' (flat string) and 'segments' (list of segment dicts) or None
         """
         try:
             # First try to get transcript from the root level
@@ -411,12 +411,12 @@ class TikTokScraper:
                         break
 
             if transcript:
-                cleaned_transcript = self._clean_transcript(transcript)
-                if cleaned_transcript:
+                result = self._parse_transcript(transcript)
+                if result and result.get("text"):
                     logger.info(
-                        f"Successfully extracted transcript from response. Length: {len(cleaned_transcript)} characters"
+                        f"Successfully extracted transcript from response. Length: {len(result['text'])} characters, Segments: {len(result.get('segments', []))}"
                     )
-                    return cleaned_transcript
+                    return result
                 else:
                     logger.info("Transcript found but empty after cleaning")
                     return None
@@ -428,30 +428,103 @@ class TikTokScraper:
             logger.warning(f"Error extracting transcript from response: {e}")
             return None
 
-    def _clean_transcript(self, transcript: str) -> str:
-        """Clean up WEBVTT format transcript"""
+    def _parse_webvtt_timestamp(self, timestamp: str) -> float:
+        """Parse WebVTT timestamp to seconds"""
+        # Format: HH:MM:SS.mmm or MM:SS.mmm
+        parts = timestamp.split(":")
+        if len(parts) == 3:
+            hours, minutes, seconds = parts
+            return float(hours) * 3600 + float(minutes) * 60 + float(seconds)
+        elif len(parts) == 2:
+            minutes, seconds = parts
+            return float(minutes) * 60 + float(seconds)
+        return 0.0
+
+    def _parse_transcript(self, transcript: str) -> Dict[str, Any]:
+        """Parse transcript and extract both flat text and timed segments"""
         if not transcript:
-            return ""
+            return {"text": "", "segments": []}
+
+        segments = []
+        text_lines = []
 
         # Handle WEBVTT format
         if transcript.startswith("WEBVTT"):
             lines = transcript.split("\n")
-            text_lines = []
-            for line in lines:
-                line = line.strip()
-                # Skip empty lines, timestamps, and WEBVTT headers
-                if (
-                    not line
-                    or "-->" in line
-                    or line.startswith("WEBVTT")
-                    or line.isdigit()
-                    or re.match(r"^\d{2}:\d{2}:\d{2}", line)
-                ):
+            current_segment = None
+            
+            i = 0
+            while i < len(lines):
+                line = lines[i].strip()
+                
+                # Skip WEBVTT header and empty lines
+                if not line or line.startswith("WEBVTT") or line.isdigit():
+                    i += 1
                     continue
-                text_lines.append(line)
-            transcript = " ".join(text_lines)
+                
+                # Check for timestamp line (e.g., "00:00:01.000 --> 00:00:03.500")
+                if "-->" in line:
+                    # Parse timestamps
+                    timestamp_parts = line.split("-->")
+                    if len(timestamp_parts) == 2:
+                        start_str = timestamp_parts[0].strip().split()[0]  # Handle positioning info
+                        end_str = timestamp_parts[1].strip().split()[0]
+                        
+                        start_time = self._parse_webvtt_timestamp(start_str)
+                        end_time = self._parse_webvtt_timestamp(end_str)
+                        
+                        # Collect text until next timestamp or end
+                        segment_text_lines = []
+                        i += 1
+                        while i < len(lines):
+                            text_line = lines[i].strip()
+                            if not text_line or "-->" in text_line or text_line.isdigit():
+                                break
+                            segment_text_lines.append(text_line)
+                            i += 1
+                        
+                        if segment_text_lines:
+                            segment_text = " ".join(segment_text_lines)
+                            text_lines.append(segment_text)
+                            
+                            # Merge with previous segment if very short and continuous
+                            if (segments and 
+                                segments[-1]["end_time"] is not None and
+                                start_time - segments[-1]["end_time"] < 0.5 and
+                                end_time - start_time < 3.0 and
+                                not segments[-1]["text"].rstrip().endswith(('.', '!', '?'))):
+                                # Merge with previous segment
+                                segments[-1]["text"] += " " + segment_text
+                                segments[-1]["end_time"] = end_time
+                            else:
+                                segments.append({
+                                    "text": segment_text,
+                                    "start_time": start_time,
+                                    "end_time": end_time,
+                                    "slide_index": None
+                                })
+                        continue
+                
+                i += 1
+            
+            flat_text = " ".join(text_lines)
+        else:
+            # Not WebVTT format, return as single segment
+            flat_text = transcript.strip()
+            if flat_text:
+                segments.append({
+                    "text": flat_text,
+                    "start_time": None,
+                    "end_time": None,
+                    "slide_index": None
+                })
 
-        return transcript.strip()
+        return {"text": flat_text.strip(), "segments": segments}
+
+    def _clean_transcript(self, transcript: str) -> str:
+        """Clean up WEBVTT format transcript - returns flat text only (backward compat)"""
+        result = self._parse_transcript(transcript)
+        return result.get("text", "")
 
     async def get_video_info(
         self, url: str, options: Optional[ScrapingOptions] = None
@@ -486,14 +559,15 @@ class TikTokScraper:
             metadata = self.extract_metadata(api_data)
 
             # Get transcript if requested
-            transcript = None
+            transcript_data = None
             if options.get_transcript:
-                transcript = self._extract_transcript_from_response(api_data)
+                transcript_data = self._extract_transcript_from_response(api_data)
 
             # Return structured response
             result = {
                 "metadata": metadata.__dict__,
-                "transcript": transcript,
+                "transcript": transcript_data.get("text") if transcript_data else None,
+                "transcript_segments": transcript_data.get("segments") if transcript_data else None,
                 "raw_api_data": api_data if not options.trim_response else None,
             }
 
@@ -502,7 +576,7 @@ class TikTokScraper:
                 result["video_download_url"] = self.get_video_download_url(api_data)
 
             logger.info(
-                f"Successfully fetched video info. Transcript: {'Yes' if transcript else 'No'}"
+                f"Successfully fetched video info. Transcript: {'Yes' if transcript_data else 'No'}"
             )
             return result
 
@@ -767,14 +841,14 @@ class TikTokScraper:
             slideshow_images = await self.download_slideshow_images(api_data)
 
             # Get transcript if requested
-            transcript = None
+            transcript_data = None
             if options.get_transcript:
-                transcript = self._extract_transcript_from_response(api_data)
+                transcript_data = self._extract_transcript_from_response(api_data)
 
             logger.info(
-                f"Successfully scraped TikTok slideshow. {len(slideshow_images)} images downloaded, Transcript: {'Yes' if transcript else 'No'}"
+                f"Successfully scraped TikTok slideshow. {len(slideshow_images)} images downloaded, Transcript: {'Yes' if transcript_data else 'No'}"
             )
-            return slideshow_images, metadata, transcript
+            return slideshow_images, metadata, transcript_data
 
         except Exception as e:
             logger.error(f"Failed to scrape TikTok slideshow: {e}")

@@ -7,6 +7,15 @@ from typing import Optional, List, Dict, Any
 from datetime import datetime
 
 
+class TranscriptSegment(BaseModel):
+    """Individual transcript segment with timing or slide info"""
+    
+    text: str = Field(..., description="The text content of this segment")
+    start_time: Optional[float] = Field(None, description="Start time in seconds (for videos)")
+    end_time: Optional[float] = Field(None, description="End time in seconds (for videos)")
+    slide_index: Optional[int] = Field(None, description="Slide number (for slideshows, 1-indexed)")
+
+
 class CreatorContent(BaseModel):
     """Complete creator content extracted from social media videos"""
 
@@ -19,6 +28,10 @@ class CreatorContent(BaseModel):
     transcript: Optional[str] = Field(
         None, 
         description="Full transcript of everything said in the video"
+    )
+    transcript_segments: Optional[List[TranscriptSegment]] = Field(
+        None,
+        description="Transcript broken into segments with timing (videos) or slide numbers (slideshows)"
     )
     hook: Optional[str] = Field(
         None, 

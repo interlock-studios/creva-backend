@@ -361,7 +361,11 @@ Required JSON structure:
 {
   "title": "short, descriptive title for the slideshow content",
   "description": "brief 1-2 sentence summary of what the slideshow is about",
-  "transcript": "FULL transcript of any spoken audio AND all text visible on the slideshow images. This is PRIORITY #1. Include all text from each slide in order. If no audio, transcribe the on-screen text from each image.",
+  "transcript": "FULL transcript as single text - all text visible on slideshow images AND any spoken audio combined.",
+  "transcript_segments": [
+    {"text": "Content from Slide 1", "slide_index": 1},
+    {"text": "Content from Slide 2", "slide_index": 2}
+  ],
   "hook": "The attention-grabbing opening text or line from the first slide/audio. This captures viewer attention immediately.",
   "format": "slideshow (this is always 'slideshow' for image carousels)",
   "niche": "primary content category (see NICHE CLASSIFICATION below)",
@@ -379,6 +383,8 @@ TRANSCRIPT EXTRACTION (PRIORITY #1):
 - For text-heavy slides, capture all readable text
 - Combine visual text with any audio transcript
 - Be thorough - creators need complete transcripts to study content
+- IMPORTANT: Return BOTH "transcript" (single combined text) AND "transcript_segments" (array with per-slide content)
+- Each segment should have "text" (the content) and "slide_index" (1-indexed slide number)
 
 HOOK EXTRACTION (PRIORITY #2):
 - The hook is the opening text/line from the first slide
@@ -416,7 +422,16 @@ EXAMPLE OUTPUT:
 {
   "title": "5 Morning Habits for Success",
   "description": "Slideshow sharing five morning routine habits that successful entrepreneurs follow daily.",
-  "transcript": "Slide 1: 5 Morning Habits of Successful People. Slide 2: 1. Wake up at 5am - The most successful CEOs start their day early. Slide 3: 2. Exercise first thing - Gets your blood flowing and mind sharp. Slide 4: 3. No phone for the first hour - Protect your mental space. Slide 5: 4. Journal your goals - Write down what you want to achieve. Slide 6: 5. Eat a healthy breakfast - Fuel your body for peak performance. Slide 7: Follow for more tips! @productivityguru",
+  "transcript": "5 Morning Habits of Successful People. 1. Wake up at 5am - The most successful CEOs start their day early. 2. Exercise first thing - Gets your blood flowing and mind sharp. 3. No phone for the first hour - Protect your mental space. 4. Journal your goals - Write down what you want to achieve. 5. Eat a healthy breakfast - Fuel your body for peak performance. Follow for more tips! @productivityguru",
+  "transcript_segments": [
+    {"text": "5 Morning Habits of Successful People", "slide_index": 1},
+    {"text": "1. Wake up at 5am - The most successful CEOs start their day early.", "slide_index": 2},
+    {"text": "2. Exercise first thing - Gets your blood flowing and mind sharp.", "slide_index": 3},
+    {"text": "3. No phone for the first hour - Protect your mental space.", "slide_index": 4},
+    {"text": "4. Journal your goals - Write down what you want to achieve.", "slide_index": 5},
+    {"text": "5. Eat a healthy breakfast - Fuel your body for peak performance.", "slide_index": 6},
+    {"text": "Follow for more tips! @productivityguru", "slide_index": 7}
+  ],
   "hook": "5 Morning Habits of Successful People",
   "format": "slideshow",
   "niche": "lifestyle",

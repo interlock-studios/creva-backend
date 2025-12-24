@@ -110,7 +110,8 @@ class VideoProcessor:
                     # It's a regular video, proceed with normal video download
                     # Pass api_data to avoid duplicate API call
                     video_content, metadata_obj, caption_text = await self.instagram_scraper.scrape_instagram_complete(url, api_data=api_data)
-                    transcript_text = caption_text
+                    # Instagram doesn't have WebVTT transcripts, just caption text
+                    transcript_text_or_data = caption_text
                     
             except Exception as e:
                 raise InstagramAPIError(
@@ -119,11 +120,20 @@ class VideoProcessor:
         else:
             # TikTok handling
             try:
-                video_content, metadata_obj, transcript_text = await self.tiktok_scraper.scrape_tiktok_complete(url)
+                video_content, metadata_obj, transcript_text_or_data = await self.tiktok_scraper.scrape_tiktok_complete(url)
             except Exception as e:
                 raise TikTokAPIError(
                     message=f"Failed to download TikTok video: {str(e)}", url=url, cause=e
                 )
+
+        # Handle transcript data (can be dict with text/segments or None)
+        transcript_text = None
+        transcript_segments = None
+        if isinstance(transcript_text_or_data, dict):
+            transcript_text = transcript_text_or_data.get("text")
+            transcript_segments = transcript_text_or_data.get("segments")
+        elif transcript_text_or_data:
+            transcript_text = transcript_text_or_data
 
         # Convert metadata to dict format (same format for both platforms)
         metadata = {
@@ -135,6 +145,7 @@ class VideoProcessor:
             "caption": metadata_obj.caption or metadata_obj.description or "",
             "tags": metadata_obj.hashtags or [],
             "transcript_text": transcript_text,
+            "transcript_segments": transcript_segments,
             # Slideshow-specific metadata
             "is_slideshow": getattr(metadata_obj, "is_slideshow", False),
             "image_count": getattr(metadata_obj, "image_count", None),
